@@ -13,6 +13,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
+import { incrementAIDresserUsage, updateUserPreferences } from '@/lib/firestore'
 
 // Quiz step types
 type Purpose = 'personal' | 'gift' | null
@@ -185,6 +186,17 @@ export default function AIDresserPage() {
   // Simulate loading recommendations
   const generateRecommendations = async () => {
     setCurrentStep(7) // Loading state
+
+    // Track AI Dresser usage and save preferences
+    if (user?.id) {
+      await Promise.all([
+        incrementAIDresserUsage(user.id),
+        updateUserPreferences(user.id, {
+          styles: answers.style ? [answers.style] : [],
+          colors: answers.color ? [answers.color] : [],
+        })
+      ])
+    }
 
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 2500))
