@@ -104,12 +104,11 @@ export default function RegisterPage() {
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8">
               {/* Logo */}
               <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 rounded-full border-2 border-gold overflow-hidden">
+                <div className="relative w-20 h-20 rounded-full border-2 border-gold overflow-hidden">
                   <Image
                     src="/logo.jpg"
                     alt="LGM Apparel"
-                    width={80}
-                    height={80}
+                    fill
                     className="object-cover"
                   />
                 </div>
