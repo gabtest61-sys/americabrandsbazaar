@@ -5,17 +5,21 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
+import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
 import { CheckoutFormData } from '@/lib/types'
 import { sendWebhook, createCheckoutPayload, createOrderCompletedPayload } from '@/lib/webhook'
+import { createOrder, OrderItem } from '@/lib/firestore'
 
 type CheckoutStep = 'info' | 'confirm' | 'success'
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart()
+  const { user, isLoggedIn } = useAuth()
   const [step, setStep] = useState<CheckoutStep>('info')
   const [isGuest, setIsGuest] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [orderId, setOrderId] = useState<string>('')
   const [formData, setFormData] = useState<CheckoutFormData>({
     fullName: '',
     email: '',
@@ -52,6 +56,35 @@ export default function CheckoutPage() {
     setIsSubmitting(true)
 
     try {
+      // Prepare order items for Firestore
+      const orderItems: OrderItem[] = items.map(item => ({
+        productId: item.product.id,
+        name: item.product.name,
+        brand: item.product.brand,
+        price: item.product.price,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color
+      }))
+
+      // Save order to Firestore
+      const result = await createOrder(
+        orderItems,
+        {
+          name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address || undefined,
+          city: formData.city || undefined
+        },
+        isLoggedIn ? user?.id : undefined,
+        formData.notes || undefined
+      )
+
+      if (result.orderId) {
+        setOrderId(result.orderId)
+      }
+
       // Send order completed webhook to n8n
       const payload = createOrderCompletedPayload(items, formData)
       await sendWebhook(payload)
@@ -118,6 +151,11 @@ export default function CheckoutPage() {
               <Check className="w-10 h-10 text-green-600" />
             </div>
             <h1 className="text-3xl font-bold text-navy mb-4">Order Placed!</h1>
+            {orderId && (
+              <p className="text-gold font-mono text-sm mb-4">
+                Order ID: {orderId}
+              </p>
+            )}
             <p className="text-gray-600 mb-2">
               Thank you for your order, {formData.fullName}!
             </p>

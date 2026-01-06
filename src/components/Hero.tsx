@@ -112,17 +112,17 @@ export default function Hero() {
           <div className={`relative transition-all duration-1000 delay-300 ${
             isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}>
-            <div className="relative w-80 h-80 md:w-[420px] md:h-[420px] mx-auto">
+            <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-[420px] md:h-[420px] mx-auto">
               {/* Animated rings */}
               <div className="absolute inset-0 rounded-full border border-gold/10 animate-[spin_20s_linear_infinite]" />
-              <div className="absolute inset-6 rounded-full border border-gold/20 animate-[spin_15s_linear_infinite_reverse]" />
-              <div className="absolute inset-12 rounded-full border border-gold/30" />
+              <div className="absolute inset-4 sm:inset-6 rounded-full border border-gold/20 animate-[spin_15s_linear_infinite_reverse]" />
+              <div className="absolute inset-8 sm:inset-12 rounded-full border border-gold/30" />
 
               {/* Glow effect */}
-              <div className="absolute inset-16 rounded-full bg-gold/20 blur-3xl" />
+              <div className="absolute inset-12 sm:inset-16 rounded-full bg-gold/20 blur-3xl" />
 
               {/* Main logo */}
-              <div className="absolute inset-16 rounded-full border-4 border-gold shadow-2xl shadow-gold/30 overflow-hidden">
+              <div className="absolute inset-12 sm:inset-16 rounded-full border-4 border-gold shadow-2xl shadow-gold/30 overflow-hidden">
                 <Image
                   src="/logo.jpg"
                   alt={BRAND.name}
@@ -133,10 +133,10 @@ export default function Hero() {
               </div>
 
               {/* Floating brand badges */}
-              <div className="absolute top-8 right-4 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full text-white text-sm font-medium animate-float">
+              <div className="absolute top-4 sm:top-8 right-0 sm:right-4 bg-white/10 backdrop-blur-md border border-white/20 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white text-xs sm:text-sm font-medium animate-float">
                 <span className="text-gold">500+</span> Happy Customers
               </div>
-              <div className="absolute bottom-12 left-0 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full text-white text-sm font-medium animate-float" style={{ animationDelay: '1s' }}>
+              <div className="absolute bottom-8 sm:bottom-12 -left-2 sm:left-0 bg-white/10 backdrop-blur-md border border-white/20 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-white text-xs sm:text-sm font-medium animate-float" style={{ animationDelay: '1s' }}>
                 <span className="text-gold">EST.</span> {BRAND.established}
               </div>
             </div>
