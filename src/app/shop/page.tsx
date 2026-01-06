@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useCart } from '@/context/CartContext'
@@ -24,9 +25,17 @@ const sortOptions = [
   { label: 'Name: A-Z', value: 'name-asc' },
 ]
 
-export default function ShopPage() {
+function ShopContent() {
+  const searchParams = useSearchParams()
+  const urlSearchQuery = searchParams.get('search') || ''
+
   const { addItem } = useCart()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery)
+
+  // Update search when URL changes
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery)
+  }, [urlSearchQuery])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [selectedBrand, setSelectedBrand] = useState<string>('')
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0])
@@ -464,5 +473,17 @@ export default function ShopPage() {
       </main>
       <Footer />
     </>
+  )
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gold" />
+      </div>
+    }>
+      <ShopContent />
+    </Suspense>
   )
 }
