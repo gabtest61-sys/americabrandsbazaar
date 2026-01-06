@@ -94,15 +94,19 @@ function ShopContent() {
   }, [searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
 
   const handleAddToCart = (product: Product) => {
-    addItem({
+    // Convert to the Product type expected by CartContext
+    const cartProduct = {
       id: product.id,
       name: product.name,
+      brand: product.brand,
       price: product.price,
+      originalPrice: product.originalPrice || product.price,
       image: product.images[0] || '/placeholder.jpg',
-      quantity: 1,
-      size: product.sizes[0],
-      color: product.colors[0],
-    })
+      category: product.category as 'clothes' | 'accessories' | 'shoes',
+      sizes: product.sizes,
+      colors: product.colors,
+    }
+    addItem(cartProduct, 1, product.sizes[0], product.colors[0])
     setAddedItems(prev => new Set([...prev, product.id]))
     setTimeout(() => {
       setAddedItems(prev => {
