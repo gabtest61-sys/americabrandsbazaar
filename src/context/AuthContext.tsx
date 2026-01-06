@@ -1,6 +1,16 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import {
+  User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase'
 
 interface User {
   id: string
@@ -12,94 +22,149 @@ interface User {
 
 interface AuthContextType {
   user: User | null
+  firebaseUser: FirebaseUser | null
   isLoggedIn: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Check for existing session on mount
+  // Listen to Firebase auth state changes
   useEffect(() => {
-    const storedUser = localStorage.getItem('lgm_user')
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch {
-        localStorage.removeItem('lgm_user')
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setFirebaseUser(fbUser)
+
+        // Try to get additional user data from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            setUser({
+              id: fbUser.uid,
+              username: userData.username || fbUser.email?.split('@')[0] || '',
+              name: userData.name || fbUser.displayName || '',
+              email: fbUser.email || '',
+              phone: userData.phone || ''
+            })
+          } else {
+            // User exists in Auth but not in Firestore
+            setUser({
+              id: fbUser.uid,
+              username: fbUser.email?.split('@')[0] || '',
+              name: fbUser.displayName || '',
+              email: fbUser.email || '',
+            })
+          }
+        } catch (error) {
+          // Firestore might not be set up yet, use basic auth data
+          setUser({
+            id: fbUser.uid,
+            username: fbUser.email?.split('@')[0] || '',
+            name: fbUser.displayName || '',
+            email: fbUser.email || '',
+          })
+        }
+      } else {
+        setFirebaseUser(null)
+        setUser(null)
       }
-    }
-    setIsLoading(false)
+      setIsLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [])
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    // Check if user exists in localStorage (registered users)
-    const registeredUsers = JSON.parse(localStorage.getItem('lgm_registered_users') || '[]')
-    const foundUser = registeredUsers.find((u: { email: string; password: string }) =>
-      u.email === email && u.password === password
-    )
-
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem('lgm_user', JSON.stringify(userWithoutPassword))
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
       return { success: true }
-    }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed'
 
-    return { success: false, error: 'Invalid email or password' }
+      // Provide user-friendly error messages
+      if (errorMessage.includes('user-not-found')) {
+        return { success: false, error: 'No account found with this email' }
+      }
+      if (errorMessage.includes('wrong-password')) {
+        return { success: false, error: 'Incorrect password' }
+      }
+      if (errorMessage.includes('invalid-email')) {
+        return { success: false, error: 'Invalid email address' }
+      }
+      if (errorMessage.includes('too-many-requests')) {
+        return { success: false, error: 'Too many attempts. Please try again later' }
+      }
+      if (errorMessage.includes('invalid-credential')) {
+        return { success: false, error: 'Invalid email or password' }
+      }
+
+      return { success: false, error: 'Invalid email or password' }
+    }
   }
 
   const register = async (data: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password)
+      const fbUser = userCredential.user
 
-    // Get existing users
-    const registeredUsers = JSON.parse(localStorage.getItem('lgm_registered_users') || '[]')
+      // Update display name
+      await updateProfile(fbUser, { displayName: data.name })
 
-    // Check if email already exists
-    if (registeredUsers.some((u: { email: string }) => u.email === data.email)) {
-      return { success: false, error: 'Email already registered' }
+      // Store additional user data in Firestore
+      try {
+        await setDoc(doc(db, 'users', fbUser.uid), {
+          username: data.email.split('@')[0],
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          createdAt: new Date().toISOString()
+        })
+      } catch (firestoreError) {
+        // Firestore write might fail if rules aren't set up, but auth still works
+        console.warn('Could not save to Firestore:', firestoreError)
+      }
+
+      return { success: true }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed'
+
+      // Provide user-friendly error messages
+      if (errorMessage.includes('email-already-in-use')) {
+        return { success: false, error: 'Email already registered' }
+      }
+      if (errorMessage.includes('weak-password')) {
+        return { success: false, error: 'Password is too weak. Use at least 6 characters.' }
+      }
+      if (errorMessage.includes('invalid-email')) {
+        return { success: false, error: 'Invalid email address' }
+      }
+
+      return { success: false, error: 'Registration failed. Please try again.' }
     }
-
-    // Create new user
-    const newUser = {
-      id: `user_${Date.now()}`,
-      username: data.email.split('@')[0],
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      password: data.password // In production, this would be hashed
-    }
-
-    // Save to registered users
-    registeredUsers.push(newUser)
-    localStorage.setItem('lgm_registered_users', JSON.stringify(registeredUsers))
-
-    // Log the user in
-    const { password: _, ...userWithoutPassword } = newUser
-    setUser(userWithoutPassword)
-    localStorage.setItem('lgm_user', JSON.stringify(userWithoutPassword))
-
-    return { success: true }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('lgm_user')
+  const logout = async () => {
+    try {
+      await signOut(auth)
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   return (
     <AuthContext.Provider value={{
       user,
+      firebaseUser,
       isLoggedIn: !!user,
       isLoading,
       login,
