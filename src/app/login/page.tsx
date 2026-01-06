@@ -82,7 +82,7 @@ function LoginForm() {
                     src="/logo.jpg"
                     alt="LGM Apparel"
                     fill
-                    className="object-cover"
+                    className="object-cover scale-150"
                   />
                 </div>
               </div>
