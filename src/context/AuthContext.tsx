@@ -7,29 +7,19 @@ interface User {
   username: string
   name: string
   email: string
+  phone?: string
 }
 
 interface AuthContextType {
   user: User | null
   isLoggedIn: boolean
   isLoading: boolean
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-// Demo credentials - In production, this would be handled by a backend
-const DEMO_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin',
-  user: {
-    id: 'user_admin_001',
-    username: 'admin',
-    name: 'Admin User',
-    email: 'admin@lgmapparel.com'
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -48,18 +38,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    // Check credentials
-    if (username === DEMO_CREDENTIALS.username && password === DEMO_CREDENTIALS.password) {
-      setUser(DEMO_CREDENTIALS.user)
-      localStorage.setItem('lgm_user', JSON.stringify(DEMO_CREDENTIALS.user))
+    // Check if user exists in localStorage (registered users)
+    const registeredUsers = JSON.parse(localStorage.getItem('lgm_registered_users') || '[]')
+    const foundUser = registeredUsers.find((u: { email: string; password: string }) =>
+      u.email === email && u.password === password
+    )
+
+    if (foundUser) {
+      const { password: _, ...userWithoutPassword } = foundUser
+      setUser(userWithoutPassword)
+      localStorage.setItem('lgm_user', JSON.stringify(userWithoutPassword))
       return { success: true }
     }
 
-    return { success: false, error: 'Invalid username or password' }
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  const register = async (data: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; error?: string }> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Get existing users
+    const registeredUsers = JSON.parse(localStorage.getItem('lgm_registered_users') || '[]')
+
+    // Check if email already exists
+    if (registeredUsers.some((u: { email: string }) => u.email === data.email)) {
+      return { success: false, error: 'Email already registered' }
+    }
+
+    // Create new user
+    const newUser = {
+      id: `user_${Date.now()}`,
+      username: data.email.split('@')[0],
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      password: data.password // In production, this would be hashed
+    }
+
+    // Save to registered users
+    registeredUsers.push(newUser)
+    localStorage.setItem('lgm_registered_users', JSON.stringify(registeredUsers))
+
+    // Log the user in
+    const { password: _, ...userWithoutPassword } = newUser
+    setUser(userWithoutPassword)
+    localStorage.setItem('lgm_user', JSON.stringify(userWithoutPassword))
+
+    return { success: true }
   }
 
   const logout = () => {
@@ -73,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoggedIn: !!user,
       isLoading,
       login,
+      register,
       logout
     }}>
       {children}

@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Eye, EyeOff, LogIn, ArrowLeft, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, LogIn, ArrowLeft, Loader2, Mail } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -16,7 +16,7 @@ function LoginForm() {
 
   const { login, isLoggedIn, isLoading: authLoading } = useAuth()
 
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -34,7 +34,7 @@ function LoginForm() {
     setError('')
     setIsLoading(true)
 
-    const result = await login(username, password)
+    const result = await login(email, password)
 
     if (result.success) {
       router.push(`/${redirect}`)
@@ -105,20 +105,23 @@ function LoginForm() {
 
               {/* Login Form */}
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Username */}
+                {/* Email */}
                 <div>
-                  <label htmlFor="username" className="block text-white/70 text-sm font-medium mb-2">
-                    Username
+                  <label htmlFor="email" className="block text-white/70 text-sm font-medium mb-2">
+                    Email Address
                   </label>
-                  <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
-                    required
-                  />
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* Password */}
@@ -159,9 +162,9 @@ function LoginForm() {
                     />
                     Remember me
                   </label>
-                  <Link href="/forgot-password" className="text-gold hover:text-yellow-400 transition-colors">
+                  <button type="button" className="text-gold hover:text-yellow-400 transition-colors">
                     Forgot password?
-                  </Link>
+                  </button>
                 </div>
 
                 {/* Submit Button */}
@@ -197,14 +200,6 @@ function LoginForm() {
                 <Link href="/register" className="text-gold hover:text-yellow-400 transition-colors font-medium">
                   Create Account
                 </Link>
-              </p>
-            </div>
-
-            {/* Demo Credentials Hint */}
-            <div className="mt-6 bg-gold/10 border border-gold/20 rounded-xl p-4 text-center">
-              <p className="text-gold text-sm font-medium mb-1">Demo Credentials</p>
-              <p className="text-white/60 text-xs">
-                Username: <span className="text-white font-mono">admin</span> | Password: <span className="text-white font-mono">admin</span>
               </p>
             </div>
           </div>
