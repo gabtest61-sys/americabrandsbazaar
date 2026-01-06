@@ -11,6 +11,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 
 // Quiz step types
@@ -179,6 +180,7 @@ export default function AIDresserPage() {
   const [activeLook, setActiveLook] = useState(0)
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set())
   const [savedLooks, setSavedLooks] = useState<Set<number>>(new Set())
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
 
   // Simulate loading recommendations
   const generateRecommendations = async () => {
@@ -302,13 +304,13 @@ export default function AIDresserPage() {
           <p className="text-white/50 text-sm mb-4">
             Sign in to access your free daily AI Stylist session
           </p>
-          <Link
-            href="/login?redirect=ai-dresser"
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
             className="inline-flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
           >
             Sign In to Continue
             <ArrowRight className="w-5 h-5" />
-          </Link>
+          </button>
         </div>
       ) : !hasAccess ? (
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 mb-6">
@@ -873,6 +875,11 @@ export default function AIDresserPage() {
         </div>
       </main>
       <Footer />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode="login"
+      />
     </>
   )
 }

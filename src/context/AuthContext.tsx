@@ -39,24 +39,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen to Firebase auth state changes
   useEffect(() => {
+    if (!auth) {
+      setIsLoading(false)
+      return
+    }
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         setFirebaseUser(fbUser)
 
         // Try to get additional user data from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid))
-          if (userDoc.exists()) {
-            const userData = userDoc.data()
-            setUser({
-              id: fbUser.uid,
-              username: userData.username || fbUser.email?.split('@')[0] || '',
-              name: userData.name || fbUser.displayName || '',
-              email: fbUser.email || '',
-              phone: userData.phone || ''
-            })
-          } else {
-            // User exists in Auth but not in Firestore
+        if (db) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', fbUser.uid))
+            if (userDoc.exists()) {
+              const userData = userDoc.data()
+              setUser({
+                id: fbUser.uid,
+                username: userData.username || fbUser.email?.split('@')[0] || '',
+                name: userData.name || fbUser.displayName || '',
+                email: fbUser.email || '',
+                phone: userData.phone || ''
+              })
+            } else {
+              // User exists in Auth but not in Firestore
+              setUser({
+                id: fbUser.uid,
+                username: fbUser.email?.split('@')[0] || '',
+                name: fbUser.displayName || '',
+                email: fbUser.email || '',
+              })
+            }
+          } catch (error) {
+            // Firestore might not be set up yet, use basic auth data
             setUser({
               id: fbUser.uid,
               username: fbUser.email?.split('@')[0] || '',
@@ -64,8 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: fbUser.email || '',
             })
           }
-        } catch (error) {
-          // Firestore might not be set up yet, use basic auth data
+        } else {
+          // Firestore not configured, use basic auth data
           setUser({
             id: fbUser.uid,
             username: fbUser.email?.split('@')[0] || '',
@@ -84,6 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    if (!auth) {
+      return { success: false, error: 'Authentication service not configured' }
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password)
       return { success: true }
@@ -112,6 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const register = async (data: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; error?: string }> => {
+    if (!auth) {
+      return { success: false, error: 'Authentication service not configured' }
+    }
     try {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password)
@@ -121,17 +141,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updateProfile(fbUser, { displayName: data.name })
 
       // Store additional user data in Firestore
-      try {
-        await setDoc(doc(db, 'users', fbUser.uid), {
-          username: data.email.split('@')[0],
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          createdAt: new Date().toISOString()
-        })
-      } catch (firestoreError) {
-        // Firestore write might fail if rules aren't set up, but auth still works
-        console.warn('Could not save to Firestore:', firestoreError)
+      if (db) {
+        try {
+          await setDoc(doc(db, 'users', fbUser.uid), {
+            username: data.email.split('@')[0],
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            createdAt: new Date().toISOString()
+          })
+        } catch (firestoreError) {
+          // Firestore write might fail if rules aren't set up, but auth still works
+          console.warn('Could not save to Firestore:', firestoreError)
+        }
       }
 
       return { success: true }
@@ -154,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    if (!auth) return
     try {
       await signOut(auth)
     } catch (error) {
