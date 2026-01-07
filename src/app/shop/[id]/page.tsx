@@ -140,7 +140,7 @@ export default function ProductDetailPage() {
   }, [params.id, user])
 
   const handleAddToCart = () => {
-    if (!product) return
+    if (!product || !product.id) return
 
     const cartProduct = {
       id: product.id,
@@ -148,10 +148,10 @@ export default function ProductDetailPage() {
       brand: product.brand,
       price: product.price,
       originalPrice: product.originalPrice || product.price,
-      image: product.images[0] || '/placeholder.jpg',
+      image: product.images?.[0] || '/placeholder.jpg',
       category: product.category,
-      sizes: product.sizes,
-      colors: product.colors,
+      sizes: product.sizes || [],
+      colors: product.colors || [],
     }
 
     addItem(cartProduct, quantity, selectedSize, selectedColor)
@@ -160,14 +160,16 @@ export default function ProductDetailPage() {
   }
 
   const toggleWishlist = async () => {
-    if (!product) return
+    if (!product || !product.id) return
+
+    const productId = product.id
 
     if (user) {
       // Use Firestore for logged in users
       if (isWishlisted) {
-        await removeFromWishlist(user.id, product.id)
+        await removeFromWishlist(user.id, productId)
       } else {
-        await addToWishlist(user.id, product.id)
+        await addToWishlist(user.id, productId)
       }
     } else {
       // Use localStorage for guests
@@ -175,9 +177,9 @@ export default function ProductDetailPage() {
       let updated: string[]
 
       if (isWishlisted) {
-        updated = wishlist.filter((id: string) => id !== product.id)
+        updated = wishlist.filter((id: string) => id !== productId)
       } else {
-        updated = [...wishlist, product.id]
+        updated = [...wishlist, productId]
       }
 
       localStorage.setItem('wishlist', JSON.stringify(updated))
