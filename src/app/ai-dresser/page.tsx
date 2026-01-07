@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, ArrowRight, ArrowLeft, Lock, ShoppingBag,
   Clock, Heart, Share2, Plus, Check,
-  User, Gift, Shirt, Wallet, Loader2, MessageCircle, Copy, X
+  User, Gift, Wallet, Loader2, MessageCircle, Copy, X, RefreshCw
 } from 'lucide-react'
+import ProductImage from '@/components/ai-dresser/ProductImage'
+import Toast, { useToast } from '@/components/ai-dresser/Toast'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -16,16 +18,14 @@ import { useCart } from '@/context/CartContext'
 import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, useBonusAIDresserSession } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { products as allProducts, getProductById } from '@/lib/products'
+import { regenerateLooks } from '@/lib/ai-dresser-engine'
 import {
-  checkAIDresserAccess,
-  getRecommendations,
   addLookToCart,
   saveLookToWishlist,
   getShareUrls,
+  getAIRecommendations,
   Look,
-  LookItem,
-  CollectedData,
-  AIDresserAccessResponse
+  LookItem
 } from '@/lib/ai-dresser'
 
 // Quiz step types
@@ -320,6 +320,7 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
         items.push({
           product_id: scored.product.id,
           product_name: scored.product.name,
+          brand: scored.product.brand,
           category: 'clothes',
           price: scored.product.price,
           image_url: scored.product.images[0] || '/placeholder.jpg',
@@ -346,6 +347,7 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
       items.push({
         product_id: accessory.product.id,
         product_name: accessory.product.name,
+        brand: accessory.product.brand,
         category: 'accessories',
         price: accessory.product.price,
         image_url: accessory.product.images[0] || '/placeholder.jpg',
@@ -369,6 +371,7 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
       items.push({
         product_id: shoe.product.id,
         product_name: shoe.product.name,
+        brand: shoe.product.brand,
         category: 'shoes',
         price: shoe.product.price,
         image_url: shoe.product.images[0] || '/placeholder.jpg',
@@ -430,6 +433,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
         items.push({
           product_id: c.id,
           product_name: c.name,
+          brand: c.brand,
           category: 'clothes',
           price: c.price,
           image_url: c.images[0] || '/placeholder.jpg',
@@ -446,6 +450,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
         items.push({
           product_id: a.id,
           product_name: a.name,
+          brand: a.brand,
           category: 'accessories',
           price: a.price,
           image_url: a.images[0] || '/placeholder.jpg',
@@ -463,6 +468,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
         items.push({
           product_id: s.id,
           product_name: s.name,
+          brand: s.brand,
           category: 'shoes',
           price: s.price,
           image_url: s.images[0] || '/placeholder.jpg',
@@ -496,7 +502,6 @@ export default function AIDresserPage() {
   const [hasAccess, setHasAccess] = useState(true)
   const [accessType, setAccessType] = useState<'daily_free' | 'bonus' | 'none'>('daily_free')
   const [bonusSessions, setBonusSessions] = useState(0)
-  const [, setAccessInfo] = useState<AIDresserAccessResponse | null>(null)
   const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-6 = quiz steps, 7 = loading, 8 = results
   const [answers, setAnswers] = useState<QuizAnswers>({
     purpose: null,
@@ -513,6 +518,11 @@ export default function AIDresserPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareUrls, setShareUrls] = useState<{ messenger?: string; whatsapp?: string; copy?: string } | null>(null)
+  const [shownProductIds, setShownProductIds] = useState<string[]>([])
+  const [isRegenerating, setIsRegenerating] = useState(false)
+
+  // Toast notifications
+  const { toast, showToast, hideToast } = useToast()
 
   // Swipe gesture state
   const [touchStart, setTouchStart] = useState<number | null>(null)
@@ -556,14 +566,6 @@ export default function AIDresserPage() {
           setHasAccess(accessResult.hasAccess)
           setAccessType(accessResult.accessType)
           setBonusSessions(accessResult.bonusSessions)
-
-          // Also try n8n webhook for additional info
-          try {
-            const response = await checkAIDresserAccess('', user.id)
-            setAccessInfo(response)
-          } catch {
-            // n8n not configured, that's fine
-          }
         } catch {
           // If Firestore check fails, allow access
           setHasAccess(true)
@@ -594,32 +596,52 @@ export default function AIDresserPage() {
       })
     }
 
-    // Prepare collected data for API
-    const collectedData: CollectedData = {
-      purpose: answers.purpose || undefined,
-      gender: answers.gender || undefined,
-      style: answers.style,
-      occasion: answers.occasion,
-      budget: answers.budget,
-      color: answers.color,
-      recipient: answers.recipient,
+    // Prepare products for AI (filter by gender/budget first)
+    let filteredProducts = allProducts.filter(p => p.inStock && p.stockQty > 0)
+
+    if (answers.gender && answers.gender !== 'unisex') {
+      filteredProducts = filteredProducts.filter(p =>
+        p.gender === answers.gender || p.gender === 'unisex'
+      )
     }
 
-    // Create summary
-    const summary = `${answers.gender || 'Unisex'}, ${answers.style?.replace('-', ' ')} style for ${answers.occasion?.replace('-', ' ')}, budget up to ₱${parseInt(answers.budget).toLocaleString()}, prefers ${answers.color} colors`
+    if (answers.budget) {
+      const maxBudget = parseInt(answers.budget)
+      filteredProducts = filteredProducts.filter(p => p.price <= maxBudget)
+    }
 
-    try {
-      // Try n8n webhook first
-      const response = await getRecommendations(sessionId, user?.id || '', collectedData, summary)
-      if (response?.success && response.looks?.length > 0) {
-        setLooks(response.looks)
-      } else {
-        // Fallback to local generation
-        const localLooks = generateLocalRecommendations(answers)
-        setLooks(localLooks)
-      }
-    } catch {
-      // Fallback to local generation if API fails
+    // Try n8n AI recommendations first (if configured)
+    const aiResponse = await getAIRecommendations(
+      sessionId,
+      user?.id || 'guest',
+      {
+        purpose: answers.purpose || undefined,
+        gender: answers.gender || undefined,
+        style: answers.style,
+        occasion: answers.occasion,
+        budget: answers.budget,
+        color: answers.color
+      },
+      filteredProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        price: p.price,
+        category: p.category,
+        subcategory: p.subcategory,
+        colors: p.colors,
+        style: p.style,
+        images: p.images,
+        gender: p.gender,
+        giftSuitable: p.giftSuitable
+      }))
+    )
+
+    if (aiResponse?.success && aiResponse.looks?.length > 0) {
+      // Use AI-generated looks
+      setLooks(aiResponse.looks)
+    } else {
+      // Fallback to local generation
       const localLooks = generateLocalRecommendations(answers)
       setLooks(localLooks)
     }
@@ -671,6 +693,7 @@ export default function AIDresserPage() {
         sizes: product.sizes,
         colors: product.colors,
       }, 1)
+      showToast(`${product.name} added to cart`, 'cart')
     }
     setAddedItems(prev => new Set([...prev, item.product_id]))
   }
@@ -698,6 +721,7 @@ export default function AIDresserPage() {
     const newItems = new Set(addedItems)
     look.items.forEach(item => newItems.add(item.product_id))
     setAddedItems(newItems)
+    showToast(`${look.items.length} items added to cart`, 'cart')
 
     // Try to notify n8n webhook
     try {
@@ -742,6 +766,7 @@ export default function AIDresserPage() {
 
   const saveLook = async (lookNumber: number) => {
     const look = looks.find(l => l.look_number === lookNumber)
+    const isAlreadySaved = savedLooks.has(lookNumber)
 
     setSavedLooks(prev => {
       const newSet = new Set(prev)
@@ -753,14 +778,51 @@ export default function AIDresserPage() {
       return newSet
     })
 
+    // Show toast notification
+    if (isAlreadySaved) {
+      showToast('Look removed from wishlist', 'info')
+    } else {
+      showToast(`${look?.look_name || 'Look'} saved to wishlist`, 'wishlist')
+    }
+
     // Try to save to n8n webhook
-    if (look && !savedLooks.has(lookNumber)) {
+    if (look && !isAlreadySaved) {
       try {
         await saveLookToWishlist(sessionId, user?.id || '', look)
       } catch {
         // Silently fail if webhook not configured
       }
     }
+  }
+
+  // Regenerate looks with new products
+  const handleRegenerateLooks = async () => {
+    setIsRegenerating(true)
+
+    // Collect all currently shown product IDs
+    const currentProductIds = looks.flatMap(look => look.items.map(item => item.product_id))
+    const allShownIds = [...shownProductIds, ...currentProductIds]
+    setShownProductIds(allShownIds)
+
+    // Generate new looks excluding previously shown products
+    const newLooks = regenerateLooks(answers, allShownIds)
+
+    if (newLooks.length > 0) {
+      setLooks(newLooks)
+      setActiveLook(0)
+      setAddedItems(new Set())
+      setSavedLooks(new Set())
+      showToast('New looks generated!', 'success')
+    } else {
+      // If no new looks possible, reset exclusions and regenerate
+      setShownProductIds([])
+      const freshLooks = regenerateLooks(answers, [])
+      setLooks(freshLooks)
+      setActiveLook(0)
+      showToast('Showing fresh looks', 'info')
+    }
+
+    setIsRegenerating(false)
   }
 
   const handleShare = async (look: Look) => {
@@ -794,14 +856,14 @@ export default function AIDresserPage() {
         navigator.share({ title: look.look_name, text: shareText, url: window.location.href })
       } else {
         navigator.clipboard.writeText(shareText + ' ' + window.location.href)
-        alert('Link copied to clipboard!')
+        showToast('Link copied to clipboard!', 'success')
       }
     }
   }
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    alert('Link copied!')
+    showToast('Link copied!', 'success')
     setShareModalOpen(false)
   }
 
@@ -1239,18 +1301,42 @@ export default function AIDresserPage() {
         <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">
           5 Perfect Outfits, Just for You
         </h2>
-        <p className="text-white/50">
+        <p className="text-white/50 mb-4">
           Based on your {answers.style?.replace('-', ' ')} style for {answers.occasion?.replace('-', ' ')}
         </p>
+        <button
+          onClick={handleRegenerateLooks}
+          disabled={isRegenerating}
+          className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full transition-all border border-white/20 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+          {isRegenerating ? 'Generating...' : 'Get New Looks'}
+        </button>
       </div>
 
       {/* Look Navigation */}
-      <div className="flex justify-center gap-2 mb-8">
+      <div
+        className="flex justify-center gap-2 mb-8"
+        role="tablist"
+        aria-label="Outfit looks navigation"
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') {
+            setActiveLook(prev => Math.max(0, prev - 1))
+          } else if (e.key === 'ArrowRight') {
+            setActiveLook(prev => Math.min(looks.length - 1, prev + 1))
+          }
+        }}
+      >
         {looks.map((look, index) => (
           <button
             key={look.look_number}
+            role="tab"
+            aria-selected={activeLook === index}
+            aria-controls={`look-panel-${index}`}
+            aria-label={`View ${look.look_name}, outfit ${look.look_number} of ${looks.length}`}
+            tabIndex={activeLook === index ? 0 : -1}
             onClick={() => setActiveLook(index)}
-            className={`w-12 h-12 rounded-full font-semibold transition-all ${
+            className={`w-12 h-12 rounded-full font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 focus:ring-offset-navy ${
               activeLook === index
                 ? 'bg-gold text-navy scale-110'
                 : 'bg-white/10 text-white hover:bg-white/20'
@@ -1265,6 +1351,9 @@ export default function AIDresserPage() {
       <AnimatePresence mode="wait">
         <motion.div
           key={activeLook}
+          id={`look-panel-${activeLook}`}
+          role="tabpanel"
+          aria-labelledby={`look-tab-${activeLook}`}
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
@@ -1281,12 +1370,12 @@ export default function AIDresserPage() {
                 <h3 className="text-xl font-bold text-white mb-1">
                   {looks[activeLook].look_name}
                 </h3>
-                <p className="text-white/50 text-sm">
+                <p className="text-white/70 text-sm">
                   {looks[activeLook].look_description}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-white/50 text-sm">Total</p>
+                <p className="text-white/70 text-sm">Total</p>
                 <p className="text-2xl font-bold text-gold">
                   ₱{looks[activeLook].total_price.toLocaleString()}
                 </p>
@@ -1298,20 +1387,27 @@ export default function AIDresserPage() {
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {looks[activeLook].items.map((item) => (
-                <div
+                <Link
                   key={item.product_id}
-                  className="bg-white/5 rounded-xl overflow-hidden group"
+                  href={item.product_url}
+                  className="bg-white/5 rounded-xl overflow-hidden group block"
                 >
-                  <div className="aspect-square bg-gradient-to-br from-gray-700 to-gray-800 relative">
-                    {/* Placeholder for product image */}
-                    <div className="absolute inset-0 flex items-center justify-center text-white/20">
-                      <Shirt className="w-12 h-12" />
-                    </div>
+                  <div className="relative">
+                    {/* Product Image with Fallback */}
+                    <ProductImage
+                      src={item.image_url}
+                      alt={item.product_name}
+                      brand={item.brand}
+                      category={item.category}
+                    />
 
                     {/* Add to Cart Button */}
                     <button
-                      onClick={() => addToCart(item)}
-                      className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                      onClick={(e) => {
+                        e.preventDefault()
+                        addToCart(item)
+                      }}
+                      className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 ${
                         addedItems.has(item.product_id)
                           ? 'bg-green-500 text-white'
                           : 'bg-gold text-navy opacity-0 group-hover:opacity-100'
@@ -1326,6 +1422,7 @@ export default function AIDresserPage() {
                   </div>
 
                   <div className="p-3">
+                    <p className="text-white/60 text-xs mb-0.5">{item.brand}</p>
                     <p className="text-white text-sm font-medium truncate">
                       {item.product_name}
                     </p>
@@ -1336,7 +1433,7 @@ export default function AIDresserPage() {
                       {item.styling_note}
                     </p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
@@ -1523,6 +1620,14 @@ export default function AIDresserPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </>
   )
 }

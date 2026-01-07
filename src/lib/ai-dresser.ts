@@ -61,6 +61,7 @@ export interface QuizSessionResponse {
 export interface LookItem {
   product_id: string
   product_name: string
+  brand: string
   category: string
   price: number
   image_url: string
@@ -179,13 +180,33 @@ export const submitQuizAnswer = async (
   }
 }
 
-// Get AI recommendations
-export const getRecommendations = async (
+// Product type for sending to n8n
+export interface ProductForAI {
+  id: string
+  name: string
+  brand: string
+  price: number
+  category: string
+  subcategory?: string
+  colors?: string[]
+  style?: string[]
+  images: string[]
+  gender?: string
+  giftSuitable?: boolean
+}
+
+// Get AI recommendations from n8n (sends products from frontend)
+export const getAIRecommendations = async (
   sessionId: string,
   userId: string,
-  collectedData: CollectedData,
-  summary: string
+  preferences: CollectedData,
+  products: ProductForAI[]
 ): Promise<RecommendationsResponse | null> => {
+  if (!WEBHOOK_BASE) {
+    console.log('n8n webhook not configured, skipping AI recommendations')
+    return null
+  }
+
   try {
     const response = await fetch(`${WEBHOOK_BASE}/ai-dresser/get-recommendations`, {
       method: 'POST',
@@ -193,13 +214,20 @@ export const getRecommendations = async (
       body: JSON.stringify({
         session_id: sessionId,
         user_id: userId,
-        collected_data: collectedData,
-        summary
+        preferences: {
+          purpose: preferences.purpose,
+          gender: preferences.gender,
+          style: preferences.style,
+          occasion: preferences.occasion,
+          budget: preferences.budget,
+          color: preferences.color
+        },
+        products: products
       })
     })
     return await response.json()
   } catch (error) {
-    console.error('Error getting recommendations:', error)
+    console.error('Error getting AI recommendations:', error)
     return null
   }
 }
