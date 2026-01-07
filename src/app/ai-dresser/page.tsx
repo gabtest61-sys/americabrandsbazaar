@@ -13,7 +13,8 @@ import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { incrementAIDresserUsage, updateUserPreferences } from '@/lib/firestore'
+import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, useBonusAIDresserSession } from '@/lib/firestore'
+import { useRouter } from 'next/navigation'
 import { products as allProducts, getProductById } from '@/lib/products'
 import {
   checkAIDresserAccess,
@@ -490,8 +491,11 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 export default function AIDresserPage() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
   const { addItem } = useCart()
+  const router = useRouter()
   const [sessionId, setSessionId] = useState<string>('')
   const [hasAccess, setHasAccess] = useState(true)
+  const [accessType, setAccessType] = useState<'daily_free' | 'bonus' | 'none'>('daily_free')
+  const [bonusSessions, setBonusSessions] = useState(0)
   const [, setAccessInfo] = useState<AIDresserAccessResponse | null>(null)
   const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-6 = quiz steps, 7 = loading, 8 = results
   const [answers, setAnswers] = useState<QuizAnswers>({
@@ -510,6 +514,34 @@ export default function AIDresserPage() {
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareUrls, setShareUrls] = useState<{ messenger?: string; whatsapp?: string; copy?: string } | null>(null)
 
+  // Swipe gesture state
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const minSwipeDistance = 50
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe && activeLook < looks.length - 1) {
+      setActiveLook(prev => prev + 1)
+    }
+    if (isRightSwipe && activeLook > 0) {
+      setActiveLook(prev => prev - 1)
+    }
+  }
+
   // Check access when user logs in
   useEffect(() => {
     const checkAccess = async () => {
@@ -518,14 +550,24 @@ export default function AIDresserPage() {
         const newSessionId = `ai_session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
         setSessionId(newSessionId)
 
-        // Try n8n webhook first, fallback to always allowing access
+        // Check daily access from Firestore (resets at midnight)
         try {
-          const response = await checkAIDresserAccess('', user.id)
-          setAccessInfo(response)
-          setHasAccess(response.access_granted)
+          const accessResult = await checkAIDresserDailyAccess(user.id)
+          setHasAccess(accessResult.hasAccess)
+          setAccessType(accessResult.accessType)
+          setBonusSessions(accessResult.bonusSessions)
+
+          // Also try n8n webhook for additional info
+          try {
+            const response = await checkAIDresserAccess('', user.id)
+            setAccessInfo(response)
+          } catch {
+            // n8n not configured, that's fine
+          }
         } catch {
-          // If n8n not configured, allow access
+          // If Firestore check fails, allow access
           setHasAccess(true)
+          setAccessType('daily_free')
         }
       }
     }
@@ -538,13 +580,18 @@ export default function AIDresserPage() {
 
     // Track AI Dresser usage and save preferences
     if (user?.id) {
-      await Promise.all([
-        incrementAIDresserUsage(user.id),
-        updateUserPreferences(user.id, {
-          styles: answers.style ? [answers.style] : [],
-          colors: answers.color ? [answers.color] : [],
-        })
-      ])
+      // If using bonus session, decrement it
+      if (accessType === 'bonus') {
+        await useBonusAIDresserSession(user.id)
+        setBonusSessions(prev => prev - 1)
+      } else {
+        await incrementAIDresserUsage(user.id)
+      }
+
+      await updateUserPreferences(user.id, {
+        styles: answers.style ? [answers.style] : [],
+        colors: answers.color ? [answers.color] : [],
+      })
     }
 
     // Prepare collected data for API
@@ -658,6 +705,39 @@ export default function AIDresserPage() {
     } catch {
       // Silently fail if webhook not configured
     }
+
+    // Send Facebook Messenger notification to admin
+    try {
+      await fetch('/api/webhook/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'ai_dresser_action',
+          data: {
+            customerName: user?.name || 'Guest',
+            customerEmail: user?.email || 'Not provided',
+            items: look.items.map(item => ({
+              name: item.product_name,
+              price: item.price,
+              quantity: 1
+            })),
+            total: look.total_price,
+            lookName: look.look_name,
+            source: 'AI Dresser'
+          }
+        })
+      })
+    } catch {
+      // Silently fail if notification fails
+    }
+  }
+
+  // One-click checkout - add all items and go directly to checkout
+  const oneClickCheckout = async (look: Look) => {
+    // Add all items to cart first
+    await addAllToCart(look)
+    // Navigate to checkout
+    router.push('/checkout')
   }
 
   const saveLook = async (lookNumber: number) => {
@@ -794,18 +874,21 @@ export default function AIDresserPage() {
           <Clock className="w-8 h-8 text-gold mx-auto mb-3" />
           <p className="text-white font-medium mb-2">Session Used Today</p>
           <p className="text-white/50 text-sm mb-4">
-            You've used your free session for today. Make a purchase to unlock another!
+            You&apos;ve already used your free styling session for today.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col gap-3 items-center">
             <Link
               href="/shop"
               className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
             >
               <ShoppingBag className="w-5 h-5" />
-              Shop Now
+              Browse Our Collection
             </Link>
-            <p className="text-white/40 text-sm self-center">
-              or come back tomorrow
+            <p className="text-white/40 text-sm">
+              Your session resets at 12:00 AM midnight
+            </p>
+            <p className="text-white/50 text-xs mt-2">
+              💡 Tip: Make a purchase to earn bonus AI Dresser sessions!
             </p>
           </div>
         </div>
@@ -814,6 +897,11 @@ export default function AIDresserPage() {
           {user && (
             <p className="text-white/50 text-sm mb-4">
               Welcome back, <span className="text-gold font-medium">{user.name}</span>!
+              {bonusSessions > 0 && (
+                <span className="ml-2 text-gold">
+                  ✨ {bonusSessions} bonus session{bonusSessions > 1 ? 's' : ''} available
+                </span>
+              )}
             </p>
           )}
           <button
@@ -821,13 +909,14 @@ export default function AIDresserPage() {
             className="group inline-flex items-center gap-3 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
           >
             Start Styling Session
+            {accessType === 'bonus' && <span className="text-sm opacity-75">(Using Bonus)</span>}
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       )}
 
       <p className="text-white/30 text-sm mt-6">
-        1 free session per day • Additional sessions unlock with purchases
+        1 free session per day • Purchases unlock bonus sessions
       </p>
     </motion.div>
   )
@@ -1172,14 +1261,18 @@ export default function AIDresserPage() {
         ))}
       </div>
 
-      {/* Active Look Card */}
+      {/* Active Look Card - Swipe enabled */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeLook}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl overflow-hidden"
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 0.2 }}
+          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl overflow-hidden touch-pan-y"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Look Header */}
           <div className="p-6 border-b border-white/10">
@@ -1257,10 +1350,18 @@ export default function AIDresserPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => addAllToCart(looks[activeLook])}
-                className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
               >
                 <ShoppingBag className="w-5 h-5" />
                 Add All to Cart
+              </button>
+
+              <button
+                onClick={() => oneClickCheckout(looks[activeLook])}
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-full transition-all"
+              >
+                <ArrowRight className="w-5 h-5" />
+                Buy Now
               </button>
 
               <button

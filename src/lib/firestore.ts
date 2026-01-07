@@ -144,6 +144,11 @@ export const createOrder = async (
     const collectionName = userId ? 'orders' : 'guestOrders'
     await addDoc(collection(db, collectionName), orderData)
 
+    // Grant bonus AI Dresser session for authenticated users making purchases
+    if (userId) {
+      await addBonusAIDresserSessions(userId, 1)
+    }
+
     return { success: true, orderId }
   } catch (error) {
     console.error('Error creating order:', error)
@@ -324,11 +329,106 @@ export const incrementAIDresserUsage = async (userId: string): Promise<boolean> 
 
     await updateDoc(userRef, {
       aiDresserUsage: currentUsage + 1,
+      lastAIDresserUse: serverTimestamp(),
       lastActive: serverTimestamp()
     })
     return true
   } catch (error) {
     console.error('Error incrementing AI Dresser usage:', error)
+    return false
+  }
+}
+
+// Check if user can use AI Dresser today (resets at midnight)
+// Also checks for bonus sessions from purchases
+export const checkAIDresserDailyAccess = async (userId: string): Promise<{
+  hasAccess: boolean
+  lastUse: Date | null
+  usageCount: number
+  bonusSessions: number
+  accessType: 'daily_free' | 'bonus' | 'none'
+}> => {
+  if (!db) return { hasAccess: true, lastUse: null, usageCount: 0, bonusSessions: 0, accessType: 'daily_free' }
+
+  try {
+    const userRef = doc(db, 'users', userId)
+    const userDoc = await getDoc(userRef)
+
+    if (!userDoc.exists()) {
+      return { hasAccess: true, lastUse: null, usageCount: 0, bonusSessions: 0, accessType: 'daily_free' }
+    }
+
+    const data = userDoc.data()
+    const lastUse = data?.lastAIDresserUse?.toDate() || null
+    const usageCount = data?.aiDresserUsage || 0
+    const bonusSessions = data?.bonusAIDresserSessions || 0
+
+    if (!lastUse) {
+      return { hasAccess: true, lastUse: null, usageCount, bonusSessions, accessType: 'daily_free' }
+    }
+
+    // Check if last use was before today's midnight
+    const now = new Date()
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+
+    const dailySessionAvailable = lastUse < todayMidnight
+
+    // Has access if daily session is available OR has bonus sessions
+    if (dailySessionAvailable) {
+      return { hasAccess: true, lastUse, usageCount, bonusSessions, accessType: 'daily_free' }
+    } else if (bonusSessions > 0) {
+      return { hasAccess: true, lastUse, usageCount, bonusSessions, accessType: 'bonus' }
+    }
+
+    return { hasAccess: false, lastUse, usageCount, bonusSessions, accessType: 'none' }
+  } catch (error) {
+    console.error('Error checking AI Dresser access:', error)
+    return { hasAccess: true, lastUse: null, usageCount: 0, bonusSessions: 0, accessType: 'daily_free' }
+  }
+}
+
+// Add bonus AI Dresser sessions to user (called after purchase)
+export const addBonusAIDresserSessions = async (
+  userId: string,
+  sessionsToAdd: number = 1
+): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const userRef = doc(db, 'users', userId)
+    const userDoc = await getDoc(userRef)
+    const currentBonus = userDoc.data()?.bonusAIDresserSessions || 0
+
+    await updateDoc(userRef, {
+      bonusAIDresserSessions: currentBonus + sessionsToAdd,
+      lastActive: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error adding bonus AI Dresser sessions:', error)
+    return false
+  }
+}
+
+// Use a bonus AI Dresser session (decrement count)
+export const useBonusAIDresserSession = async (userId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const userRef = doc(db, 'users', userId)
+    const userDoc = await getDoc(userRef)
+    const currentBonus = userDoc.data()?.bonusAIDresserSessions || 0
+
+    if (currentBonus <= 0) return false
+
+    await updateDoc(userRef, {
+      bonusAIDresserSessions: currentBonus - 1,
+      lastAIDresserUse: serverTimestamp(),
+      lastActive: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error using bonus AI Dresser session:', error)
     return false
   }
 }

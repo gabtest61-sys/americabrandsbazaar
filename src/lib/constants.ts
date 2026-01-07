@@ -14,9 +14,9 @@ export const COLORS = {
 
 export const NAV_LINKS = [
   { name: 'Shop', href: '/shop' },
-  { name: 'Clothes', href: '/category/clothes' },
-  { name: 'Accessories', href: '/category/accessories' },
-  { name: 'Shoes', href: '/category/shoes' },
+  { name: 'Clothes', href: '/shop?category=clothes' },
+  { name: 'Accessories', href: '/shop?category=accessories' },
+  { name: 'Shoes', href: '/shop?category=shoes' },
   { name: 'AI Dresser', href: '/ai-dresser' },
 ]
 
@@ -26,21 +26,21 @@ export const CATEGORIES = [
     name: 'Clothes',
     description: 'Premium branded apparel for every occasion',
     image: '/images/category-clothes.jpg',
-    href: '/category/clothes',
+    href: '/shop?category=clothes',
   },
   {
     id: 'accessories',
     name: 'Accessories',
     description: 'Complete your look with designer accessories',
     image: '/images/category-accessories.jpg',
-    href: '/category/accessories',
+    href: '/shop?category=accessories',
   },
   {
     id: 'shoes',
     name: 'Shoes',
     description: 'Step out in style with premium footwear',
     image: '/images/category-shoes.jpg',
-    href: '/category/shoes',
+    href: '/shop?category=shoes',
   },
 ]
 

@@ -77,7 +77,7 @@ export default function AIDresserBanner() {
               Try AI Dresser Free
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <p className="text-white/40 text-sm mt-4">No account needed</p>
+            <p className="text-white/40 text-sm mt-4">Sign in to get personalized recommendations</p>
           </div>
 
           {/* Phone Mockup */}
