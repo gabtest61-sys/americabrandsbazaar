@@ -51,22 +51,13 @@ export default function FeaturedProducts() {
     <section id="featured-products" className="section-padding bg-white">
       <div className="container-max">
         {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
-          <div>
-            <span className="text-gold font-semibold text-sm tracking-wider uppercase mb-2 block">
-              Curated Selection
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-navy">
-              Featured Products
-            </h2>
-          </div>
-          <Link
-            href="/shop"
-            className="group inline-flex items-center gap-2 text-navy hover:text-gold font-medium transition-colors"
-          >
-            View all products
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
+        <div className="mb-10">
+          <span className="text-gold font-semibold text-sm tracking-wider uppercase mb-2 block">
+            Curated Selection
+          </span>
+          <h2 className="text-3xl md:text-4xl font-bold text-navy">
+            Featured Products
+          </h2>
         </div>
 
         {/* Products Grid */}

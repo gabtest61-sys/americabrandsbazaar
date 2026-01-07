@@ -5,15 +5,27 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, ArrowRight, ArrowLeft, Lock, ShoppingBag,
   Clock, Heart, Share2, Plus, Check,
-  User, Gift, Shirt, Wallet, Loader2
+  User, Gift, Shirt, Wallet, Loader2, MessageCircle, Copy, X
 } from 'lucide-react'
-import Image from 'next/image'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { incrementAIDresserUsage, updateUserPreferences } from '@/lib/firestore'
+import { products as allProducts, getProductById } from '@/lib/products'
+import {
+  checkAIDresserAccess,
+  getRecommendations,
+  addLookToCart,
+  saveLookToWishlist,
+  getShareUrls,
+  Look,
+  LookItem,
+  CollectedData,
+  AIDresserAccessResponse
+} from '@/lib/ai-dresser'
 
 // Quiz step types
 type Purpose = 'personal' | 'gift' | null
@@ -28,25 +40,6 @@ interface QuizAnswers {
   occasion: string
   budget: string
   color: string
-}
-
-interface LookItem {
-  product_id: string
-  product_name: string
-  category: string
-  price: number
-  image_url: string
-  product_url: string
-  styling_note: string
-}
-
-interface Look {
-  look_number: number
-  look_name: string
-  look_description: string
-  items: LookItem[]
-  total_price: number
-  style_tip: string
 }
 
 // Quiz configuration based on n8n workflow
@@ -100,74 +93,406 @@ const giftOccasionOptions = [
   { id: 'just-because', label: 'Just Because', icon: '🎁' },
 ]
 
-// Mock recommendations for demo
-const mockLooks: Look[] = [
-  {
-    look_number: 1,
-    look_name: 'Casual Street Style',
-    look_description: 'Perfect for everyday adventures with a touch of urban edge',
-    items: [
-      { product_id: '1', product_name: 'Calvin Klein Oversized Tee', category: 'clothes', price: 1899, image_url: '/products/ck-tee.jpg', product_url: '/shop/ck-tee', styling_note: 'Tuck the front for a relaxed look' },
-      { product_id: '2', product_name: 'Nike Air Max 90', category: 'shoes', price: 6995, image_url: '/products/nike-airmax.jpg', product_url: '/shop/nike-airmax', styling_note: 'Classic silhouette that goes with everything' },
-      { product_id: '3', product_name: 'Michael Kors Crossbody', category: 'accessories', price: 4500, image_url: '/products/mk-bag.jpg', product_url: '/shop/mk-bag', styling_note: 'Adds sophistication to casual fits' },
-    ],
-    total_price: 13394,
-    style_tip: 'Roll up your sleeves slightly for extra style points'
-  },
-  {
-    look_number: 2,
-    look_name: 'Smart Casual Elegance',
-    look_description: 'Effortlessly polished for work-to-dinner transitions',
-    items: [
-      { product_id: '4', product_name: 'Ralph Lauren Polo', category: 'clothes', price: 3299, image_url: '/products/rl-polo.jpg', product_url: '/shop/rl-polo', styling_note: 'Pop the collar for a preppy vibe' },
-      { product_id: '5', product_name: 'GAP Slim Chinos', category: 'clothes', price: 2499, image_url: '/products/gap-chinos.jpg', product_url: '/shop/gap-chinos', styling_note: 'Cuff at the ankle for a modern touch' },
-      { product_id: '6', product_name: 'CK Leather Belt', category: 'accessories', price: 1899, image_url: '/products/ck-belt.jpg', product_url: '/shop/ck-belt', styling_note: 'Match with your shoe color' },
-    ],
-    total_price: 7697,
-    style_tip: 'Add a watch to complete the sophisticated look'
-  },
-  {
-    look_number: 3,
-    look_name: 'Weekend Wanderer',
-    look_description: 'Comfortable yet stylish for your off-duty days',
-    items: [
-      { product_id: '7', product_name: 'Nike Tech Hoodie', category: 'clothes', price: 4299, image_url: '/products/nike-hoodie.jpg', product_url: '/shop/nike-hoodie', styling_note: 'Layer over a plain tee' },
-      { product_id: '8', product_name: 'GAP Joggers', category: 'clothes', price: 1999, image_url: '/products/gap-joggers.jpg', product_url: '/shop/gap-joggers', styling_note: 'Tapered fit for a clean silhouette' },
-      { product_id: '9', product_name: 'Nike Dunk Low', category: 'shoes', price: 5495, image_url: '/products/nike-dunk.jpg', product_url: '/shop/nike-dunk', styling_note: 'Iconic sneaker for any outfit' },
-    ],
-    total_price: 11793,
-    style_tip: 'Keep accessories minimal for this athleisure look'
-  },
-  {
-    look_number: 4,
-    look_name: 'Date Night Ready',
-    look_description: 'Make an impression with this refined ensemble',
-    items: [
-      { product_id: '10', product_name: 'CK Slim Fit Shirt', category: 'clothes', price: 2899, image_url: '/products/ck-shirt.jpg', product_url: '/shop/ck-shirt', styling_note: 'Leave top button undone' },
-      { product_id: '11', product_name: 'Ralph Lauren Blazer', category: 'clothes', price: 8999, image_url: '/products/rl-blazer.jpg', product_url: '/shop/rl-blazer', styling_note: 'Push sleeves up for a relaxed feel' },
-      { product_id: '12', product_name: 'MK Leather Watch', category: 'accessories', price: 7500, image_url: '/products/mk-watch.jpg', product_url: '/shop/mk-watch', styling_note: 'Classic timepiece that elevates any look' },
-    ],
-    total_price: 19398,
-    style_tip: 'A subtle cologne completes this ensemble'
-  },
-  {
-    look_number: 5,
-    look_name: 'Minimalist Modern',
-    look_description: 'Less is more with this clean, contemporary style',
-    items: [
-      { product_id: '13', product_name: 'CK Basic Tee (White)', category: 'clothes', price: 1299, image_url: '/products/ck-white-tee.jpg', product_url: '/shop/ck-white-tee', styling_note: 'Perfect fit is key' },
-      { product_id: '14', product_name: 'GAP Black Jeans', category: 'clothes', price: 2799, image_url: '/products/gap-jeans.jpg', product_url: '/shop/gap-jeans', styling_note: 'Slim fit for a sleek look' },
-      { product_id: '15', product_name: 'Nike White Sneakers', category: 'shoes', price: 4995, image_url: '/products/nike-white.jpg', product_url: '/shop/nike-white', styling_note: 'Keep them clean!' },
-      { product_id: '16', product_name: 'CK Minimalist Watch', category: 'accessories', price: 5999, image_url: '/products/ck-watch.jpg', product_url: '/shop/ck-watch', styling_note: 'Simple elegance' },
-    ],
-    total_price: 15092,
-    style_tip: 'Stick to a monochrome palette for maximum impact'
-  },
-]
+
+// SOP 7.1 - Color Matching Rules (Fashion Color Theory)
+const colorHarmony: Record<string, string[]> = {
+  neutrals: ['black', 'white', 'gray', 'beige', 'navy', 'brown'],
+  dark: ['black', 'navy', 'charcoal', 'burgundy', 'forest', 'brown'],
+  earth: ['brown', 'tan', 'olive', 'rust', 'beige', 'forest'],
+  bright: ['red', 'blue', 'yellow', 'orange', 'green', 'pink'],
+  pastels: ['pink', 'blue', 'lavender', 'mint', 'peach', 'cream'],
+}
+
+// SOP 7.1 - Style to Product Tag Mapping
+const styleMapping: Record<string, string[]> = {
+  'casual-street': ['casual', 'streetwear', 'urban', 'relaxed', 'everyday'],
+  'smart-casual': ['smart', 'business', 'polished', 'refined', 'classic'],
+  'formal-elegant': ['formal', 'elegant', 'sophisticated', 'dressy', 'luxury'],
+  'athleisure': ['athletic', 'sporty', 'active', 'comfort', 'performance'],
+  'minimalist': ['minimal', 'simple', 'clean', 'basic', 'essential'],
+  'trendy': ['trendy', 'fashion', 'modern', 'contemporary', 'statement'],
+}
+
+// SOP 7.1 - Occasion to Tags Mapping
+const occasionMapping: Record<string, string[]> = {
+  'daily-wear': ['everyday', 'casual', 'daily', 'versatile'],
+  'work-office': ['office', 'business', 'professional', 'work'],
+  'date-night': ['date', 'evening', 'romantic', 'special'],
+  'wedding-event': ['wedding', 'formal', 'event', 'party'],
+  'vacation': ['vacation', 'travel', 'resort', 'leisure'],
+  'party': ['party', 'night', 'club', 'celebration'],
+  'birthday': ['gift', 'special', 'celebration'],
+  'anniversary': ['gift', 'romantic', 'special', 'luxury'],
+  'christmas': ['gift', 'holiday', 'festive'],
+  'valentines': ['gift', 'romantic', 'love'],
+  'graduation': ['gift', 'celebration', 'formal'],
+  'just-because': ['gift', 'versatile', 'everyday'],
+}
+
+// SOP 7.2 - Scoring function for product relevance
+interface ProductScore {
+  product: typeof allProducts[0]
+  score: number
+  reasons: string[]
+}
+
+const scoreProduct = (
+  product: typeof allProducts[0],
+  answers: QuizAnswers,
+  usedColors: Set<string>
+): ProductScore => {
+  let score = 0
+  const reasons: string[] = []
+
+  // Style matching (SOP 7.1)
+  const styleKeywords = styleMapping[answers.style] || []
+  const productTags = product.tags?.map(t => t.toLowerCase()) || []
+  const productStyles = product.style?.map(s => s.toLowerCase()) || []
+
+  for (const keyword of styleKeywords) {
+    const styleMatch = productStyles.some(s => s.includes(keyword))
+    if (productTags.some(t => t.includes(keyword)) || styleMatch) {
+      score += 15
+      reasons.push(`Style match: ${keyword}`)
+      break
+    }
+  }
+
+  // Occasion matching (SOP 7.1)
+  const occasionKeywords = occasionMapping[answers.occasion] || []
+  const productOccasions = product.occasions?.map(o => o.toLowerCase()) || []
+
+  for (const keyword of occasionKeywords) {
+    if (productOccasions.some(o => o.includes(keyword)) || productTags.some(t => t.includes(keyword))) {
+      score += 12
+      reasons.push(`Occasion match: ${keyword}`)
+      break
+    }
+  }
+
+  // Color harmony matching (SOP 7.1)
+  const preferredColors = colorHarmony[answers.color] || []
+  const productColors = product.colors?.map(c => c.toLowerCase()) || []
+
+  for (const color of productColors) {
+    if (preferredColors.some(pc => color.includes(pc) || pc.includes(color))) {
+      score += 10
+      reasons.push(`Color match: ${color}`)
+      // Bonus for color variety in outfit
+      if (!usedColors.has(color)) {
+        score += 3
+      }
+      break
+    }
+  }
+
+  // Gift suitability (SOP 7.1 - Gift logic)
+  if (answers.purpose === 'gift') {
+    if (product.giftSuitable) {
+      score += 20
+      reasons.push('Gift suitable')
+    }
+    // Prefer premium brands for gifts
+    if (['Calvin Klein', 'Ralph Lauren', 'Michael Kors'].includes(product.brand)) {
+      score += 8
+      reasons.push('Premium brand')
+    }
+  }
+
+  // Featured products bonus (popularity indicator)
+  if (product.featured) {
+    score += 8
+    reasons.push('Featured/Popular')
+  }
+
+  // Price balance scoring (SOP 7.2)
+  const budget = parseInt(answers.budget) || 10000
+  const priceRatio = product.price / budget
+
+  if (priceRatio >= 0.3 && priceRatio <= 0.6) {
+    // Sweet spot for good value
+    score += 5
+    reasons.push('Good value')
+  } else if (priceRatio > 0.8) {
+    // Premium item for upsell
+    score += 3
+    reasons.push('Premium pick')
+  }
+
+  // Brand variety bonus
+  score += Math.random() * 5 // Small random factor for variety
+
+  return { product, score, reasons }
+}
+
+// SOP 7.3 - Generate look names based on context
+const generateLookName = (
+  index: number,
+  answers: QuizAnswers,
+  items: LookItem[]
+): { name: string; desc: string } => {
+  const isGift = answers.purpose === 'gift'
+
+  const personalLooks = [
+    { name: 'Everyday Essential', desc: 'Your go-to outfit for daily adventures' },
+    { name: 'Signature Style', desc: 'A look that defines your fashion identity' },
+    { name: 'Weekend Ready', desc: 'Comfortable yet stylish for off-duty days' },
+    { name: 'Statement Maker', desc: 'Turn heads with this bold ensemble' },
+    { name: 'Classic Refined', desc: 'Timeless elegance that never goes out of style' },
+  ]
+
+  const giftSets = [
+    { name: 'Premium Gift Set', desc: 'A luxurious collection they\'ll treasure' },
+    { name: 'Style Starter Kit', desc: 'Everything needed to elevate their wardrobe' },
+    { name: 'Occasion Perfect', desc: 'Curated for your special celebration' },
+    { name: 'Thoughtful Collection', desc: 'A meaningful gift they\'ll love' },
+    { name: 'Complete Look Gift', desc: 'Head-to-toe style in one package' },
+  ]
+
+  const occasionSpecific: Record<string, { name: string; desc: string }> = {
+    'date-night': { name: 'Date Night Perfection', desc: 'Make a lasting impression' },
+    'work-office': { name: 'Office Ready', desc: 'Professional yet stylish' },
+    'wedding-event': { name: 'Event Elegance', desc: 'Stand out at any occasion' },
+    'vacation': { name: 'Vacation Vibes', desc: 'Travel in style' },
+    'party': { name: 'Party Mode', desc: 'Ready to celebrate' },
+  }
+
+  // Use occasion-specific names when available
+  if (!isGift && occasionSpecific[answers.occasion] && index === 0) {
+    return occasionSpecific[answers.occasion]
+  }
+
+  return isGift ? giftSets[index] : personalLooks[index]
+}
+
+// SOP 7.1-7.3 - Main recommendation engine
+const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
+  // Step 1: Filter base products by gender and budget
+  let filtered = [...allProducts].filter(p => p.inStock && p.stockQty > 0)
+
+  if (answers.gender && answers.gender !== 'unisex') {
+    filtered = filtered.filter(p =>
+      p.gender === answers.gender || p.gender === 'unisex'
+    )
+  }
+
+  if (answers.budget) {
+    const maxBudget = parseInt(answers.budget)
+    filtered = filtered.filter(p => p.price <= maxBudget)
+  }
+
+  // Step 2: Separate and score by category
+  const clothes = filtered.filter(p => p.category === 'clothes')
+  const accessories = filtered.filter(p => p.category === 'accessories')
+  const shoes = filtered.filter(p => p.category === 'shoes')
+
+  const looks: Look[] = []
+  const usedProducts = new Set<string>()
+
+  // Step 3: Generate 5 complete looks (SOP 7.3)
+  for (let i = 0; i < 5; i++) {
+    const items: LookItem[] = []
+    const usedColors = new Set<string>()
+    let lookBudget = parseInt(answers.budget) || 10000
+
+    // Score and sort available clothes
+    const scoredClothes = clothes
+      .filter(p => !usedProducts.has(p.id))
+      .map(p => scoreProduct(p, answers, usedColors))
+      .sort((a, b) => b.score - a.score)
+
+    // Pick 1-2 clothing items (balance premium + affordable for SOP 7.2)
+    const clothesToPick = Math.min(2, scoredClothes.length)
+    let pickedClothes = 0
+    let pickPremium = i % 2 === 0 // Alternate premium/affordable focus
+
+    for (const scored of scoredClothes) {
+      if (pickedClothes >= clothesToPick) break
+      if (scored.product.price > lookBudget * 0.7) continue // Leave room for other items
+
+      // Alternate between premium and affordable (SOP 7.2)
+      const isPremium = scored.product.price > lookBudget * 0.3
+      if (pickedClothes === 0 || (pickPremium === isPremium)) {
+        usedProducts.add(scored.product.id)
+        scored.product.colors?.forEach(c => usedColors.add(c.toLowerCase()))
+
+        items.push({
+          product_id: scored.product.id,
+          product_name: scored.product.name,
+          category: 'clothes',
+          price: scored.product.price,
+          image_url: scored.product.images[0] || '/placeholder.jpg',
+          product_url: `/shop/${scored.product.id}`,
+          styling_note: scored.reasons[0] || `${scored.product.brand} signature piece`
+        })
+
+        lookBudget -= scored.product.price
+        pickedClothes++
+        pickPremium = !pickPremium
+      }
+    }
+
+    // Score and pick 1 accessory with color harmony
+    const scoredAccessories = accessories
+      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
+      .map(p => scoreProduct(p, answers, usedColors))
+      .sort((a, b) => b.score - a.score)
+
+    if (scoredAccessories.length > 0) {
+      const accessory = scoredAccessories[0]
+      usedProducts.add(accessory.product.id)
+
+      items.push({
+        product_id: accessory.product.id,
+        product_name: accessory.product.name,
+        category: 'accessories',
+        price: accessory.product.price,
+        image_url: accessory.product.images[0] || '/placeholder.jpg',
+        product_url: `/shop/${accessory.product.id}`,
+        styling_note: accessory.reasons[0] || 'The perfect finishing touch'
+      })
+
+      lookBudget -= accessory.product.price
+    }
+
+    // Score and pick 1 shoe with color harmony
+    const scoredShoes = shoes
+      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget)
+      .map(p => scoreProduct(p, answers, usedColors))
+      .sort((a, b) => b.score - a.score)
+
+    if (scoredShoes.length > 0) {
+      const shoe = scoredShoes[0]
+      usedProducts.add(shoe.product.id)
+
+      items.push({
+        product_id: shoe.product.id,
+        product_name: shoe.product.name,
+        category: 'shoes',
+        price: shoe.product.price,
+        image_url: shoe.product.images[0] || '/placeholder.jpg',
+        product_url: `/shop/${shoe.product.id}`,
+        styling_note: shoe.reasons[0] || 'Completes the look perfectly'
+      })
+    }
+
+    // Create look if we have items (SOP 7.2 - complete purchasable sets)
+    if (items.length >= 2) {
+      const { name, desc } = generateLookName(i, answers, items)
+      const totalPrice = items.reduce((sum, item) => sum + item.price, 0)
+
+      // Generate contextual style tip
+      const styleTips = [
+        `This ${answers.style?.replace('-', ' ')} look pairs perfectly together`,
+        items.length >= 3 ? 'A complete head-to-toe ensemble' : 'Mix and match with your existing wardrobe',
+        answers.purpose === 'gift' ? 'A thoughtful gift they\'ll love' : 'Perfect for ' + answers.occasion?.replace('-', ' '),
+        'Each piece complements the others beautifully',
+        `Curated for your ${answers.color} color preference`,
+      ]
+
+      looks.push({
+        look_number: i + 1,
+        look_name: name,
+        look_description: desc,
+        items,
+        total_price: totalPrice,
+        style_tip: styleTips[i] || styleTips[0]
+      })
+    }
+  }
+
+  // Ensure we return at least some looks even if scoring filtered too much
+  if (looks.length === 0) {
+    // Fallback: create basic looks without scoring
+    return generateFallbackLooks(filtered, answers)
+  }
+
+  return looks
+}
+
+// Fallback function if scoring is too restrictive
+const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswers): Look[] => {
+  const clothes = products.filter(p => p.category === 'clothes')
+  const accessories = products.filter(p => p.category === 'accessories')
+  const shoes = products.filter(p => p.category === 'shoes')
+
+  const looks: Look[] = []
+  const used = new Set<string>()
+
+  for (let i = 0; i < Math.min(5, Math.ceil(clothes.length / 2)); i++) {
+    const items: LookItem[] = []
+
+    // Pick clothes
+    for (const c of clothes) {
+      if (!used.has(c.id) && items.filter(x => x.category === 'clothes').length < 2) {
+        used.add(c.id)
+        items.push({
+          product_id: c.id,
+          product_name: c.name,
+          category: 'clothes',
+          price: c.price,
+          image_url: c.images[0] || '/placeholder.jpg',
+          product_url: `/shop/${c.id}`,
+          styling_note: `${c.brand} quality`
+        })
+      }
+    }
+
+    // Pick accessory
+    for (const a of accessories) {
+      if (!used.has(a.id)) {
+        used.add(a.id)
+        items.push({
+          product_id: a.id,
+          product_name: a.name,
+          category: 'accessories',
+          price: a.price,
+          image_url: a.images[0] || '/placeholder.jpg',
+          product_url: `/shop/${a.id}`,
+          styling_note: 'Adds style'
+        })
+        break
+      }
+    }
+
+    // Pick shoe
+    for (const s of shoes) {
+      if (!used.has(s.id)) {
+        used.add(s.id)
+        items.push({
+          product_id: s.id,
+          product_name: s.name,
+          category: 'shoes',
+          price: s.price,
+          image_url: s.images[0] || '/placeholder.jpg',
+          product_url: `/shop/${s.id}`,
+          styling_note: 'Completes the look'
+        })
+        break
+      }
+    }
+
+    if (items.length > 0) {
+      looks.push({
+        look_number: i + 1,
+        look_name: answers.purpose === 'gift' ? `Gift Set #${i + 1}` : `Look #${i + 1}`,
+        look_description: 'A curated selection just for you',
+        items,
+        total_price: items.reduce((sum, item) => sum + item.price, 0),
+        style_tip: 'A versatile combination'
+      })
+    }
+  }
+
+  return looks
+}
 
 export default function AIDresserPage() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
-  const [hasAccess, setHasAccess] = useState(true) // TODO: Connect to session check API
+  const { addItem } = useCart()
+  const [sessionId, setSessionId] = useState<string>('')
+  const [hasAccess, setHasAccess] = useState(true)
+  const [, setAccessInfo] = useState<AIDresserAccessResponse | null>(null)
   const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-6 = quiz steps, 7 = loading, 8 = results
   const [answers, setAnswers] = useState<QuizAnswers>({
     purpose: null,
@@ -182,8 +507,32 @@ export default function AIDresserPage() {
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set())
   const [savedLooks, setSavedLooks] = useState<Set<number>>(new Set())
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareUrls, setShareUrls] = useState<{ messenger?: string; whatsapp?: string; copy?: string } | null>(null)
 
-  // Simulate loading recommendations
+  // Check access when user logs in
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (user?.id) {
+        // Generate session ID
+        const newSessionId = `ai_session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
+        setSessionId(newSessionId)
+
+        // Try n8n webhook first, fallback to always allowing access
+        try {
+          const response = await checkAIDresserAccess('', user.id)
+          setAccessInfo(response)
+          setHasAccess(response.access_granted)
+        } catch {
+          // If n8n not configured, allow access
+          setHasAccess(true)
+        }
+      }
+    }
+    checkAccess()
+  }, [user])
+
+  // Generate recommendations
   const generateRecommendations = async () => {
     setCurrentStep(7) // Loading state
 
@@ -198,12 +547,36 @@ export default function AIDresserPage() {
       ])
     }
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2500))
+    // Prepare collected data for API
+    const collectedData: CollectedData = {
+      purpose: answers.purpose || undefined,
+      gender: answers.gender || undefined,
+      style: answers.style,
+      occasion: answers.occasion,
+      budget: answers.budget,
+      color: answers.color,
+      recipient: answers.recipient,
+    }
 
-    // In production, this would call the n8n webhook
-    // POST /webhook/ai-dresser/get-recommendations
-    setLooks(mockLooks)
+    // Create summary
+    const summary = `${answers.gender || 'Unisex'}, ${answers.style?.replace('-', ' ')} style for ${answers.occasion?.replace('-', ' ')}, budget up to ₱${parseInt(answers.budget).toLocaleString()}, prefers ${answers.color} colors`
+
+    try {
+      // Try n8n webhook first
+      const response = await getRecommendations(sessionId, user?.id || '', collectedData, summary)
+      if (response?.success && response.looks?.length > 0) {
+        setLooks(response.looks)
+      } else {
+        // Fallback to local generation
+        const localLooks = generateLocalRecommendations(answers)
+        setLooks(localLooks)
+      }
+    } catch {
+      // Fallback to local generation if API fails
+      const localLooks = generateLocalRecommendations(answers)
+      setLooks(localLooks)
+    }
+
     setCurrentStep(8) // Results
   }
 
@@ -235,19 +608,61 @@ export default function AIDresserPage() {
     }
   }
 
-  const addToCart = (item: LookItem) => {
+  const addToCart = async (item: LookItem) => {
+    // Get the full product details
+    const product = getProductById(item.product_id)
+    if (product) {
+      // Convert to cart product format
+      addItem({
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        originalPrice: product.originalPrice || product.price,
+        image: product.images[0] || '/placeholder.jpg',
+        category: product.category,
+        sizes: product.sizes,
+        colors: product.colors,
+      }, 1)
+    }
     setAddedItems(prev => new Set([...prev, item.product_id]))
-    // TODO: Call cart API
   }
 
-  const addAllToCart = (look: Look) => {
+  const addAllToCart = async (look: Look) => {
+    // Add each item to cart
+    for (const item of look.items) {
+      const product = getProductById(item.product_id)
+      if (product) {
+        addItem({
+          id: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          originalPrice: product.originalPrice || product.price,
+          image: product.images[0] || '/placeholder.jpg',
+          category: product.category,
+          sizes: product.sizes,
+          colors: product.colors,
+        }, 1)
+      }
+    }
+
+    // Mark all items as added
     const newItems = new Set(addedItems)
     look.items.forEach(item => newItems.add(item.product_id))
     setAddedItems(newItems)
-    // TODO: Call cart API with all items
+
+    // Try to notify n8n webhook
+    try {
+      await addLookToCart(sessionId, user?.id || '', look, 'add_all')
+    } catch {
+      // Silently fail if webhook not configured
+    }
   }
 
-  const saveLook = (lookNumber: number) => {
+  const saveLook = async (lookNumber: number) => {
+    const look = looks.find(l => l.look_number === lookNumber)
+
     setSavedLooks(prev => {
       const newSet = new Set(prev)
       if (newSet.has(lookNumber)) {
@@ -257,7 +672,57 @@ export default function AIDresserPage() {
       }
       return newSet
     })
-    // TODO: Call wishlist API
+
+    // Try to save to n8n webhook
+    if (look && !savedLooks.has(lookNumber)) {
+      try {
+        await saveLookToWishlist(sessionId, user?.id || '', look)
+      } catch {
+        // Silently fail if webhook not configured
+      }
+    }
+  }
+
+  const handleShare = async (look: Look) => {
+    try {
+      const response = await getShareUrls(sessionId, user?.id || '', look)
+      if (response.success && response.share_options) {
+        setShareUrls({
+          messenger: response.share_options.messenger.url,
+          whatsapp: response.share_options.whatsapp.url,
+          copy: response.share_options.copy_link.url
+        })
+        setShareModalOpen(true)
+      } else {
+        // Fallback: Generate local share URLs
+        const shareText = `Check out this ${look.look_name} from LGM Apparel! Total: ₱${look.total_price.toLocaleString()}`
+        const shareUrl = `${window.location.origin}/ai-dresser?look=${look.look_number}`
+        const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID
+        setShareUrls({
+          messenger: fbAppId
+            ? `https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=${fbAppId}&redirect_uri=${encodeURIComponent(window.location.href)}`
+            : `fb-messenger://share/?link=${encodeURIComponent(shareUrl)}`,
+          whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
+          copy: shareUrl
+        })
+        setShareModalOpen(true)
+      }
+    } catch {
+      // Fallback share
+      const shareText = `Check out this ${look.look_name} from LGM Apparel!`
+      if (navigator.share) {
+        navigator.share({ title: look.look_name, text: shareText, url: window.location.href })
+      } else {
+        navigator.clipboard.writeText(shareText + ' ' + window.location.href)
+        alert('Link copied to clipboard!')
+      }
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text)
+    alert('Link copied!')
+    setShareModalOpen(false)
   }
 
   const totalSteps = answers.purpose === 'gift' ? 7 : 6
@@ -810,7 +1275,10 @@ export default function AIDresserPage() {
                 {savedLooks.has(looks[activeLook].look_number) ? 'Saved' : 'Save Look'}
               </button>
 
-              <button className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-full transition-all border border-white/10">
+              <button
+                onClick={() => handleShare(looks[activeLook])}
+                className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-full transition-all border border-white/10"
+              >
                 <Share2 className="w-5 h-5" />
                 Share
               </button>
@@ -892,6 +1360,68 @@ export default function AIDresserPage() {
         onClose={() => setIsAuthModalOpen(false)}
         initialMode="login"
       />
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShareModalOpen(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative bg-navy border border-white/10 rounded-2xl p-6 max-w-sm w-full"
+          >
+            <button
+              onClick={() => setShareModalOpen(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-4">Share This Look</h3>
+            <p className="text-white/50 text-sm mb-6">
+              Share your styled look with friends!
+            </p>
+
+            <div className="space-y-3">
+              {shareUrls?.messenger && (
+                <a
+                  href={shareUrls.messenger}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 w-full p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.477 2 2 6.145 2 11.259c0 2.913 1.454 5.512 3.726 7.21V22l3.405-1.869c.909.252 1.871.388 2.869.388 5.523 0 10-4.145 10-9.259S17.523 2 12 2zm1.008 12.461l-2.549-2.72-4.975 2.72 5.474-5.81 2.613 2.72 4.91-2.72-5.473 5.81z"/>
+                  </svg>
+                  Share via Messenger
+                </a>
+              )}
+
+              {shareUrls?.whatsapp && (
+                <a
+                  href={shareUrls.whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 w-full p-4 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-colors"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Share via WhatsApp
+                </a>
+              )}
+
+              {shareUrls?.copy && (
+                <button
+                  onClick={() => copyToClipboard(shareUrls.copy!)}
+                  className="flex items-center gap-3 w-full p-4 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                >
+                  <Copy className="w-5 h-5" />
+                  Copy Link
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   )
 }

@@ -3,13 +3,18 @@ import {
   doc,
   addDoc,
   updateDoc,
+  setDoc,
   getDoc,
   getDocs,
+  deleteDoc,
   query,
   where,
   orderBy,
+  limit,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -229,6 +234,26 @@ export const updateUserPreferences = async (
   }
 }
 
+// Update user profile (name, phone)
+export const updateUserProfile = async (
+  userId: string,
+  data: { name?: string; phone?: string }
+): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const userRef = doc(db, 'users', userId)
+    await updateDoc(userRef, {
+      ...data,
+      lastActive: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error updating profile:', error)
+    return false
+  }
+}
+
 // Increment AI Dresser usage
 export const incrementAIDresserUsage = async (userId: string): Promise<boolean> => {
   if (!db) return false
@@ -260,5 +285,204 @@ export const checkIsAdmin = async (userId: string): Promise<boolean> => {
   } catch (error) {
     console.error('Error checking admin status:', error)
     return false
+  }
+}
+
+// ==================== WISHLIST ====================
+
+export interface WishlistItem {
+  productId: string
+  addedAt: Timestamp
+}
+
+// Get user's wishlist
+export const getWishlist = async (userId: string): Promise<string[]> => {
+  if (!db) return []
+
+  try {
+    const wishlistRef = doc(db, 'wishlists', userId)
+    const wishlistDoc = await getDoc(wishlistRef)
+
+    if (wishlistDoc.exists()) {
+      return wishlistDoc.data()?.productIds || []
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching wishlist:', error)
+    return []
+  }
+}
+
+// Add to wishlist
+export const addToWishlist = async (userId: string, productId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const wishlistRef = doc(db, 'wishlists', userId)
+    await setDoc(wishlistRef, {
+      productIds: arrayUnion(productId),
+      updatedAt: serverTimestamp()
+    }, { merge: true })
+    return true
+  } catch (error) {
+    console.error('Error adding to wishlist:', error)
+    return false
+  }
+}
+
+// Remove from wishlist
+export const removeFromWishlist = async (userId: string, productId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const wishlistRef = doc(db, 'wishlists', userId)
+    await updateDoc(wishlistRef, {
+      productIds: arrayRemove(productId),
+      updatedAt: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error removing from wishlist:', error)
+    return false
+  }
+}
+
+// ==================== REVIEWS ====================
+
+export interface Review {
+  id?: string
+  productId: string
+  userId: string
+  userName: string
+  rating: number
+  title: string
+  comment: string
+  verified: boolean
+  helpful: number
+  createdAt: Timestamp | null
+}
+
+// Add a review
+export const addReview = async (
+  productId: string,
+  userId: string,
+  userName: string,
+  rating: number,
+  title: string,
+  comment: string
+): Promise<{ success: boolean; error?: string }> => {
+  if (!db) return { success: false, error: 'Database not configured' }
+
+  try {
+    // Check if user already reviewed this product
+    const reviewsRef = collection(db, 'reviews')
+    const existingQuery = query(
+      reviewsRef,
+      where('productId', '==', productId),
+      where('userId', '==', userId)
+    )
+    const existingSnapshot = await getDocs(existingQuery)
+
+    if (!existingSnapshot.empty) {
+      return { success: false, error: 'You have already reviewed this product' }
+    }
+
+    const reviewData: Omit<Review, 'id'> = {
+      productId,
+      userId,
+      userName,
+      rating,
+      title,
+      comment,
+      verified: false,
+      helpful: 0,
+      createdAt: serverTimestamp() as Timestamp
+    }
+
+    await addDoc(reviewsRef, reviewData)
+    return { success: true }
+  } catch (error) {
+    console.error('Error adding review:', error)
+    return { success: false, error: 'Failed to add review' }
+  }
+}
+
+// Get reviews for a product
+export const getProductReviews = async (productId: string): Promise<Review[]> => {
+  if (!db) return []
+
+  try {
+    const reviewsRef = collection(db, 'reviews')
+    const q = query(
+      reviewsRef,
+      where('productId', '==', productId),
+      orderBy('createdAt', 'desc')
+    )
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Review[]
+  } catch (error) {
+    console.error('Error fetching reviews:', error)
+    return []
+  }
+}
+
+// Get average rating for a product
+export const getProductRating = async (productId: string): Promise<{ average: number; count: number }> => {
+  if (!db) return { average: 0, count: 0 }
+
+  try {
+    const reviews = await getProductReviews(productId)
+    if (reviews.length === 0) return { average: 0, count: 0 }
+
+    const sum = reviews.reduce((acc, r) => acc + r.rating, 0)
+    return {
+      average: Math.round((sum / reviews.length) * 10) / 10,
+      count: reviews.length
+    }
+  } catch (error) {
+    console.error('Error getting product rating:', error)
+    return { average: 0, count: 0 }
+  }
+}
+
+// Mark review as helpful
+export const markReviewHelpful = async (reviewId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const reviewRef = doc(db, 'reviews', reviewId)
+    const reviewDoc = await getDoc(reviewRef)
+    const currentHelpful = reviewDoc.data()?.helpful || 0
+
+    await updateDoc(reviewRef, {
+      helpful: currentHelpful + 1
+    })
+    return true
+  } catch (error) {
+    console.error('Error marking review helpful:', error)
+    return false
+  }
+}
+
+// Get all reviews (admin)
+export const getAllReviews = async (): Promise<Review[]> => {
+  if (!db) return []
+
+  try {
+    const reviewsRef = collection(db, 'reviews')
+    const q = query(reviewsRef, orderBy('createdAt', 'desc'), limit(100))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Review[]
+  } catch (error) {
+    console.error('Error fetching all reviews:', error)
+    return []
   }
 }

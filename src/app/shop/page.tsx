@@ -8,7 +8,9 @@ import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, 
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useCart } from '@/context/CartContext'
+import { useAuth } from '@/context/AuthContext'
 import { products, brands, categories, filterProducts, Product } from '@/lib/products'
+import { getWishlist, addToWishlist, removeFromWishlist } from '@/lib/firestore'
 
 const priceRanges = [
   { label: 'All Prices', min: 0, max: Infinity },
@@ -28,21 +30,77 @@ const sortOptions = [
 function ShopContent() {
   const searchParams = useSearchParams()
   const urlSearchQuery = searchParams.get('search') || ''
+  const urlCategory = searchParams.get('category') || ''
 
   const { addItem } = useCart()
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery)
 
-  // Update search when URL changes
+  // Update search and category when URL changes
   useEffect(() => {
     setSearchQuery(urlSearchQuery)
   }, [urlSearchQuery])
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
+
+  const [selectedCategory, setSelectedCategory] = useState<string>(urlCategory)
   const [selectedBrand, setSelectedBrand] = useState<string>('')
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0])
   const [sortBy, setSortBy] = useState('newest')
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set())
+  const [wishlist, setWishlist] = useState<Set<string>>(new Set())
+
+  // Update category when URL changes
+  useEffect(() => {
+    setSelectedCategory(urlCategory)
+  }, [urlCategory])
+
+  // Load wishlist
+  useEffect(() => {
+    const loadWishlist = async () => {
+      if (user) {
+        const items = await getWishlist(user.id)
+        setWishlist(new Set(items))
+      } else {
+        const items = JSON.parse(localStorage.getItem('wishlist') || '[]')
+        setWishlist(new Set(items))
+      }
+    }
+    loadWishlist()
+  }, [user])
+
+  const toggleWishlist = async (productId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const isWishlisted = wishlist.has(productId)
+
+    if (user) {
+      if (isWishlisted) {
+        await removeFromWishlist(user.id, productId)
+      } else {
+        await addToWishlist(user.id, productId)
+      }
+    } else {
+      const items = JSON.parse(localStorage.getItem('wishlist') || '[]')
+      if (isWishlisted) {
+        const updated = items.filter((id: string) => id !== productId)
+        localStorage.setItem('wishlist', JSON.stringify(updated))
+      } else {
+        localStorage.setItem('wishlist', JSON.stringify([...items, productId]))
+      }
+    }
+
+    setWishlist(prev => {
+      const newSet = new Set(prev)
+      if (isWishlisted) {
+        newSet.delete(productId)
+      } else {
+        newSet.add(productId)
+      }
+      return newSet
+    })
+  }
 
   const filteredProducts = useMemo(() => {
     let result = products
@@ -137,7 +195,9 @@ function ShopContent() {
         {/* Hero Banner */}
         <div className="bg-navy text-white py-12">
           <div className="container-max px-4 md:px-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Shop All Products</h1>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">
+              {selectedCategory ? `Shop ${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}` : 'Shop All Products'}
+            </h1>
             <p className="text-white/60">
               Discover premium brands: Calvin Klein, Nike, GAP, Ralph Lauren & Michael Kors
             </p>
@@ -330,8 +390,15 @@ function ShopContent() {
                             SALE
                           </span>
                         )}
-                        <button className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-gray-50">
-                          <Heart className="w-4 h-4 text-gray-600" />
+                        <button
+                          onClick={(e) => toggleWishlist(product.id, e)}
+                          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
+                            wishlist.has(product.id)
+                              ? 'bg-pink-500 text-white opacity-100'
+                              : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Heart className={`w-4 h-4 ${wishlist.has(product.id) ? 'fill-current' : ''}`} />
                         </button>
                       </Link>
 

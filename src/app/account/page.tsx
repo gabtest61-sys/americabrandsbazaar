@@ -6,12 +6,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   User, Package, Heart, Settings, LogOut, ChevronRight,
-  ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle
+  ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle,
+  Shirt, Trash2, Edit2, Save, X, Loader2
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useAuth } from '@/context/AuthContext'
+import { useCart } from '@/context/CartContext'
 import { getOrdersByUserId, Order } from '@/lib/orders'
+import { getWishlist, removeFromWishlist, updateUserProfile } from '@/lib/firestore'
+import { getProductById, Product } from '@/lib/products'
 
 const statusIcons = {
   pending: Clock,
@@ -33,9 +37,18 @@ const statusColors = {
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, isLoggedIn, isLoading, logout } = useAuth()
+  const { user, isLoggedIn, isLoading, logout, updateUser } = useAuth()
+  const { addItem } = useCart()
   const [orders, setOrders] = useState<Order[]>([])
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
+  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([])
+  const [wishlistLoading, setWishlistLoading] = useState(false)
+
+  // Settings editing state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -46,12 +59,74 @@ export default function AccountPage() {
   useEffect(() => {
     if (user) {
       setOrders(getOrdersByUserId(user.id))
+      setEditName(user.name || '')
+      setEditPhone(user.phone || '')
     }
   }, [user])
+
+  // Load wishlist when tab is active
+  useEffect(() => {
+    const loadWishlist = async () => {
+      if (user && activeTab === 'wishlist') {
+        setWishlistLoading(true)
+        try {
+          const wishlistIds = await getWishlist(user.id)
+          const products = wishlistIds
+            .map(id => getProductById(id))
+            .filter((p): p is Product => p !== undefined)
+          setWishlistProducts(products)
+        } catch (error) {
+          console.error('Error loading wishlist:', error)
+        }
+        setWishlistLoading(false)
+      }
+    }
+    loadWishlist()
+  }, [user, activeTab])
 
   const handleLogout = () => {
     logout()
     router.push('/')
+  }
+
+  const handleRemoveFromWishlist = async (productId: string) => {
+    if (!user) return
+    await removeFromWishlist(user.id, productId)
+    setWishlistProducts(prev => prev.filter(p => p.id !== productId))
+  }
+
+  const handleAddToCart = (product: Product) => {
+    addItem({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      price: product.price,
+      originalPrice: product.originalPrice || product.price,
+      image: product.images[0] || '/placeholder.jpg',
+      category: product.category as 'clothes' | 'accessories' | 'shoes',
+      sizes: product.sizes,
+      colors: product.colors,
+    }, 1, product.sizes[0], product.colors[0])
+  }
+
+  const handleSaveProfile = async () => {
+    if (!user) return
+    setSaving(true)
+    const success = await updateUserProfile(user.id, {
+      name: editName,
+      phone: editPhone,
+    })
+    if (success && updateUser) {
+      updateUser({ ...user, name: editName, phone: editPhone })
+    }
+    setSaving(false)
+    setIsEditing(false)
+  }
+
+  const cancelEditing = () => {
+    setEditName(user?.name || '')
+    setEditPhone(user?.phone || '')
+    setIsEditing(false)
   }
 
   if (isLoading) {
@@ -233,33 +308,113 @@ export default function AccountPage() {
               {activeTab === 'wishlist' && (
                 <div>
                   <h1 className="text-2xl font-bold text-navy mb-6">My Wishlist</h1>
-                  <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-                    <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-navy mb-2">Your wishlist is empty</h3>
-                    <p className="text-gray-500 mb-6">Save items you love for later</p>
-                    <Link
-                      href="/shop"
-                      className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
-                    >
-                      <ShoppingBag className="w-5 h-5" />
-                      Browse Products
-                    </Link>
-                  </div>
+                  {wishlistLoading ? (
+                    <div className="bg-white rounded-2xl shadow-sm p-12 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-gold" />
+                    </div>
+                  ) : wishlistProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {wishlistProducts.map(product => (
+                        <div key={product.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex">
+                          <Link href={`/shop/${product.id}`} className="w-32 h-32 bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                            <Shirt className="w-12 h-12 text-gray-300" />
+                          </Link>
+                          <div className="flex-1 p-4 flex flex-col justify-between">
+                            <div>
+                              <p className="text-xs text-gold font-medium">{product.brand}</p>
+                              <Link href={`/shop/${product.id}`}>
+                                <h3 className="font-medium text-navy hover:text-gold transition-colors line-clamp-1">
+                                  {product.name}
+                                </h3>
+                              </Link>
+                              <p className="font-bold text-navy mt-1">₱{product.price.toLocaleString()}</p>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <button
+                                onClick={() => handleAddToCart(product)}
+                                className="flex-1 flex items-center justify-center gap-1 bg-gold text-navy text-sm font-medium py-2 rounded-lg hover:bg-yellow-400 transition-colors"
+                              >
+                                <ShoppingBag className="w-4 h-4" />
+                                Add to Cart
+                              </button>
+                              <button
+                                onClick={() => handleRemoveFromWishlist(product.id)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+                      <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-navy mb-2">Your wishlist is empty</h3>
+                      <p className="text-gray-500 mb-6">Save items you love for later</p>
+                      <Link
+                        href="/shop"
+                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+                      >
+                        <ShoppingBag className="w-5 h-5" />
+                        Browse Products
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeTab === 'settings' && (
                 <div>
-                  <h1 className="text-2xl font-bold text-navy mb-6">Account Settings</h1>
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-bold text-navy">Account Settings</h1>
+                    {!isEditing ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-2 text-gold hover:text-yellow-600 font-medium"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={cancelEditing}
+                          className="flex items-center gap-1 px-3 py-1.5 text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="w-4 h-4" />
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={saving}
+                          className="flex items-center gap-1 px-4 py-1.5 bg-gold text-navy rounded-lg font-medium hover:bg-yellow-400 disabled:opacity-50"
+                        >
+                          {saving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Save
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm p-6">
                     <div className="space-y-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                         <input
                           type="text"
-                          value={user?.name || ''}
-                          disabled
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50"
+                          value={isEditing ? editName : (user?.name || '')}
+                          onChange={(e) => setEditName(e.target.value)}
+                          disabled={!isEditing}
+                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
+                            isEditing
+                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
                         />
                       </div>
                       <div>
@@ -270,6 +425,22 @@ export default function AccountPage() {
                           disabled
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50"
                         />
+                        <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                        <input
+                          type="tel"
+                          value={isEditing ? editPhone : (user?.phone || '')}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          disabled={!isEditing}
+                          placeholder={isEditing ? 'Enter phone number' : 'Not set'}
+                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
+                            isEditing
+                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
@@ -279,10 +450,8 @@ export default function AccountPage() {
                           disabled
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50"
                         />
+                        <p className="text-xs text-gray-400 mt-1">Username cannot be changed</p>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        Contact support to update your account information.
-                      </p>
                     </div>
                   </div>
                 </div>

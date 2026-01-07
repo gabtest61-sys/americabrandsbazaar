@@ -6,9 +6,9 @@ import { BRAND } from '@/lib/constants'
 const footerLinks = {
   shop: [
     { name: 'All Products', href: '/shop' },
-    { name: 'Clothes', href: '/category/clothes' },
-    { name: 'Accessories', href: '/category/accessories' },
-    { name: 'Shoes', href: '/category/shoes' },
+    { name: 'Clothes', href: '/shop?category=clothes' },
+    { name: 'Accessories', href: '/shop?category=accessories' },
+    { name: 'Shoes', href: '/shop?category=shoes' },
   ],
   support: [
     { name: 'Contact Us', href: '/contact' },
