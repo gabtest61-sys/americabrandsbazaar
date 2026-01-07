@@ -29,6 +29,65 @@ const sortOptions = [
 
 const PRODUCTS_PER_PAGE = 20
 
+// Color name to hex mapping for accurate swatches
+const colorMap: Record<string, string> = {
+  white: '#FFFFFF',
+  black: '#000000',
+  red: '#DC2626',
+  blue: '#2563EB',
+  navy: '#1E3A5F',
+  green: '#16A34A',
+  yellow: '#EAB308',
+  gold: '#D4AF37',
+  orange: '#EA580C',
+  pink: '#EC4899',
+  purple: '#9333EA',
+  gray: '#6B7280',
+  grey: '#6B7280',
+  brown: '#92400E',
+  beige: '#D4C4A8',
+  cream: '#FFFDD0',
+  maroon: '#800000',
+  burgundy: '#800020',
+  olive: '#808000',
+  teal: '#0D9488',
+  coral: '#FF7F50',
+  salmon: '#FA8072',
+  tan: '#D2B48C',
+  khaki: '#C3B091',
+  charcoal: '#36454F',
+  silver: '#C0C0C0',
+  ivory: '#FFFFF0',
+  lavender: '#E6E6FA',
+  mint: '#98FF98',
+  peach: '#FFCBA4',
+  rust: '#B7410E',
+  wine: '#722F37',
+  camel: '#C19A6B',
+  sand: '#C2B280',
+  denim: '#1560BD',
+  indigo: '#4B0082',
+  turquoise: '#40E0D0',
+  aqua: '#00FFFF',
+  cyan: '#00FFFF',
+  magenta: '#FF00FF',
+  rose: '#FF007F',
+  blush: '#DE5D83',
+  mustard: '#FFDB58',
+  nude: '#E3BC9A',
+  taupe: '#483C32',
+  slate: '#708090',
+  forest: '#228B22',
+  emerald: '#50C878',
+  sapphire: '#0F52BA',
+  ruby: '#E0115F',
+}
+
+const getColorHex = (colorName: string): string => {
+  const normalized = colorName.toLowerCase().trim()
+  return colorMap[normalized] || colorName.toLowerCase()
+}
+
 function ShopContent() {
   const searchParams = useSearchParams()
   const urlSearchQuery = searchParams.get('search') || ''
@@ -411,23 +470,23 @@ function ShopContent() {
                         </button>
                       )}
                     </div>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
                       {availableColors.map(color => (
                         <label
                           key={color}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <input
                             type="checkbox"
                             checked={selectedColors.includes(color)}
                             onChange={() => toggleColor(color)}
-                            className="w-4 h-4 accent-gold rounded"
+                            className="w-3.5 h-3.5 accent-gold rounded"
                           />
                           <span
-                            className="w-4 h-4 rounded-full border border-gray-300"
-                            style={{ backgroundColor: color.toLowerCase() }}
+                            className="w-3.5 h-3.5 rounded-full border border-gray-300 flex-shrink-0"
+                            style={{ backgroundColor: getColorHex(color) }}
                           />
-                          {color}
+                          <span className="truncate">{color}</span>
                         </label>
                       ))}
                     </div>
@@ -748,23 +807,23 @@ function ShopContent() {
                         </button>
                       )}
                     </div>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
                       {availableColors.map(color => (
                         <label
                           key={color}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <input
                             type="checkbox"
                             checked={selectedColors.includes(color)}
                             onChange={() => toggleColor(color)}
-                            className="w-4 h-4 accent-gold rounded"
+                            className="w-3.5 h-3.5 accent-gold rounded"
                           />
                           <span
-                            className="w-4 h-4 rounded-full border border-gray-300"
-                            style={{ backgroundColor: color.toLowerCase() }}
+                            className="w-3.5 h-3.5 rounded-full border border-gray-300 flex-shrink-0"
+                            style={{ backgroundColor: getColorHex(color) }}
                           />
-                          {color}
+                          <span className="truncate">{color}</span>
                         </label>
                       ))}
                     </div>

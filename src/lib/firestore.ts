@@ -709,6 +709,17 @@ export const getFirestoreProduct = async (productId: string): Promise<FirestoreP
   }
 }
 
+// Helper to remove undefined values (Firestore doesn't accept undefined)
+const removeUndefinedFields = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = value
+    }
+  }
+  return cleaned as Partial<T>
+}
+
 // Create new product
 export const createProduct = async (
   product: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>
@@ -717,8 +728,9 @@ export const createProduct = async (
 
   try {
     const productsRef = collection(db, 'products')
+    const cleanedProduct = removeUndefinedFields(product)
     const docRef = await addDoc(productsRef, {
-      ...product,
+      ...cleanedProduct,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     })
@@ -738,8 +750,9 @@ export const updateProduct = async (
 
   try {
     const productRef = doc(db, 'products', productId)
+    const cleanedData = removeUndefinedFields(data)
     await updateDoc(productRef, {
-      ...data,
+      ...cleanedData,
       updatedAt: serverTimestamp()
     })
     return true
