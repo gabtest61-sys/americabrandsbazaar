@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "cloudinary": "^2.8.0",
     "firebase": "^12.7.0",
     "framer-motion": "^12.24.0",
     "lucide-react": "^0.468.0",

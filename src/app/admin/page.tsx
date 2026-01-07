@@ -29,7 +29,6 @@ import {
   deleteProduct,
   seedProductsToFirestore,
   FirestoreProduct,
-  uploadProductImage,
   getShippingSettings,
   updateShippingSettings,
   ShippingSettings,
@@ -452,7 +451,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // Image upload handler
+  // Image upload handler - using Cloudinary
   const handleImageUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
@@ -461,10 +460,30 @@ export default function AdminDashboard() {
     const newImages: string[] = []
 
     for (const file of Array.from(files)) {
-      const productId = editingProduct?.id || `new-${Date.now()}`
-      const result = await uploadProductImage(file, productId)
-      if (result.success && result.url) {
-        newImages.push(result.url)
+      try {
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        // Upload to Cloudinary via API route
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64, folder: 'products' }),
+        })
+
+        const result = await response.json()
+        if (result.success && result.url) {
+          newImages.push(result.url)
+        } else {
+          console.error('Upload failed:', result.error)
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error)
       }
     }
 
