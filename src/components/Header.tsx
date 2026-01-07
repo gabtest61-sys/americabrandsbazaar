@@ -8,7 +8,7 @@ import { Menu, X, ShoppingCart, User, Search, ChevronRight, Truck, Shield, Rotat
 import { NAV_LINKS, BRAND } from '@/lib/constants'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { products, searchProducts, Product } from '@/lib/products'
+import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 import AuthModal from '@/components/AuthModal'
 
 const promoMessages = [
@@ -25,12 +25,26 @@ export default function Header() {
   const [currentPromo, setCurrentPromo] = useState(0)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<Product[]>([])
+  const [searchResults, setSearchResults] = useState<FirestoreProduct[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login')
+  const [allProducts, setAllProducts] = useState<FirestoreProduct[]>([])
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { itemCount, toggleCart } = useCart()
+
+  // Load products from Firestore on mount
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const products = await getFirestoreProducts()
+        setAllProducts(products)
+      } catch {
+        setAllProducts([])
+      }
+    }
+    loadProducts()
+  }, [])
 
   // Focus search input when modal opens
   useEffect(() => {
@@ -44,7 +58,14 @@ export default function Header() {
     if (searchQuery.trim().length > 1) {
       setIsSearching(true)
       const timer = setTimeout(() => {
-        const results = searchProducts(searchQuery)
+        const query = searchQuery.toLowerCase().trim()
+        const results = allProducts.filter(product =>
+          product.name.toLowerCase().includes(query) ||
+          product.brand.toLowerCase().includes(query) ||
+          product.category.toLowerCase().includes(query) ||
+          product.subcategory?.toLowerCase().includes(query) ||
+          product.tags?.some(tag => tag.toLowerCase().includes(query))
+        )
         setSearchResults(results.slice(0, 6)) // Show top 6 results
         setIsSearching(false)
       }, 200)
@@ -52,7 +73,7 @@ export default function Header() {
     } else {
       setSearchResults([])
     }
-  }, [searchQuery])
+  }, [searchQuery, allProducts])
 
   // Close search on escape
   useEffect(() => {
@@ -311,10 +332,10 @@ export default function Header() {
                       </div>
                     ) : searchResults.length > 0 ? (
                       <div className="max-h-96 overflow-y-auto">
-                        {searchResults.map((product) => (
+                        {searchResults.filter(p => p.id).map((product) => (
                           <button
                             key={product.id}
-                            onClick={() => handleProductClick(product.id)}
+                            onClick={() => handleProductClick(product.id!)}
                             className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors text-left"
                           >
                             <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">

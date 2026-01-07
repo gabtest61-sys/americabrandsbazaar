@@ -1,8 +1,8 @@
 // AI Dresser Recommendation Engine
 // Scoring and recommendation generation logic
 
-import { products as allProducts } from './products'
 import type { Look, LookItem } from './ai-dresser'
+import type { FirestoreProduct } from './firestore'
 import {
   colorHarmony,
   styleMapping,
@@ -28,14 +28,14 @@ export interface QuizAnswers {
 
 // Product scoring result
 interface ProductScore {
-  product: typeof allProducts[0]
+  product: FirestoreProduct
   score: number
   reasons: string[]
 }
 
 // Score a product based on quiz answers
 export const scoreProduct = (
-  product: typeof allProducts[0],
+  product: FirestoreProduct,
   answers: QuizAnswers,
   usedColors: Set<string>,
   usedBrands: Set<string> = new Set(),
@@ -157,10 +157,12 @@ export const generateLookName = (
 // Main recommendation engine
 export const generateLocalRecommendations = (
   answers: QuizAnswers,
+  allProducts: FirestoreProduct[],
   excludeProductIds: Set<string> = new Set()
 ): Look[] => {
-  // Step 1: Filter base products by gender and budget
+  // Step 1: Filter base products by gender and budget (only products with IDs)
   let filtered = [...allProducts].filter(p =>
+    p.id &&
     p.inStock &&
     p.stockQty > 0 &&
     !excludeProductIds.has(p.id)
@@ -195,7 +197,7 @@ export const generateLocalRecommendations = (
 
     // Score and sort available clothes
     const scoredClothes = clothes
-      .filter(p => !usedProducts.has(p.id))
+      .filter(p => p.id && !usedProducts.has(p.id))
       .map(p => scoreProduct(p, answers, usedColors, usedBrands, usedSubcategories))
       .sort((a, b) => b.score - a.score)
 
@@ -207,6 +209,7 @@ export const generateLocalRecommendations = (
     for (const scored of scoredClothes) {
       if (pickedClothes >= clothesToPick) break
       if (scored.product.price > lookBudget * 0.7) continue // Leave room for other items
+      if (!scored.product.id) continue
 
       // Alternate between premium and affordable
       const isPremium = scored.product.price > lookBudget * 0.3
@@ -235,16 +238,16 @@ export const generateLocalRecommendations = (
 
     // Score and pick 1 accessory with color harmony
     const scoredAccessories = accessories
-      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
+      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
       .map(p => scoreProduct(p, answers, usedColors, usedBrands, usedSubcategories))
       .sort((a, b) => b.score - a.score)
 
-    if (scoredAccessories.length > 0) {
+    if (scoredAccessories.length > 0 && scoredAccessories[0].product.id) {
       const accessory = scoredAccessories[0]
-      usedProducts.add(accessory.product.id)
+      usedProducts.add(accessory.product.id!)
 
       items.push({
-        product_id: accessory.product.id,
+        product_id: accessory.product.id!,
         product_name: accessory.product.name,
         brand: accessory.product.brand,
         category: 'accessories',
@@ -259,16 +262,16 @@ export const generateLocalRecommendations = (
 
     // Score and pick 1 shoe with color harmony
     const scoredShoes = shoes
-      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget)
+      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget)
       .map(p => scoreProduct(p, answers, usedColors, usedBrands, usedSubcategories))
       .sort((a, b) => b.score - a.score)
 
-    if (scoredShoes.length > 0) {
+    if (scoredShoes.length > 0 && scoredShoes[0].product.id) {
       const shoe = scoredShoes[0]
-      usedProducts.add(shoe.product.id)
+      usedProducts.add(shoe.product.id!)
 
       items.push({
-        product_id: shoe.product.id,
+        product_id: shoe.product.id!,
         product_name: shoe.product.name,
         brand: shoe.product.brand,
         category: 'shoes',
@@ -313,10 +316,10 @@ export const generateLocalRecommendations = (
 }
 
 // Fallback function if scoring is too restrictive
-const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswers): Look[] => {
-  const clothes = products.filter(p => p.category === 'clothes')
-  const accessories = products.filter(p => p.category === 'accessories')
-  const shoes = products.filter(p => p.category === 'shoes')
+const generateFallbackLooks = (products: FirestoreProduct[], answers: QuizAnswers): Look[] => {
+  const clothes = products.filter(p => p.id && p.category === 'clothes')
+  const accessories = products.filter(p => p.id && p.category === 'accessories')
+  const shoes = products.filter(p => p.id && p.category === 'shoes')
 
   const looks: Look[] = []
   const used = new Set<string>()
@@ -326,7 +329,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 
     // Pick clothes
     for (const c of clothes) {
-      if (!used.has(c.id) && items.filter(x => x.category === 'clothes').length < 2) {
+      if (c.id && !used.has(c.id) && items.filter(x => x.category === 'clothes').length < 2) {
         used.add(c.id)
         items.push({
           product_id: c.id,
@@ -343,7 +346,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 
     // Pick accessory
     for (const a of accessories) {
-      if (!used.has(a.id)) {
+      if (a.id && !used.has(a.id)) {
         used.add(a.id)
         items.push({
           product_id: a.id,
@@ -361,7 +364,7 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 
     // Pick shoe
     for (const s of shoes) {
-      if (!used.has(s.id)) {
+      if (s.id && !used.has(s.id)) {
         used.add(s.id)
         items.push({
           product_id: s.id,
@@ -395,8 +398,9 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 // Regenerate looks with exclusions (for "Get New Looks" feature)
 export const regenerateLooks = (
   answers: QuizAnswers,
+  allProducts: FirestoreProduct[],
   previousProductIds: string[]
 ): Look[] => {
   const excludeSet = new Set(previousProductIds)
-  return generateLocalRecommendations(answers, excludeSet)
+  return generateLocalRecommendations(answers, allProducts, excludeSet)
 }

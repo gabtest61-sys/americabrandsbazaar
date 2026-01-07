@@ -83,6 +83,13 @@ export interface FirestoreOrder {
     city?: string
   }
   notes?: string
+  // Payment fields
+  paymentMethod?: 'cod' | 'online' | 'gcash' | 'bank'
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded'
+  paymentId?: string
+  checkoutSessionId?: string
+  paidAt?: Timestamp | null
+  paymentError?: string
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }
@@ -113,7 +120,9 @@ export const createOrder = async (
   items: OrderItem[],
   customerInfo: FirestoreOrder['customerInfo'],
   userId?: string,
-  notes?: string
+  notes?: string,
+  paymentMethod?: FirestoreOrder['paymentMethod'],
+  paymentStatus?: FirestoreOrder['paymentStatus']
 ): Promise<{ success: boolean; orderId?: string; error?: string }> => {
   if (!db) {
     console.warn('Firestore not configured')
@@ -136,6 +145,8 @@ export const createOrder = async (
       status: 'pending',
       customerInfo,
       notes: notes || undefined,
+      paymentMethod: paymentMethod || 'cod',
+      paymentStatus: paymentStatus || 'pending',
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
     }
@@ -145,7 +156,8 @@ export const createOrder = async (
     await addDoc(collection(db, collectionName), orderData)
 
     // Grant bonus AI Dresser session for authenticated users making purchases
-    if (userId) {
+    // Only grant if payment is already confirmed (COD or paid online)
+    if (userId && (paymentMethod === 'cod' || paymentStatus === 'paid')) {
       await addBonusAIDresserSessions(userId, 1)
     }
 
@@ -216,6 +228,38 @@ export const getAllOrders = async (): Promise<FirestoreOrder[]> => {
   }
 }
 
+// Get order by order ID (searches both collections)
+export const getOrderById = async (orderId: string): Promise<FirestoreOrder | null> => {
+  if (!db) return null
+
+  try {
+    // Search in authenticated orders first
+    const ordersRef = collection(db, 'orders')
+    const q = query(ordersRef, where('orderId', '==', orderId))
+    const snapshot = await getDocs(q)
+
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0]
+      return { id: doc.id, ...doc.data() } as FirestoreOrder
+    }
+
+    // Search in guest orders
+    const guestOrdersRef = collection(db, 'guestOrders')
+    const guestQ = query(guestOrdersRef, where('orderId', '==', orderId))
+    const guestSnapshot = await getDocs(guestQ)
+
+    if (!guestSnapshot.empty) {
+      const doc = guestSnapshot.docs[0]
+      return { id: doc.id, ...doc.data() } as FirestoreOrder
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error fetching order by ID:', error)
+    return null
+  }
+}
+
 // Update order status (admin)
 export const updateOrderStatus = async (
   orderId: string,
@@ -256,6 +300,70 @@ export const updateOrderNotes = async (
     return true
   } catch (error) {
     console.error('Error updating order notes:', error)
+    return false
+  }
+}
+
+// Update order payment info (for PayMongo webhooks)
+export const updateOrderPayment = async (
+  orderId: string,
+  paymentData: {
+    paymentStatus?: FirestoreOrder['paymentStatus']
+    paymentId?: string
+    checkoutSessionId?: string
+    paidAt?: Timestamp | null
+    paymentError?: string
+  }
+): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    // Find the order by orderId field (not document ID)
+    const order = await getOrderById(orderId)
+    if (!order || !order.id) {
+      console.error('Order not found:', orderId)
+      return false
+    }
+
+    // Determine collection based on userId
+    const collectionName = order.userId ? 'orders' : 'guestOrders'
+    const orderRef = doc(db, collectionName, order.id)
+
+    const updateData: Record<string, unknown> = {
+      updatedAt: serverTimestamp()
+    }
+
+    if (paymentData.paymentStatus) {
+      updateData.paymentStatus = paymentData.paymentStatus
+    }
+    if (paymentData.paymentId) {
+      updateData.paymentId = paymentData.paymentId
+    }
+    if (paymentData.checkoutSessionId) {
+      updateData.checkoutSessionId = paymentData.checkoutSessionId
+    }
+    if (paymentData.paidAt !== undefined) {
+      updateData.paidAt = paymentData.paidAt
+    }
+    if (paymentData.paymentError) {
+      updateData.paymentError = paymentData.paymentError
+    }
+
+    // If payment is successful, update order status to confirmed
+    if (paymentData.paymentStatus === 'paid') {
+      updateData.status = 'confirmed'
+      updateData.paidAt = serverTimestamp()
+
+      // Grant bonus AI Dresser session if userId exists
+      if (order.userId) {
+        await addBonusAIDresserSessions(order.userId, 1)
+      }
+    }
+
+    await updateDoc(orderRef, updateData)
+    return true
+  } catch (error) {
+    console.error('Error updating order payment:', error)
     return false
   }
 }
@@ -521,6 +629,34 @@ export interface Review {
   createdAt: Timestamp | null
 }
 
+// Check if a user has purchased a specific product
+export const hasUserPurchasedProduct = async (userId: string, productId: string): Promise<boolean> => {
+  if (!db || !userId) return false
+
+  try {
+    // Check orders for this user
+    const ordersRef = collection(db, 'orders')
+    const ordersQuery = query(
+      ordersRef,
+      where('userId', '==', userId),
+      where('status', 'in', ['delivered', 'shipped', 'processing', 'confirmed'])
+    )
+    const ordersSnapshot = await getDocs(ordersQuery)
+
+    // Check if any order contains the product
+    for (const orderDoc of ordersSnapshot.docs) {
+      const orderData = orderDoc.data() as FirestoreOrder
+      const hasProduct = orderData.items?.some(item => item.productId === productId)
+      if (hasProduct) return true
+    }
+
+    return false
+  } catch (error) {
+    console.error('Error checking purchase history:', error)
+    return false
+  }
+}
+
 // Add a review
 export const addReview = async (
   productId: string,
@@ -546,6 +682,9 @@ export const addReview = async (
       return { success: false, error: 'You have already reviewed this product' }
     }
 
+    // Check if this is a verified purchase
+    const isVerifiedPurchase = await hasUserPurchasedProduct(userId, productId)
+
     const reviewData: Omit<Review, 'id'> = {
       productId,
       userId,
@@ -553,7 +692,7 @@ export const addReview = async (
       rating,
       title,
       comment,
-      verified: false,
+      verified: isVerifiedPurchase,
       helpful: 0,
       createdAt: serverTimestamp() as Timestamp
     }
@@ -643,6 +782,20 @@ export const getAllReviews = async (): Promise<Review[]> => {
   } catch (error) {
     console.error('Error fetching all reviews:', error)
     return []
+  }
+}
+
+// Delete a review (admin)
+export const deleteReview = async (reviewId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const reviewRef = doc(db, 'reviews', reviewId)
+    await deleteDoc(reviewRef)
+    return true
+  } catch (error) {
+    console.error('Error deleting review:', error)
+    return false
   }
 }
 

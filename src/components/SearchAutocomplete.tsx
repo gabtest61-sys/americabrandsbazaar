@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Search, X, TrendingUp, Clock, Shirt } from 'lucide-react'
-import { products, searchProducts, Product } from '@/lib/products'
+import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 interface SearchAutocompleteProps {
   onClose?: () => void
@@ -30,12 +30,24 @@ export default function SearchAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<Product[]>([])
+  const [results, setResults] = useState<FirestoreProduct[]>([])
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [allProducts, setAllProducts] = useState<FirestoreProduct[]>([])
 
   useEffect(() => {
+    // Load products from Firestore
+    const loadProducts = async () => {
+      try {
+        const products = await getFirestoreProducts()
+        setAllProducts(products)
+      } catch {
+        setAllProducts([])
+      }
+    }
+    loadProducts()
+
     // Load recent searches from localStorage
     const recent = JSON.parse(localStorage.getItem('recentSearches') || '[]')
     setRecentSearches(recent)
@@ -46,7 +58,14 @@ export default function SearchAutocomplete({
 
   useEffect(() => {
     if (query.length >= 2) {
-      const searchResults = searchProducts(query).slice(0, 6)
+      const searchQuery = query.toLowerCase().trim()
+      const searchResults = allProducts.filter(product =>
+        product.name.toLowerCase().includes(searchQuery) ||
+        product.brand.toLowerCase().includes(searchQuery) ||
+        product.category.toLowerCase().includes(searchQuery) ||
+        product.subcategory?.toLowerCase().includes(searchQuery) ||
+        product.tags?.some(tag => tag.toLowerCase().includes(searchQuery))
+      ).slice(0, 6)
       setResults(searchResults)
       setIsOpen(true)
       setSelectedIndex(-1)
@@ -54,7 +73,7 @@ export default function SearchAutocomplete({
       setResults([])
       setIsOpen(query.length === 0 && (recentSearches.length > 0 || showTrending))
     }
-  }, [query, recentSearches, showTrending])
+  }, [query, recentSearches, showTrending, allProducts])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

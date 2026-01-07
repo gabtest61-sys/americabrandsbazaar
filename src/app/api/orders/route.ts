@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createOrder, getAllOrders, getOrderById, Order } from '@/lib/orders'
+import {
+  createOrder,
+  getAllOrders,
+  getOrderById,
+  getOrdersByUser,
+  FirestoreOrder,
+  OrderItem
+} from '@/lib/firestore'
 
 // GET /api/orders - Get all orders (admin) or user's orders
 export async function GET(request: NextRequest) {
@@ -8,15 +15,21 @@ export async function GET(request: NextRequest) {
   const orderId = searchParams.get('orderId')
 
   if (orderId) {
-    const order = getOrderById(orderId)
+    const order = await getOrderById(orderId)
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
     return NextResponse.json(order)
   }
 
-  // For now, return all orders (in production, add auth check)
-  const orders = getAllOrders()
+  if (userId) {
+    // Return orders for specific user
+    const orders = await getOrdersByUser(userId)
+    return NextResponse.json(orders)
+  }
+
+  // Return all orders (admin)
+  const orders = await getAllOrders()
   return NextResponse.json(orders)
 }
 
@@ -29,11 +42,6 @@ export async function POST(request: NextRequest) {
       userId,
       customerInfo,
       items,
-      subtotal,
-      shipping,
-      total,
-      paymentMethod,
-      isGuest
     } = body
 
     // Validate required fields
@@ -49,19 +57,46 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Create the order
-    const order = createOrder({
-      userId,
-      customerInfo,
-      items,
-      subtotal,
-      shipping: shipping || 0,
-      total,
-      status: 'pending',
-      paymentMethod: paymentMethod || 'cod',
-      paymentStatus: 'pending',
-      isGuest: isGuest ?? true,
-    })
+    // Transform items to Firestore format
+    const orderItems: OrderItem[] = items.map((item: {
+      id: string
+      name: string
+      brand: string
+      price: number
+      quantity: number
+      selectedSize?: string
+      selectedColor?: string
+    }) => ({
+      productId: item.id,
+      name: item.name,
+      brand: item.brand,
+      price: item.price,
+      quantity: item.quantity,
+      size: item.selectedSize,
+      color: item.selectedColor
+    }))
+
+    // Transform customer info to Firestore format
+    const firestoreCustomerInfo: FirestoreOrder['customerInfo'] = {
+      name: customerInfo.fullName,
+      email: customerInfo.email,
+      phone: customerInfo.phone,
+      address: customerInfo.address,
+      city: customerInfo.city
+    }
+
+    // Create the order in Firestore
+    const result = await createOrder(
+      orderItems,
+      firestoreCustomerInfo,
+      userId || undefined
+    )
+
+    if (!result.success) {
+      return NextResponse.json({
+        error: result.error || 'Failed to create order'
+      }, { status: 500 })
+    }
 
     // Send notification webhook
     try {
@@ -72,7 +107,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           type: 'order_placed',
           data: {
-            orderId: order.id,
+            orderId: result.orderId,
             customerName: customerInfo.fullName,
             customerEmail: customerInfo.email,
             customerPhone: customerInfo.phone,
@@ -81,7 +116,7 @@ export async function POST(request: NextRequest) {
               price: item.price,
               quantity: item.quantity
             })),
-            total: order.total
+            total: orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
           }
         })
       })
@@ -92,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      order,
+      orderId: result.orderId,
       message: 'Order created successfully'
     })
   } catch (error) {

@@ -15,9 +15,8 @@ import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, consumeBonusAIDresserSession } from '@/lib/firestore'
+import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, consumeBonusAIDresserSession, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
-import { products as allProducts, getProductById } from '@/lib/products'
 import { regenerateLooks } from '@/lib/ai-dresser-engine'
 import {
   addLookToCart,
@@ -138,13 +137,13 @@ const occasionMapping: Record<string, string[]> = {
 
 // SOP 7.2 - Scoring function for product relevance
 interface ProductScore {
-  product: typeof allProducts[0]
+  product: FirestoreProduct
   score: number
   reasons: string[]
 }
 
 const scoreProduct = (
-  product: typeof allProducts[0],
+  product: FirestoreProduct,
   answers: QuizAnswers,
   usedColors: Set<string>
 ): ProductScore => {
@@ -153,12 +152,12 @@ const scoreProduct = (
 
   // Style matching (SOP 7.1)
   const styleKeywords = styleMapping[answers.style] || []
-  const productTags = product.tags?.map(t => t.toLowerCase()) || []
-  const productStyles = product.style?.map(s => s.toLowerCase()) || []
+  const productTags = product.tags?.map((t: string) => t.toLowerCase()) || []
+  const productStyles = product.style?.map((s: string) => s.toLowerCase()) || []
 
   for (const keyword of styleKeywords) {
-    const styleMatch = productStyles.some(s => s.includes(keyword))
-    if (productTags.some(t => t.includes(keyword)) || styleMatch) {
+    const styleMatch = productStyles.some((s: string) => s.includes(keyword))
+    if (productTags.some((t: string) => t.includes(keyword)) || styleMatch) {
       score += 15
       reasons.push(`Style match: ${keyword}`)
       break
@@ -167,10 +166,10 @@ const scoreProduct = (
 
   // Occasion matching (SOP 7.1)
   const occasionKeywords = occasionMapping[answers.occasion] || []
-  const productOccasions = product.occasions?.map(o => o.toLowerCase()) || []
+  const productOccasions = product.occasions?.map((o: string) => o.toLowerCase()) || []
 
   for (const keyword of occasionKeywords) {
-    if (productOccasions.some(o => o.includes(keyword)) || productTags.some(t => t.includes(keyword))) {
+    if (productOccasions.some((o: string) => o.includes(keyword)) || productTags.some((t: string) => t.includes(keyword))) {
       score += 12
       reasons.push(`Occasion match: ${keyword}`)
       break
@@ -179,7 +178,7 @@ const scoreProduct = (
 
   // Color harmony matching (SOP 7.1)
   const preferredColors = colorHarmony[answers.color] || []
-  const productColors = product.colors?.map(c => c.toLowerCase()) || []
+  const productColors = product.colors?.map((c: string) => c.toLowerCase()) || []
 
   for (const color of productColors) {
     if (preferredColors.some(pc => color.includes(pc) || pc.includes(color))) {
@@ -273,9 +272,9 @@ const generateLookName = (
 }
 
 // SOP 7.1-7.3 - Main recommendation engine
-const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
-  // Step 1: Filter base products by gender and budget
-  let filtered = [...allProducts].filter(p => p.inStock && p.stockQty > 0)
+const generateLocalRecommendations = (answers: QuizAnswers, allProducts: FirestoreProduct[]): Look[] => {
+  // Step 1: Filter base products by gender and budget (only products with IDs)
+  let filtered = [...allProducts].filter(p => p.id && p.inStock && p.stockQty > 0)
 
   if (answers.gender && answers.gender !== 'unisex') {
     filtered = filtered.filter(p =>
@@ -304,7 +303,7 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
 
     // Score and sort available clothes
     const scoredClothes = clothes
-      .filter(p => !usedProducts.has(p.id))
+      .filter(p => p.id && !usedProducts.has(p.id))
       .map(p => scoreProduct(p, answers, usedColors))
       .sort((a, b) => b.score - a.score)
 
@@ -316,12 +315,13 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
     for (const scored of scoredClothes) {
       if (pickedClothes >= clothesToPick) break
       if (scored.product.price > lookBudget * 0.7) continue // Leave room for other items
+      if (!scored.product.id) continue
 
       // Alternate between premium and affordable (SOP 7.2)
       const isPremium = scored.product.price > lookBudget * 0.3
       if (pickedClothes === 0 || (pickPremium === isPremium)) {
         usedProducts.add(scored.product.id)
-        scored.product.colors?.forEach(c => usedColors.add(c.toLowerCase()))
+        scored.product.colors?.forEach((c: string) => usedColors.add(c.toLowerCase()))
 
         items.push({
           product_id: scored.product.id,
@@ -329,7 +329,7 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
           brand: scored.product.brand,
           category: 'clothes',
           price: scored.product.price,
-          image_url: scored.product.images[0] || '/placeholder.jpg',
+          image_url: scored.product.images?.[0] || '/placeholder.jpg',
           product_url: `/shop/${scored.product.id}`,
           styling_note: scored.reasons[0] || `${scored.product.brand} signature piece`
         })
@@ -342,48 +342,52 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
 
     // Score and pick 1 accessory with color harmony
     const scoredAccessories = accessories
-      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
+      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
       .map(p => scoreProduct(p, answers, usedColors))
       .sort((a, b) => b.score - a.score)
 
     if (scoredAccessories.length > 0) {
       const accessory = scoredAccessories[0]
-      usedProducts.add(accessory.product.id)
+      if (accessory.product.id) {
+        usedProducts.add(accessory.product.id)
 
-      items.push({
-        product_id: accessory.product.id,
-        product_name: accessory.product.name,
-        brand: accessory.product.brand,
-        category: 'accessories',
-        price: accessory.product.price,
-        image_url: accessory.product.images[0] || '/placeholder.jpg',
-        product_url: `/shop/${accessory.product.id}`,
-        styling_note: accessory.reasons[0] || 'The perfect finishing touch'
-      })
+        items.push({
+          product_id: accessory.product.id,
+          product_name: accessory.product.name,
+          brand: accessory.product.brand,
+          category: 'accessories',
+          price: accessory.product.price,
+          image_url: accessory.product.images?.[0] || '/placeholder.jpg',
+          product_url: `/shop/${accessory.product.id}`,
+          styling_note: accessory.reasons[0] || 'The perfect finishing touch'
+        })
 
-      lookBudget -= accessory.product.price
+        lookBudget -= accessory.product.price
+      }
     }
 
     // Score and pick 1 shoe with color harmony
     const scoredShoes = shoes
-      .filter(p => !usedProducts.has(p.id) && p.price <= lookBudget)
+      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget)
       .map(p => scoreProduct(p, answers, usedColors))
       .sort((a, b) => b.score - a.score)
 
     if (scoredShoes.length > 0) {
       const shoe = scoredShoes[0]
-      usedProducts.add(shoe.product.id)
+      if (shoe.product.id) {
+        usedProducts.add(shoe.product.id)
 
-      items.push({
-        product_id: shoe.product.id,
-        product_name: shoe.product.name,
-        brand: shoe.product.brand,
-        category: 'shoes',
-        price: shoe.product.price,
-        image_url: shoe.product.images[0] || '/placeholder.jpg',
-        product_url: `/shop/${shoe.product.id}`,
-        styling_note: shoe.reasons[0] || 'Completes the look perfectly'
-      })
+        items.push({
+          product_id: shoe.product.id,
+          product_name: shoe.product.name,
+          brand: shoe.product.brand,
+          category: 'shoes',
+          price: shoe.product.price,
+          image_url: shoe.product.images?.[0] || '/placeholder.jpg',
+          product_url: `/shop/${shoe.product.id}`,
+          styling_note: shoe.reasons[0] || 'Completes the look perfectly'
+        })
+      }
     }
 
     // Create look if we have items (SOP 7.2 - complete purchasable sets)
@@ -421,10 +425,10 @@ const generateLocalRecommendations = (answers: QuizAnswers): Look[] => {
 }
 
 // Fallback function if scoring is too restrictive
-const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswers): Look[] => {
-  const clothes = products.filter(p => p.category === 'clothes')
-  const accessories = products.filter(p => p.category === 'accessories')
-  const shoes = products.filter(p => p.category === 'shoes')
+const generateFallbackLooks = (products: FirestoreProduct[], answers: QuizAnswers): Look[] => {
+  const clothes = products.filter(p => p.id && p.category === 'clothes')
+  const accessories = products.filter(p => p.id && p.category === 'accessories')
+  const shoes = products.filter(p => p.id && p.category === 'shoes')
 
   const looks: Look[] = []
   const used = new Set<string>()
@@ -432,17 +436,17 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
   for (let i = 0; i < Math.min(5, Math.ceil(clothes.length / 2)); i++) {
     const items: LookItem[] = []
 
-    // Pick clothes
+    // Pick clothes (products already filtered to have IDs)
     for (const c of clothes) {
-      if (!used.has(c.id) && items.filter(x => x.category === 'clothes').length < 2) {
-        used.add(c.id)
+      if (!used.has(c.id!) && items.filter(x => x.category === 'clothes').length < 2) {
+        used.add(c.id!)
         items.push({
-          product_id: c.id,
+          product_id: c.id!,
           product_name: c.name,
           brand: c.brand,
           category: 'clothes',
           price: c.price,
-          image_url: c.images[0] || '/placeholder.jpg',
+          image_url: c.images?.[0] || '/placeholder.jpg',
           product_url: `/shop/${c.id}`,
           styling_note: `${c.brand} quality`
         })
@@ -451,15 +455,15 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 
     // Pick accessory
     for (const a of accessories) {
-      if (!used.has(a.id)) {
-        used.add(a.id)
+      if (!used.has(a.id!)) {
+        used.add(a.id!)
         items.push({
-          product_id: a.id,
+          product_id: a.id!,
           product_name: a.name,
           brand: a.brand,
           category: 'accessories',
           price: a.price,
-          image_url: a.images[0] || '/placeholder.jpg',
+          image_url: a.images?.[0] || '/placeholder.jpg',
           product_url: `/shop/${a.id}`,
           styling_note: 'Adds style'
         })
@@ -469,15 +473,15 @@ const generateFallbackLooks = (products: typeof allProducts, answers: QuizAnswer
 
     // Pick shoe
     for (const s of shoes) {
-      if (!used.has(s.id)) {
-        used.add(s.id)
+      if (!used.has(s.id!)) {
+        used.add(s.id!)
         items.push({
-          product_id: s.id,
+          product_id: s.id!,
           product_name: s.name,
           brand: s.brand,
           category: 'shoes',
           price: s.price,
-          image_url: s.images[0] || '/placeholder.jpg',
+          image_url: s.images?.[0] || '/placeholder.jpg',
           product_url: `/shop/${s.id}`,
           styling_note: 'Completes the look'
         })
@@ -508,6 +512,7 @@ export default function AIDresserPage() {
   const [hasAccess, setHasAccess] = useState(true)
   const [accessType, setAccessType] = useState<'daily_free' | 'bonus' | 'none'>('daily_free')
   const [bonusSessions, setBonusSessions] = useState(0)
+  const [allProducts, setAllProducts] = useState<FirestoreProduct[]>([])
   const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-8 = quiz steps, 9 = loading, 10 = results
   const [answers, setAnswers] = useState<QuizAnswers>({
     purpose: null,
@@ -565,6 +570,19 @@ export default function AIDresserPage() {
       setActiveLook(prev => prev - 1)
     }
   }
+
+  // Load products from Firestore
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const products = await getFirestoreProducts()
+        setAllProducts(products)
+      } catch {
+        setAllProducts([])
+      }
+    }
+    loadProducts()
+  }, [])
 
   // Check access when user logs in
   useEffect(() => {
@@ -675,8 +693,8 @@ export default function AIDresserPage() {
         budget: answers.budget,
         color: answers.color
       },
-      filteredProducts.map(p => ({
-        id: p.id,
+      filteredProducts.filter(p => p.id).map(p => ({
+        id: p.id!,
         name: p.name,
         brand: p.brand,
         price: p.price,
@@ -698,7 +716,7 @@ export default function AIDresserPage() {
       setLooks(generatedLooks)
     } else {
       // Fallback to local generation
-      generatedLooks = generateLocalRecommendations(answers)
+      generatedLooks = generateLocalRecommendations(answers, allProducts)
       setLooks(generatedLooks)
     }
 
@@ -740,13 +758,16 @@ export default function AIDresserPage() {
     }
   }
 
+  // Helper function to get product by ID from loaded products
+  const getProductById = (id: string) => allProducts.find(p => p.id === id)
+
   const addToCart = async (item: LookItem) => {
     // Get the full product details
     const product = getProductById(item.product_id)
     if (product) {
       // Convert to cart product format
       addItem({
-        id: product.id,
+        id: product.id!,
         name: product.name,
         brand: product.brand,
         price: product.price,
@@ -765,7 +786,7 @@ export default function AIDresserPage() {
     // Add each item to cart
     for (const item of look.items) {
       const product = getProductById(item.product_id)
-      if (product) {
+      if (product && product.id) {
         addItem({
           id: product.id,
           name: product.name,
@@ -868,7 +889,7 @@ export default function AIDresserPage() {
     setShownProductIds(allShownIds)
 
     // Generate new looks excluding previously shown products
-    const newLooks = regenerateLooks(answers, allShownIds)
+    const newLooks = regenerateLooks(answers, allProducts, allShownIds)
 
     if (newLooks.length > 0) {
       setLooks(newLooks)
@@ -879,7 +900,7 @@ export default function AIDresserPage() {
     } else {
       // If no new looks possible, reset exclusions and regenerate
       setShownProductIds([])
-      const freshLooks = regenerateLooks(answers, [])
+      const freshLooks = regenerateLooks(answers, allProducts, [])
       setLooks(freshLooks)
       setActiveLook(0)
       showToast('Showing fresh looks', 'info')

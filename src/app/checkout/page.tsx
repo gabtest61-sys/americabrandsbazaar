@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check, Truck, Loader2 } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check, Truck, Loader2, CreditCard, Wallet, Building2 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
@@ -11,7 +11,8 @@ import { CheckoutFormData } from '@/lib/types'
 import { sendWebhook, createCheckoutPayload, createOrderCompletedPayload } from '@/lib/webhook'
 import { createOrder, OrderItem, getShippingSettings, ShippingSettings } from '@/lib/firestore'
 
-type CheckoutStep = 'info' | 'confirm' | 'success'
+type CheckoutStep = 'info' | 'payment' | 'confirm' | 'success'
+type PaymentMethod = 'online' | 'cod'
 
 // Default shipping settings (fallback if Firestore not available)
 const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
@@ -34,6 +35,7 @@ export default function CheckoutPage() {
   const [shippingRegion, setShippingRegion] = useState<string>('')
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings>(DEFAULT_SHIPPING_SETTINGS)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online')
 
   // Load shipping settings from Firestore
   useEffect(() => {
@@ -82,6 +84,10 @@ export default function CheckoutPage() {
     const payload = createCheckoutPayload(items, formData)
     await sendWebhook(payload)
 
+    setStep('payment')
+  }
+
+  const handleSelectPayment = () => {
     setStep('confirm')
   }
 
@@ -89,7 +95,46 @@ export default function CheckoutPage() {
     setIsSubmitting(true)
 
     try {
-      // Prepare order items for Firestore
+      if (paymentMethod === 'online') {
+        // Use PayMongo for online payment
+        const response = await fetch('/api/paymongo/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items.map(item => ({
+              id: item.product.id,
+              name: item.product.name,
+              brand: item.product.brand,
+              price: item.product.price,
+              quantity: item.quantity,
+              selectedSize: item.size,
+              selectedColor: item.color
+            })),
+            customerInfo: {
+              fullName: formData.fullName,
+              email: formData.email,
+              phone: formData.phone,
+              address: formData.address,
+              city: formData.city
+            },
+            userId: isLoggedIn ? user?.id : undefined,
+            notes: formData.notes,
+            shippingFee
+          })
+        })
+
+        const data = await response.json()
+
+        if (data.success && data.checkoutUrl) {
+          // Redirect to PayMongo checkout
+          window.location.href = data.checkoutUrl
+          return
+        } else {
+          throw new Error(data.error || 'Failed to create payment session')
+        }
+      }
+
+      // COD order - save directly to Firestore
       const orderItems: OrderItem[] = items.map(item => ({
         productId: item.product.id,
         name: item.product.name,
@@ -100,7 +145,6 @@ export default function CheckoutPage() {
         color: item.color
       }))
 
-      // Save order to Firestore
       const result = await createOrder(
         orderItems,
         {
@@ -111,7 +155,9 @@ export default function CheckoutPage() {
           city: formData.city || undefined
         },
         isLoggedIn ? user?.id : undefined,
-        formData.notes || undefined
+        formData.notes || undefined,
+        'cod',
+        'pending'
       )
 
       if (result.orderId) {
@@ -421,9 +467,120 @@ export default function CheckoutPage() {
                       disabled={!shippingRegion}
                       className="btn-primary w-full text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {!shippingRegion ? 'Select Shipping Region' : 'Continue to Review'}
+                      {!shippingRegion ? 'Select Shipping Region' : 'Continue to Payment'}
                     </button>
                   </form>
+                </div>
+              ) : step === 'payment' ? (
+                /* Payment Method Selection */
+                <div className="bg-white rounded-xl shadow-md p-6 md:p-8">
+                  <h1 className="text-2xl font-bold text-navy mb-6">Select Payment Method</h1>
+
+                  <div className="space-y-4 mb-8">
+                    {/* Online Payment Option */}
+                    <button
+                      onClick={() => setPaymentMethod('online')}
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        paymentMethod === 'online'
+                          ? 'border-gold bg-gold/10'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          paymentMethod === 'online' ? 'bg-gold text-white' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          <CreditCard className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-navy">Pay Online</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            GCash, Maya, Credit/Debit Card, Online Banking
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                              <Check className="w-3 h-3" />
+                              Instant confirmation
+                            </div>
+                            <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                              <Lock className="w-3 h-3" />
+                              Secure
+                            </div>
+                          </div>
+                        </div>
+                        {paymentMethod === 'online' && (
+                          <div className="w-6 h-6 bg-gold rounded-full flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* COD Option */}
+                    <button
+                      onClick={() => setPaymentMethod('cod')}
+                      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                        paymentMethod === 'cod'
+                          ? 'border-gold bg-gold/10'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          paymentMethod === 'cod' ? 'bg-gold text-white' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          <Wallet className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-navy">Cash on Delivery (COD)</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Pay when your order arrives
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                              <Building2 className="w-3 h-3" />
+                              Available in select areas
+                            </div>
+                          </div>
+                        </div>
+                        {paymentMethod === 'cod' && (
+                          <div className="w-6 h-6 bg-gold rounded-full flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Payment method logos */}
+                  {paymentMethod === 'online' && (
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500 mb-3">Accepted payment methods:</p>
+                      <div className="flex flex-wrap gap-3">
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-blue-600">GCash</span>
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-green-600">Maya</span>
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-gray-600">Visa</span>
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-orange-600">Mastercard</span>
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-blue-800">BDO</span>
+                        <span className="px-3 py-1 bg-white rounded border text-sm font-medium text-red-600">BPI</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setStep('info')}
+                      className="btn-secondary flex-1"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleSelectPayment}
+                      className="btn-primary flex-1"
+                    >
+                      Continue to Review
+                    </button>
+                  </div>
                 </div>
               ) : (
                 /* Order Review */
@@ -477,17 +634,54 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
+                  {/* Payment Method */}
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-navy">Payment Method</h3>
+                      <button
+                        onClick={() => setStep('payment')}
+                        className="text-gold text-sm hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {paymentMethod === 'online' ? (
+                        <>
+                          <CreditCard className="w-5 h-5 text-gold" />
+                          <span className="text-gray-600">Pay Online (GCash, Maya, Card, etc.)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="w-5 h-5 text-gold" />
+                          <span className="text-gray-600">Cash on Delivery</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Payment Notice */}
                   <div className="mb-6 p-4 bg-gold/10 border border-gold/30 rounded-lg">
-                    <h3 className="font-semibold text-navy mb-2">Payment Instructions</h3>
-                    <p className="text-gray-600 text-sm">
-                      After placing your order, we will contact you via Facebook Messenger with payment options including GCash, Maya, Bank Transfer, or COD.
-                    </p>
+                    {paymentMethod === 'online' ? (
+                      <>
+                        <h3 className="font-semibold text-navy mb-2">Secure Payment</h3>
+                        <p className="text-gray-600 text-sm">
+                          You'll be redirected to our secure payment partner (PayMongo) to complete your payment.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-semibold text-navy mb-2">COD Information</h3>
+                        <p className="text-gray-600 text-sm">
+                          Please prepare the exact amount. Our delivery partner will collect payment upon delivery.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex gap-4">
                     <button
-                      onClick={() => setStep('info')}
+                      onClick={() => setStep('payment')}
                       className="btn-secondary flex-1"
                     >
                       Back
@@ -497,7 +691,16 @@ export default function CheckoutPage() {
                       disabled={isSubmitting}
                       className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isSubmitting ? 'Placing Order...' : 'Place Order'}
+                      {isSubmitting ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Processing...
+                        </span>
+                      ) : paymentMethod === 'online' ? (
+                        'Proceed to Payment'
+                      ) : (
+                        'Place Order'
+                      )}
                     </button>
                   </div>
                 </div>

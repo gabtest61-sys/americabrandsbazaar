@@ -12,7 +12,7 @@ import {
   Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
   CheckSquare, Square, History, MessageSquare, Printer,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
-  Settings
+  Settings, Star
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -32,7 +32,10 @@ import {
   getShippingSettings,
   updateShippingSettings,
   ShippingSettings,
-  ShippingRate
+  ShippingRate,
+  getAllReviews,
+  deleteReview,
+  Review
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 
@@ -45,7 +48,7 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
-type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'settings'
+type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'reviews' | 'settings'
 
 // Coupon interface
 interface Coupon {
@@ -139,6 +142,13 @@ export default function AdminDashboard() {
   const [editingShipping, setEditingShipping] = useState<ShippingSettings | null>(null)
   const [isSavingShipping, setIsSavingShipping] = useState(false)
 
+  // Reviews management state
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null)
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'verified' | 'unverified'>('all')
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null)
+
   // Check admin access and redirect if not logged in
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -155,16 +165,18 @@ export default function AdminDashboard() {
       setIsAdmin(adminStatus)
 
       if (adminStatus) {
-        const [ordersData, usersData, productsData, shippingData] = await Promise.all([
+        const [ordersData, usersData, productsData, shippingData, reviewsData] = await Promise.all([
           getAllOrders(),
           getAllUsers(),
           getFirestoreProducts(),
-          getShippingSettings()
+          getShippingSettings(),
+          getAllReviews()
         ])
         setOrders(ordersData)
         setUsers(usersData)
         setFirestoreProducts(productsData)
         setShippingSettings(shippingData)
+        setReviews(reviewsData)
       }
       setIsLoadingData(false)
     }
@@ -883,6 +895,7 @@ export default function AdminDashboard() {
             { id: 'inventory', icon: Package, label: 'Inventory' },
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
             { id: 'products', icon: LayoutDashboard, label: 'Products' },
+            { id: 'reviews', icon: Star, label: 'Reviews' },
             { id: 'coupons', icon: Tag, label: 'Coupons' },
             { id: 'settings', icon: Settings, label: 'Settings' },
           ].map(tab => (
@@ -898,6 +911,11 @@ export default function AdminDashboard() {
               {tab.id === 'inventory' && lowStockProducts.length > 0 && (
                 <span className="ml-auto bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                   {lowStockProducts.length}
+                </span>
+              )}
+              {tab.id === 'reviews' && reviews.length > 0 && (
+                <span className="ml-auto bg-gold text-navy text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {reviews.length}
                 </span>
               )}
             </button>
@@ -941,6 +959,7 @@ export default function AdminDashboard() {
               { id: 'inventory', label: 'Inventory' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'products', label: 'Products' },
+              { id: 'reviews', label: 'Reviews' },
               { id: 'coupons', label: 'Coupons' },
               { id: 'settings', label: 'Settings' },
             ].map(tab => (
@@ -1887,6 +1906,194 @@ export default function AdminDashboard() {
                     className="mt-4 text-gold hover:text-yellow-600 font-medium"
                   >
                     Create your first coupon
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-navy">Product Reviews</h2>
+                  <p className="text-sm text-gray-500">Manage and moderate customer reviews</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Verified Filter */}
+                  <select
+                    value={reviewFilter}
+                    onChange={(e) => setReviewFilter(e.target.value as 'all' | 'verified' | 'unverified')}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold/50"
+                  >
+                    <option value="all">All Reviews</option>
+                    <option value="verified">Verified Only</option>
+                    <option value="unverified">Unverified Only</option>
+                  </select>
+                  {/* Rating Filter */}
+                  <select
+                    value={reviewRatingFilter ?? ''}
+                    onChange={(e) => setReviewRatingFilter(e.target.value ? Number(e.target.value) : null)}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gold/50"
+                  >
+                    <option value="">All Ratings</option>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Reviews Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Total Reviews</p>
+                  <p className="text-2xl font-bold text-navy">{reviews.length}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Verified</p>
+                  <p className="text-2xl font-bold text-green-600">{reviews.filter(r => r.verified).length}</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Avg Rating</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : '0'}
+                  </p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">5-Star Reviews</p>
+                  <p className="text-2xl font-bold text-blue-600">{reviews.filter(r => r.rating === 5).length}</p>
+                </div>
+              </div>
+
+              {/* Reviews List */}
+              <div className="space-y-4">
+                {reviews
+                  .filter(review => {
+                    if (reviewFilter === 'verified' && !review.verified) return false
+                    if (reviewFilter === 'unverified' && review.verified) return false
+                    if (reviewRatingFilter && review.rating !== reviewRatingFilter) return false
+                    return true
+                  })
+                  .map(review => {
+                    const product = firestoreProducts.find(p => p.id === review.productId)
+                    return (
+                      <div key={review.id} className="border border-gray-200 rounded-lg p-4 hover:border-gold/50 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            {/* Product Link */}
+                            {product && (
+                              <Link
+                                href={`/shop/${product.id}`}
+                                className="text-sm text-gold hover:text-yellow-600 font-medium mb-1 inline-block"
+                              >
+                                {product.name} by {product.brand}
+                              </Link>
+                            )}
+                            {!product && (
+                              <p className="text-sm text-gray-400 mb-1">Product ID: {review.productId}</p>
+                            )}
+
+                            {/* Rating & Verified Badge */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                  <Star
+                                    key={star}
+                                    className={`w-4 h-4 ${star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                                  />
+                                ))}
+                              </div>
+                              {review.verified && (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Verified Purchase
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Review Title & Content */}
+                            <h4 className="font-semibold text-navy">{review.title}</h4>
+                            <p className="text-gray-600 text-sm mt-1">{review.comment}</p>
+
+                            {/* Review Meta */}
+                            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                              <span>By: {review.userName}</span>
+                              <span>•</span>
+                              <span>{review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : 'N/A'}</span>
+                              <span>•</span>
+                              <span>{review.helpful} found helpful</span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2">
+                            {reviewToDelete === review.id ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={async () => {
+                                    const success = await deleteReview(review.id!)
+                                    if (success) {
+                                      setReviews(prev => prev.filter(r => r.id !== review.id))
+                                    }
+                                    setReviewToDelete(null)
+                                  }}
+                                  className="px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setReviewToDelete(null)}
+                                  className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setReviewToDelete(review.id!)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Review"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+
+              {/* Empty State */}
+              {reviews.length === 0 && (
+                <div className="text-center py-12">
+                  <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No reviews yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Reviews will appear here when customers leave feedback</p>
+                </div>
+              )}
+
+              {/* No Results */}
+              {reviews.length > 0 && reviews.filter(r => {
+                if (reviewFilter === 'verified' && !r.verified) return false
+                if (reviewFilter === 'unverified' && r.verified) return false
+                if (reviewRatingFilter && r.rating !== reviewRatingFilter) return false
+                return true
+              }).length === 0 && (
+                <div className="text-center py-12">
+                  <Filter className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No reviews match your filters</p>
+                  <button
+                    onClick={() => { setReviewFilter('all'); setReviewRatingFilter(null); }}
+                    className="mt-2 text-gold hover:text-yellow-600 font-medium text-sm"
+                  >
+                    Clear Filters
                   </button>
                 </div>
               )}

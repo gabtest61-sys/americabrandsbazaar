@@ -13,9 +13,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { getOrdersByUserId, Order } from '@/lib/orders'
-import { getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct } from '@/lib/firestore'
-import { getProductById, Product } from '@/lib/products'
+import { getOrdersByUser, getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct, FirestoreOrder } from '@/lib/firestore'
 
 const statusIcons = {
   pending: Clock,
@@ -39,9 +37,9 @@ export default function AccountPage() {
   const router = useRouter()
   const { user, isLoggedIn, isLoading, logout, deleteAccount, updateUser } = useAuth()
   const { addItem } = useCart()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<FirestoreOrder[]>([])
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
-  const [wishlistProducts, setWishlistProducts] = useState<(Product | FirestoreProduct)[]>([])
+  const [wishlistProducts, setWishlistProducts] = useState<FirestoreProduct[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
 
   // Settings editing state
@@ -63,11 +61,15 @@ export default function AccountPage() {
   }, [isLoggedIn, isLoading, router])
 
   useEffect(() => {
-    if (user) {
-      setOrders(getOrdersByUserId(user.id))
-      setEditName(user.name || '')
-      setEditPhone(user.phone || '')
+    const loadOrders = async () => {
+      if (user) {
+        const userOrders = await getOrdersByUser(user.id)
+        setOrders(userOrders)
+        setEditName(user.name || '')
+        setEditPhone(user.phone || '')
+      }
     }
+    loadOrders()
   }, [user])
 
   // Load wishlist when tab is active
@@ -77,19 +79,12 @@ export default function AccountPage() {
         setWishlistLoading(true)
         try {
           const wishlistIds = await getWishlist(user.id)
-          // Load products from both static and Firestore sources
-          const products: (Product | FirestoreProduct)[] = []
+          // Load products from Firestore
+          const products: FirestoreProduct[] = []
           for (const id of wishlistIds) {
-            // Try static products first
-            const staticProduct = getProductById(id)
-            if (staticProduct) {
-              products.push(staticProduct)
-            } else {
-              // Try Firestore products
-              const firestoreProduct = await getFirestoreProductById(id)
-              if (firestoreProduct) {
-                products.push(firestoreProduct)
-              }
+            const product = await getFirestoreProductById(id)
+            if (product) {
+              products.push(product)
             }
           }
           setWishlistProducts(products)
@@ -113,7 +108,7 @@ export default function AccountPage() {
     setWishlistProducts(prev => prev.filter(p => p.id !== productId))
   }
 
-  const handleAddToCart = (product: Product | FirestoreProduct) => {
+  const handleAddToCart = (product: FirestoreProduct) => {
     if (!product.id) return
     addItem({
       id: product.id,
@@ -283,14 +278,15 @@ export default function AccountPage() {
                     <div className="space-y-4">
                       {orders.map(order => {
                         const StatusIcon = statusIcons[order.status]
+                        const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date()
                         return (
-                          <div key={order.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                          <div key={order.id || order.orderId} className="bg-white rounded-2xl shadow-sm overflow-hidden">
                             {/* Order Header */}
                             <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
                               <div>
-                                <p className="font-mono text-sm text-gray-500">{order.id}</p>
+                                <p className="font-mono text-sm text-gray-500">{order.orderId}</p>
                                 <p className="text-sm text-gray-400">
-                                  {new Date(order.createdAt).toLocaleDateString('en-US', {
+                                  {orderDate.toLocaleDateString('en-US', {
                                     year: 'numeric',
                                     month: 'long',
                                     day: 'numeric'
