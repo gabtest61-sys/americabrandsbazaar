@@ -81,6 +81,7 @@ export default function AdminDashboard() {
   const [isSavingProduct, setIsSavingProduct] = useState(false)
   const [isSeeding, setIsSeeding] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [customProductId, setCustomProductId] = useState('')
 
   // Image upload state
   const [uploadingImages, setUploadingImages] = useState(false)
@@ -347,6 +348,7 @@ export default function AdminDashboard() {
     if (product) {
       setEditingProduct(product)
       setProductFormData({ ...product })
+      setCustomProductId('')
     } else {
       setEditingProduct(null)
       setProductFormData({
@@ -369,6 +371,7 @@ export default function AdminDashboard() {
         occasions: [],
         style: []
       })
+      setCustomProductId('')
     }
     setShowProductForm(true)
   }
@@ -396,12 +399,16 @@ export default function AdminDashboard() {
           alert('Failed to update product')
         }
       } else {
-        // Create new product
-        const result = await createProduct(productFormData as Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>)
+        // Create new product (with optional custom ID)
+        const result = await createProduct(
+          productFormData as Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>,
+          customProductId.trim() || undefined
+        )
         if (result.success && result.id) {
           const newProduct = { ...productFormData, id: result.id } as FirestoreProduct
           setFirestoreProducts(prev => [newProduct, ...prev])
           setShowProductForm(false)
+          setCustomProductId('')
         } else {
           alert(result.error || 'Failed to create product')
         }
@@ -1642,6 +1649,130 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Products List */}
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h3 className="font-semibold text-navy">All Products</h3>
+                  <div className="flex gap-3">
+                    <select
+                      value={productFilter.category}
+                      onChange={(e) => setProductFilter(prev => ({ ...prev, category: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat} className="capitalize">{cat}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={productFilter.brand}
+                      onChange={(e) => setProductFilter(prev => ({ ...prev, brand: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
+                    >
+                      <option value="">All Brands</option>
+                      {brands.map(brand => (
+                        <option key={brand} value={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Products Grid */}
+              <div className="p-6">
+                {allProducts.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>No products yet. Add your first product or seed from static data.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {allProducts
+                      .filter(p => {
+                        if (productFilter.category && p.category !== productFilter.category) return false
+                        if (productFilter.brand && p.brand !== productFilter.brand) return false
+                        return true
+                      })
+                      .slice(0, 20)
+                      .map(product => (
+                        <div
+                          key={product.id}
+                          className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100 hover:border-gold/50 transition-colors group"
+                        >
+                          {/* Product Image */}
+                          <div className="relative aspect-square bg-white">
+                            {product.images && product.images[0] ? (
+                              <Image
+                                src={product.images[0]}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 50vw, 25vw"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                                <Package className="w-12 h-12" />
+                              </div>
+                            )}
+                            {/* Actions overlay */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                              <button
+                                onClick={() => openProductForm(product as FirestoreProduct)}
+                                className="p-2 bg-white rounded-lg hover:bg-gold transition-colors"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4 text-navy" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(product.id || null)}
+                                className="p-2 bg-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {/* Featured badge */}
+                            {product.featured && (
+                              <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
+                                Featured
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Product Info */}
+                          <div className="p-3">
+                            <p className="text-xs text-gold font-medium mb-0.5">{product.brand}</p>
+                            <p className="text-sm font-medium text-navy truncate" title={product.name}>
+                              {product.name}
+                            </p>
+                            <div className="flex items-center justify-between mt-2">
+                              <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                product.stockQty > 20 ? 'bg-green-100 text-green-700' :
+                                product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {product.stockQty} in stock
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1 font-mono truncate" title={product.id}>
+                              ID: {product.id}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {allProducts.length > 20 && (
+                  <p className="text-center text-sm text-gray-500 mt-4">
+                    Showing 20 of {allProducts.length} products. Use Inventory tab for full list with pagination.
+                  </p>
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -2052,6 +2183,35 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Product ID (only for new products) */}
+              {!editingProduct && (
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-blue-700 mb-2">
+                    Product ID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customProductId}
+                    onChange={(e) => setCustomProductId(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, '-'))}
+                    className="w-full px-4 py-3 border border-blue-200 rounded-xl focus:outline-none focus:border-blue-500 bg-white"
+                    placeholder="e.g. ck-logo-tshirt-black (auto-generated if empty)"
+                  />
+                  <p className="text-xs text-blue-600 mt-2">
+                    Leave empty to auto-generate. Use lowercase letters, numbers, and hyphens only.
+                  </p>
+                </div>
+              )}
+
+              {/* Show current ID when editing */}
+              {editingProduct?.id && (
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Product ID</label>
+                  <p className="font-mono text-sm text-navy bg-white px-3 py-2 rounded-lg border border-gray-200">
+                    {editingProduct.id}
+                  </p>
+                </div>
+              )}
+
               {/* Basic Info */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div>

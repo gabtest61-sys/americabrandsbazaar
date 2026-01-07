@@ -24,10 +24,10 @@ import {
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ReviewSection from '@/components/ReviewSection'
-import { getProductById, products, Product } from '@/lib/products'
+import { getProductById, Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProductById, FirestoreProduct } from '@/lib/firestore'
+import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProductById, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 // Size guide data
 const sizeGuideData = {
@@ -81,8 +81,8 @@ export default function ProductDetailPage() {
   const [showSizeGuide, setShowSizeGuide] = useState(false)
   const [showZoom, setShowZoom] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
-  const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([])
+  const [relatedProducts, setRelatedProducts] = useState<FirestoreProduct[]>([])
+  const [recentlyViewed, setRecentlyViewed] = useState<FirestoreProduct[]>([])
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -102,8 +102,9 @@ export default function ProductDetailPage() {
         setSelectedSize(foundProduct.sizes?.[0] || '')
         setSelectedImageIndex(0)
 
-        // Get related products (same category, different product)
-        const related = products
+        // Get related products from Firestore (same category, different product)
+        const allFirestoreProducts = await getFirestoreProducts()
+        const related = allFirestoreProducts
           .filter(p => p.category === foundProduct!.category && p.id !== foundProduct!.id)
           .slice(0, 4)
         setRelatedProducts(related)
@@ -114,12 +115,10 @@ export default function ProductDetailPage() {
         const updated = [productId, ...filtered].slice(0, 8)
         localStorage.setItem('recentlyViewed', JSON.stringify(updated))
 
-        // Load recently viewed products
-        const recentIds = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
-        const recentProds = recentIds
-          .filter((id: string) => id !== productId)
-          .map((id: string) => getProductById(id))
-          .filter(Boolean)
+        // Load recently viewed products from Firestore
+        const recentIds = JSON.parse(localStorage.getItem('recentlyViewed') || '[]') as string[]
+        const recentProds = allFirestoreProducts
+          .filter(p => p.id && recentIds.includes(p.id) && p.id !== productId)
           .slice(0, 4)
         setRecentlyViewed(recentProds)
 
@@ -479,40 +478,53 @@ export default function ProductDetailPage() {
             <section className="mt-16">
               <h2 className="text-2xl font-bold text-navy mb-6">Related Products</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {relatedProducts.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/shop/${item.id}`}
-                    className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
-                  >
-                    <div className="aspect-[3/4] bg-gray-100 relative">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-16 h-16 rounded-full bg-white shadow flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <span className="text-navy font-bold text-xl">{item.brand.charAt(0)}</span>
-                        </div>
-                      </div>
-                      {item.originalPrice && (
-                        <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                          SALE
-                        </span>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <p className="text-xs text-gold font-medium mb-1">{item.brand}</p>
-                      <h3 className="text-sm font-medium text-navy line-clamp-2 mb-2 group-hover:text-gold transition-colors">
-                        {item.name}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-navy">₱{item.price.toLocaleString()}</span>
-                        {item.originalPrice && (
-                          <span className="text-xs text-gray-400 line-through">
-                            ₱{item.originalPrice.toLocaleString()}
+                {relatedProducts.map((item) => {
+                  const itemHasImage = item.images && item.images.length > 0 && item.images[0]
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/shop/${item.id}`}
+                      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
+                        {itemHasImage ? (
+                          <Image
+                            src={item.images[0]}
+                            alt={item.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-16 h-16 rounded-full bg-white shadow flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <span className="text-navy font-bold text-xl">{item.brand.charAt(0)}</span>
+                            </div>
+                          </div>
+                        )}
+                        {item.originalPrice && item.originalPrice > item.price && (
+                          <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10">
+                            SALE
                           </span>
                         )}
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                      <div className="p-4">
+                        <p className="text-xs text-gold font-medium mb-1">{item.brand}</p>
+                        <h3 className="text-sm font-medium text-navy line-clamp-2 mb-2 group-hover:text-gold transition-colors">
+                          {item.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-navy">₱{item.price.toLocaleString()}</span>
+                          {item.originalPrice && item.originalPrice > item.price && (
+                            <span className="text-xs text-gray-400 line-through">
+                              ₱{item.originalPrice.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             </section>
           )}
@@ -522,28 +534,41 @@ export default function ProductDetailPage() {
             <section className="mt-16">
               <h2 className="text-2xl font-bold text-navy mb-6">Recently Viewed</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {recentlyViewed.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/shop/${item.id}`}
-                    className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
-                  >
-                    <div className="aspect-[3/4] bg-gray-100 relative">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-16 h-16 rounded-full bg-white shadow flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <span className="text-navy font-bold text-xl">{item.brand.charAt(0)}</span>
-                        </div>
+                {recentlyViewed.map((item) => {
+                  const itemHasImage = item.images && item.images.length > 0 && item.images[0]
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/shop/${item.id}`}
+                      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 relative overflow-hidden">
+                        {itemHasImage ? (
+                          <Image
+                            src={item.images[0]}
+                            alt={item.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-16 h-16 rounded-full bg-white shadow flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <span className="text-navy font-bold text-xl">{item.brand.charAt(0)}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="p-4">
-                      <p className="text-xs text-gold font-medium mb-1">{item.brand}</p>
-                      <h3 className="text-sm font-medium text-navy line-clamp-2 mb-2 group-hover:text-gold transition-colors">
-                        {item.name}
-                      </h3>
-                      <span className="font-bold text-navy">₱{item.price.toLocaleString()}</span>
-                    </div>
-                  </Link>
-                ))}
+                      <div className="p-4">
+                        <p className="text-xs text-gold font-medium mb-1">{item.brand}</p>
+                        <h3 className="text-sm font-medium text-navy line-clamp-2 mb-2 group-hover:text-gold transition-colors">
+                          {item.name}
+                        </h3>
+                        <span className="font-bold text-navy">₱{item.price.toLocaleString()}</span>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             </section>
           )}

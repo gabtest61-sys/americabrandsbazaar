@@ -720,21 +720,37 @@ const removeUndefinedFields = <T extends Record<string, unknown>>(obj: T): Parti
   return cleaned as Partial<T>
 }
 
-// Create new product
+// Create new product (with optional custom ID)
 export const createProduct = async (
-  product: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>
+  product: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>,
+  customId?: string
 ): Promise<{ success: boolean; id?: string; error?: string }> => {
   if (!db) return { success: false, error: 'Database not configured' }
 
   try {
-    const productsRef = collection(db, 'products')
     const cleanedProduct = removeUndefinedFields(product)
-    const docRef = await addDoc(productsRef, {
+    const productData = {
       ...cleanedProduct,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    })
-    return { success: true, id: docRef.id }
+    }
+
+    if (customId) {
+      // Use custom ID with setDoc
+      const productRef = doc(db, 'products', customId)
+      // Check if product with this ID already exists
+      const existingDoc = await getDoc(productRef)
+      if (existingDoc.exists()) {
+        return { success: false, error: 'A product with this ID already exists' }
+      }
+      await setDoc(productRef, productData)
+      return { success: true, id: customId }
+    } else {
+      // Auto-generate ID with addDoc
+      const productsRef = collection(db, 'products')
+      const docRef = await addDoc(productsRef, productData)
+      return { success: true, id: docRef.id }
+    }
   } catch (error) {
     console.error('Error creating product:', error)
     return { success: false, error: 'Failed to create product' }

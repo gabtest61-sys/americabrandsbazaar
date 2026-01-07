@@ -14,7 +14,7 @@ import Footer from '@/components/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
 import { getOrdersByUserId, Order } from '@/lib/orders'
-import { getWishlist, removeFromWishlist, updateUserProfile } from '@/lib/firestore'
+import { getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct } from '@/lib/firestore'
 import { getProductById, Product } from '@/lib/products'
 
 const statusIcons = {
@@ -41,7 +41,7 @@ export default function AccountPage() {
   const { addItem } = useCart()
   const [orders, setOrders] = useState<Order[]>([])
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
-  const [wishlistProducts, setWishlistProducts] = useState<Product[]>([])
+  const [wishlistProducts, setWishlistProducts] = useState<(Product | FirestoreProduct)[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
 
   // Settings editing state
@@ -77,9 +77,21 @@ export default function AccountPage() {
         setWishlistLoading(true)
         try {
           const wishlistIds = await getWishlist(user.id)
-          const products = wishlistIds
-            .map(id => getProductById(id))
-            .filter((p): p is Product => p !== undefined)
+          // Load products from both static and Firestore sources
+          const products: (Product | FirestoreProduct)[] = []
+          for (const id of wishlistIds) {
+            // Try static products first
+            const staticProduct = getProductById(id)
+            if (staticProduct) {
+              products.push(staticProduct)
+            } else {
+              // Try Firestore products
+              const firestoreProduct = await getFirestoreProductById(id)
+              if (firestoreProduct) {
+                products.push(firestoreProduct)
+              }
+            }
+          }
           setWishlistProducts(products)
         } catch (error) {
           console.error('Error loading wishlist:', error)
@@ -101,18 +113,19 @@ export default function AccountPage() {
     setWishlistProducts(prev => prev.filter(p => p.id !== productId))
   }
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: Product | FirestoreProduct) => {
+    if (!product.id) return
     addItem({
       id: product.id,
       name: product.name,
       brand: product.brand,
       price: product.price,
       originalPrice: product.originalPrice || product.price,
-      image: product.images[0] || '/placeholder.jpg',
+      image: product.images?.[0] || '/placeholder.jpg',
       category: product.category as 'clothes' | 'accessories' | 'shoes',
-      sizes: product.sizes,
-      colors: product.colors,
-    }, 1, product.sizes[0], product.colors[0])
+      sizes: product.sizes || [],
+      colors: product.colors || [],
+    }, 1, product.sizes?.[0] || '', product.colors?.[0] || '')
   }
 
   const handleSaveProfile = async () => {
@@ -351,39 +364,54 @@ export default function AccountPage() {
                     </div>
                   ) : wishlistProducts.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {wishlistProducts.map(product => (
-                        <div key={product.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex">
-                          <Link href={`/shop/${product.id}`} className="w-32 h-32 bg-gray-100 flex-shrink-0 flex items-center justify-center">
-                            <Shirt className="w-12 h-12 text-gray-300" />
-                          </Link>
-                          <div className="flex-1 p-4 flex flex-col justify-between">
-                            <div>
-                              <p className="text-xs text-gold font-medium">{product.brand}</p>
-                              <Link href={`/shop/${product.id}`}>
-                                <h3 className="font-medium text-navy hover:text-gold transition-colors line-clamp-1">
-                                  {product.name}
-                                </h3>
-                              </Link>
-                              <p className="font-bold text-navy mt-1">₱{product.price.toLocaleString()}</p>
-                            </div>
-                            <div className="flex items-center gap-2 mt-2">
-                              <button
-                                onClick={() => handleAddToCart(product)}
-                                className="flex-1 flex items-center justify-center gap-1 bg-gold text-navy text-sm font-medium py-2 rounded-lg hover:bg-yellow-400 transition-colors"
-                              >
-                                <ShoppingBag className="w-4 h-4" />
-                                Add to Cart
-                              </button>
-                              <button
-                                onClick={() => handleRemoveFromWishlist(product.id)}
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                      {wishlistProducts.map(product => {
+                        const hasImage = product.images && product.images.length > 0 && product.images[0]
+                        return (
+                          <div key={product.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex">
+                            <Link href={`/shop/${product.id}`} className="w-32 h-32 bg-gray-100 flex-shrink-0 relative overflow-hidden">
+                              {hasImage ? (
+                                <Image
+                                  src={product.images[0]}
+                                  alt={product.name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="128px"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <Shirt className="w-12 h-12 text-gray-300" />
+                                </div>
+                              )}
+                            </Link>
+                            <div className="flex-1 p-4 flex flex-col justify-between">
+                              <div>
+                                <p className="text-xs text-gold font-medium">{product.brand}</p>
+                                <Link href={`/shop/${product.id}`}>
+                                  <h3 className="font-medium text-navy hover:text-gold transition-colors line-clamp-1">
+                                    {product.name}
+                                  </h3>
+                                </Link>
+                                <p className="font-bold text-navy mt-1">₱{product.price.toLocaleString()}</p>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => handleAddToCart(product)}
+                                  className="flex-1 flex items-center justify-center gap-1 bg-gold text-navy text-sm font-medium py-2 rounded-lg hover:bg-yellow-400 transition-colors"
+                                >
+                                  <ShoppingBag className="w-4 h-4" />
+                                  Add to Cart
+                                </button>
+                                <button
+                                  onClick={() => product.id && handleRemoveFromWishlist(product.id)}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
