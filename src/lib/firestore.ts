@@ -410,8 +410,8 @@ export const addBonusAIDresserSessions = async (
   }
 }
 
-// Use a bonus AI Dresser session (decrement count)
-export const useBonusAIDresserSession = async (userId: string): Promise<boolean> => {
+// Consume a bonus AI Dresser session (decrement count)
+export const consumeBonusAIDresserSession = async (userId: string): Promise<boolean> => {
   if (!db) return false
 
   try {

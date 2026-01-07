@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ShoppingBag, Heart, Check, ArrowRight, Loader2 } from 'lucide-react'
-import { FEATURED_PRODUCTS, formatPrice } from '@/lib/constants'
+import { formatPrice } from '@/lib/constants'
 import { useCart } from '@/context/CartContext'
 import { useToast } from '@/components/Toast'
 import { Product } from '@/lib/types'
@@ -15,7 +15,7 @@ export default function FeaturedProducts() {
   const { showToast } = useToast()
   const [addedProducts, setAddedProducts] = useState<Set<string>>(new Set())
   const [likedProducts, setLikedProducts] = useState<Set<string>>(new Set())
-  const [featuredProducts, setFeaturedProducts] = useState<(FirestoreProduct | typeof FEATURED_PRODUCTS[0])[]>([])
+  const [featuredProducts, setFeaturedProducts] = useState<FirestoreProduct[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,7 +34,9 @@ export default function FeaturedProducts() {
     loadFeaturedProducts()
   }, [])
 
-  const handleAddToCart = (product: FirestoreProduct | typeof FEATURED_PRODUCTS[0]) => {
+  const handleAddToCart = (product: FirestoreProduct) => {
+    if (!product.id) return
+
     const productData: Product = {
       id: product.id,
       name: product.name,
@@ -48,11 +50,12 @@ export default function FeaturedProducts() {
     }
     addItem(productData)
 
-    setAddedProducts((prev) => new Set(prev).add(product.id))
+    const productId = product.id
+    setAddedProducts((prev) => new Set(prev).add(productId))
     setTimeout(() => {
       setAddedProducts((prev) => {
         const next = new Set(prev)
-        next.delete(product.id)
+        next.delete(productId)
         return next
       })
     }, 2000)
@@ -98,15 +101,16 @@ export default function FeaturedProducts() {
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {featuredProducts.map((product) => {
-              const isAdded = addedProducts.has(product.id)
-              const isLiked = likedProducts.has(product.id)
+            {featuredProducts.filter(p => p.id).map((product) => {
+              const productId = product.id!
+              const isAdded = addedProducts.has(productId)
+              const isLiked = likedProducts.has(productId)
               const hasImage = product.images && product.images.length > 0 && product.images[0]
 
               return (
                 <Link
-                  key={product.id}
-                  href={`/shop/${product.id}`}
+                  key={productId}
+                  href={`/shop/${productId}`}
                   className="group relative bg-gray-50 rounded-2xl overflow-hidden"
                 >
                   {/* Image Container */}
@@ -141,7 +145,7 @@ export default function FeaturedProducts() {
                     <button
                       onClick={(e) => {
                         e.preventDefault()
-                        toggleLike(product.id)
+                        toggleLike(productId)
                       }}
                       className={`absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 z-10 ${
                         isLiked

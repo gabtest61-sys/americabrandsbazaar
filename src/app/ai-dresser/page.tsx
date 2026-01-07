@@ -15,7 +15,7 @@ import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, useBonusAIDresserSession } from '@/lib/firestore'
+import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, consumeBonusAIDresserSession } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { products as allProducts, getProductById } from '@/lib/products'
 import { regenerateLooks } from '@/lib/ai-dresser-engine'
@@ -584,7 +584,7 @@ export default function AIDresserPage() {
     if (user?.id) {
       // If using bonus session, decrement it
       if (accessType === 'bonus') {
-        await useBonusAIDresserSession(user.id)
+        await consumeBonusAIDresserSession(user.id)
         setBonusSessions(prev => prev - 1)
       } else {
         await incrementAIDresserUsage(user.id)

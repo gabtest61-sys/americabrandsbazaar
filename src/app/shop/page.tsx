@@ -588,16 +588,18 @@ function ShopContent() {
                     ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
                     : 'grid-cols-1'
                 }`}>
-                  {paginatedProducts.map(product => (
+                  {paginatedProducts.filter(p => p.id).map(product => {
+                    const productId = product.id!
+                    return (
                     <div
-                      key={product.id}
+                      key={productId}
                       className={`bg-white rounded-2xl overflow-hidden shadow-sm group hover:shadow-md transition-shadow ${
                         viewMode === 'list' ? 'flex' : ''
                       }`}
                     >
                       {/* Image */}
                       <Link
-                        href={`/shop/${product.id}`}
+                        href={`/shop/${productId}`}
                         className={`relative block bg-gray-100 ${
                           viewMode === 'list' ? 'w-40 flex-shrink-0' : 'aspect-[3/4]'
                         }`}
@@ -611,14 +613,14 @@ function ShopContent() {
                           </span>
                         )}
                         <button
-                          onClick={(e) => product.id && toggleWishlist(product.id, e)}
+                          onClick={(e) => toggleWishlist(productId, e)}
                           className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
-                            product.id && wishlist.has(product.id)
+                            wishlist.has(productId)
                               ? 'bg-pink-500 text-white opacity-100'
                               : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
                           }`}
                         >
-                          <Heart className={`w-4 h-4 ${product.id && wishlist.has(product.id) ? 'fill-current' : ''}`} />
+                          <Heart className={`w-4 h-4 ${wishlist.has(productId) ? 'fill-current' : ''}`} />
                         </button>
                       </Link>
 
@@ -626,7 +628,7 @@ function ShopContent() {
                       <div className={`p-4 ${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
                         <div>
                           <p className="text-xs text-gold font-medium mb-1">{product.brand}</p>
-                          <Link href={`/shop/${product.id}`}>
+                          <Link href={`/shop/${productId}`}>
                             <h3 className="font-medium text-navy hover:text-gold transition-colors line-clamp-2">
                               {product.name}
                             </h3>
@@ -647,19 +649,20 @@ function ShopContent() {
                           </div>
                           <button
                             onClick={() => handleAddToCart(product)}
-                            disabled={!product.id || addedItems.has(product.id)}
+                            disabled={addedItems.has(productId)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                              product.id && addedItems.has(product.id)
+                              addedItems.has(productId)
                                 ? 'bg-green-500 text-white'
                                 : 'bg-gold text-navy hover:bg-yellow-400'
                             }`}
                           >
-                            {product.id && addedItems.has(product.id) ? '✓' : <ShoppingBag className="w-4 h-4" />}
+                            {addedItems.has(productId) ? '✓' : <ShoppingBag className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
+
                 </div>
               ) : (
                 <div className="text-center py-16 bg-white rounded-2xl">
