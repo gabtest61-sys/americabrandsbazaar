@@ -11,7 +11,8 @@ import {
   AlertTriangle, BarChart3, Plus, Edit2, Trash2, Save, X,
   Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
   CheckSquare, Square, History, MessageSquare, Printer,
-  FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical
+  FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
+  Settings
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -28,7 +29,11 @@ import {
   deleteProduct,
   seedProductsToFirestore,
   FirestoreProduct,
-  uploadProductImage
+  uploadProductImage,
+  getShippingSettings,
+  updateShippingSettings,
+  ShippingSettings,
+  ShippingRate
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 
@@ -41,7 +46,7 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
-type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons'
+type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'settings'
 
 // Coupon interface
 interface Coupon {
@@ -125,6 +130,15 @@ export default function AdminDashboard() {
   // Revenue chart period
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
+  // Inventory pagination state
+  const [inventoryPage, setInventoryPage] = useState(1)
+  const INVENTORY_PER_PAGE = 20
+
+  // Shipping settings state
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null)
+  const [editingShipping, setEditingShipping] = useState<ShippingSettings | null>(null)
+  const [isSavingShipping, setIsSavingShipping] = useState(false)
+
   // Check admin access and redirect if not logged in
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -141,14 +155,16 @@ export default function AdminDashboard() {
       setIsAdmin(adminStatus)
 
       if (adminStatus) {
-        const [ordersData, usersData, productsData] = await Promise.all([
+        const [ordersData, usersData, productsData, shippingData] = await Promise.all([
           getAllOrders(),
           getAllUsers(),
-          getFirestoreProducts()
+          getFirestoreProducts(),
+          getShippingSettings()
         ])
         setOrders(ordersData)
         setUsers(usersData)
         setFirestoreProducts(productsData)
+        setShippingSettings(shippingData)
       }
       setIsLoadingData(false)
     }
@@ -193,8 +209,9 @@ export default function AdminDashboard() {
     totalCustomers: users.length,
   }
 
-  // Inventory stats
-  const lowStockProducts = allProducts.filter(p => p.stockQty < 20)
+  // Inventory stats - Low stock threshold
+  const LOW_STOCK_THRESHOLD = 5
+  const lowStockProducts = allProducts.filter(p => p.stockQty > 0 && p.stockQty < LOW_STOCK_THRESHOLD)
   const outOfStockProducts = allProducts.filter(p => p.stockQty === 0)
   const totalInventoryValue = allProducts.reduce((sum, p) => sum + (p.price * p.stockQty), 0)
 
@@ -309,7 +326,7 @@ export default function AdminDashboard() {
       p.category,
       p.price.toString(),
       p.stockQty.toString(),
-      p.stockQty === 0 ? 'Out of Stock' : p.stockQty < 20 ? 'Low Stock' : 'In Stock'
+      p.stockQty === 0 ? 'Out of Stock' : p.stockQty < LOW_STOCK_THRESHOLD ? 'Low Stock' : 'In Stock'
     ])
 
     const csvContent = [
@@ -841,6 +858,7 @@ export default function AdminDashboard() {
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
             { id: 'products', icon: LayoutDashboard, label: 'Products' },
             { id: 'coupons', icon: Tag, label: 'Coupons' },
+            { id: 'settings', icon: Settings, label: 'Settings' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -898,6 +916,7 @@ export default function AdminDashboard() {
               { id: 'analytics', label: 'Analytics' },
               { id: 'products', label: 'Products' },
               { id: 'coupons', label: 'Coupons' },
+              { id: 'settings', label: 'Settings' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1270,7 +1289,12 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-xl shadow-sm">
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <h2 className="text-lg font-bold text-navy">Inventory</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-navy">Inventory</h2>
+                    <p className="text-sm text-gray-500">
+                      Showing {((inventoryPage - 1) * INVENTORY_PER_PAGE) + 1}-{Math.min(inventoryPage * INVENTORY_PER_PAGE, allProducts.length)} of {allProducts.length} products
+                    </p>
+                  </div>
                   <button
                     onClick={exportInventoryToCSV}
                     className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -1294,7 +1318,9 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {allProducts.slice(0, 20).map(product => (
+                    {allProducts
+                      .slice((inventoryPage - 1) * INVENTORY_PER_PAGE, inventoryPage * INVENTORY_PER_PAGE)
+                      .map(product => (
                       <tr key={product.id} className="hover:bg-gray-50">
                         <td className="py-4 px-6">
                           <p className="font-medium text-navy">{product.name}</p>
@@ -1316,11 +1342,11 @@ export default function AdminDashboard() {
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             product.stockQty === 0
                               ? 'bg-red-100 text-red-700'
-                              : product.stockQty < 20
+                              : product.stockQty < LOW_STOCK_THRESHOLD
                               ? 'bg-yellow-100 text-yellow-700'
                               : 'bg-green-100 text-green-700'
                           }`}>
-                            {product.stockQty === 0 ? 'Out of Stock' : product.stockQty < 20 ? 'Low Stock' : 'In Stock'}
+                            {product.stockQty === 0 ? 'Out of Stock' : product.stockQty < LOW_STOCK_THRESHOLD ? 'Low Stock' : 'In Stock'}
                           </span>
                         </td>
                       </tr>
@@ -1328,6 +1354,62 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Inventory Pagination */}
+              {Math.ceil(allProducts.length / INVENTORY_PER_PAGE) > 1 && (
+                <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setInventoryPage(prev => Math.max(1, prev - 1))}
+                    disabled={inventoryPage === 1}
+                    className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors ${
+                      inventoryPage === 1
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 text-navy hover:bg-gold hover:border-gold'
+                    }`}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  {Array.from({ length: Math.min(5, Math.ceil(allProducts.length / INVENTORY_PER_PAGE)) }, (_, i) => {
+                    const totalPages = Math.ceil(allProducts.length / INVENTORY_PER_PAGE)
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (inventoryPage <= 3) {
+                      pageNum = i + 1
+                    } else if (inventoryPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = inventoryPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setInventoryPage(pageNum)}
+                        className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg border transition-colors ${
+                          inventoryPage === pageNum
+                            ? 'bg-gold border-gold text-navy font-bold'
+                            : 'border-gray-200 text-navy hover:bg-gold hover:border-gold'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+
+                  <button
+                    onClick={() => setInventoryPage(prev => Math.min(Math.ceil(allProducts.length / INVENTORY_PER_PAGE), prev + 1))}
+                    disabled={inventoryPage === Math.ceil(allProducts.length / INVENTORY_PER_PAGE)}
+                    className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors ${
+                      inventoryPage === Math.ceil(allProducts.length / INVENTORY_PER_PAGE)
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 text-navy hover:bg-gold hover:border-gold'
+                    }`}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1723,7 +1805,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-6">
                           <span className={`text-sm font-medium ${
                             product.stockQty === 0 ? 'text-red-600' :
-                            product.stockQty < 20 ? 'text-yellow-600' : 'text-green-600'
+                            product.stockQty < LOW_STOCK_THRESHOLD ? 'text-yellow-600' : 'text-green-600'
                           }`}>
                             {product.stockQty}
                           </span>
@@ -1990,6 +2072,176 @@ export default function AdminDashboard() {
                   >
                     Create your first coupon
                   </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            {/* Shipping Rates Section */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-navy">Shipping Settings</h2>
+                  <p className="text-sm text-gray-500">Configure shipping rates by region</p>
+                </div>
+                {!editingShipping && (
+                  <button
+                    onClick={() => setEditingShipping(shippingSettings ? { ...shippingSettings } : null)}
+                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit Rates
+                  </button>
+                )}
+              </div>
+
+              {/* View Mode */}
+              {!editingShipping && shippingSettings && (
+                <div className="space-y-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-medium text-navy mb-3">Shipping Rates by Region</h3>
+                    <div className="space-y-2">
+                      {shippingSettings.rates.map(rate => (
+                        <div key={rate.id} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                          <span className="text-gray-700">{rate.region}</span>
+                          <span className="font-semibold text-navy">₱{rate.fee.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-medium text-green-800">Free Shipping Threshold</h3>
+                        <p className="text-sm text-green-600">Orders above this amount get free shipping</p>
+                      </div>
+                      <span className="text-xl font-bold text-green-700">₱{shippingSettings.freeShippingThreshold.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit Mode */}
+              {editingShipping && (
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-navy">Shipping Rates by Region</h3>
+                    {editingShipping.rates.map((rate, index) => (
+                      <div key={rate.id} className="flex items-center gap-4 bg-gray-50 rounded-lg p-4">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Region Name</label>
+                          <input
+                            type="text"
+                            value={rate.region}
+                            onChange={(e) => {
+                              const newRates = [...editingShipping.rates]
+                              newRates[index] = { ...rate, region: e.target.value }
+                              setEditingShipping({ ...editingShipping, rates: newRates })
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Fee (₱)</label>
+                          <input
+                            type="number"
+                            value={rate.fee}
+                            onChange={(e) => {
+                              const newRates = [...editingShipping.rates]
+                              newRates[index] = { ...rate, fee: parseInt(e.target.value) || 0 }
+                              setEditingShipping({ ...editingShipping, rates: newRates })
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold"
+                          />
+                        </div>
+                        {editingShipping.rates.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const newRates = editingShipping.rates.filter((_, i) => i !== index)
+                              setEditingShipping({ ...editingShipping, rates: newRates })
+                            }}
+                            className="mt-6 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        const newRate: ShippingRate = {
+                          id: `region-${Date.now()}`,
+                          region: 'New Region',
+                          fee: 100
+                        }
+                        setEditingShipping({
+                          ...editingShipping,
+                          rates: [...editingShipping.rates, newRate]
+                        })
+                      }}
+                      className="flex items-center gap-2 text-gold hover:text-yellow-600 font-medium"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Region
+                    </button>
+                  </div>
+
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <label className="block font-medium text-green-800 mb-2">Free Shipping Threshold (₱)</label>
+                    <input
+                      type="number"
+                      value={editingShipping.freeShippingThreshold}
+                      onChange={(e) => setEditingShipping({
+                        ...editingShipping,
+                        freeShippingThreshold: parseInt(e.target.value) || 0
+                      })}
+                      className="w-full px-3 py-2 border border-green-200 rounded-lg focus:outline-none focus:border-green-500"
+                    />
+                    <p className="text-sm text-green-600 mt-1">Orders above this amount will get free shipping</p>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={async () => {
+                        setIsSavingShipping(true)
+                        const success = await updateShippingSettings(editingShipping)
+                        if (success) {
+                          setShippingSettings(editingShipping)
+                          setEditingShipping(null)
+                        } else {
+                          alert('Failed to save shipping settings')
+                        }
+                        setIsSavingShipping(false)
+                      }}
+                      disabled={isSavingShipping}
+                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSavingShipping ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setEditingShipping(null)}
+                      className="px-6 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {!shippingSettings && !editingShipping && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-gray-300 mx-auto mb-2 animate-spin" />
+                  <p className="text-gray-500">Loading shipping settings...</p>
                 </div>
               )}
             </div>

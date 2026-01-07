@@ -810,3 +810,59 @@ export const deleteUserData = async (userId: string): Promise<boolean> => {
     return false
   }
 }
+
+// ==================== SHIPPING SETTINGS ====================
+
+export interface ShippingRate {
+  id: string
+  region: string
+  fee: number
+}
+
+export interface ShippingSettings {
+  rates: ShippingRate[]
+  freeShippingThreshold: number
+  updatedAt?: string
+}
+
+const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
+  rates: [
+    { id: 'metro-manila', region: 'Metro Manila', fee: 100 },
+    { id: 'luzon', region: 'Luzon (Provincial)', fee: 150 },
+    { id: 'visayas', region: 'Visayas', fee: 200 },
+    { id: 'mindanao', region: 'Mindanao', fee: 250 },
+  ],
+  freeShippingThreshold: 3000,
+}
+
+// Get shipping settings
+export const getShippingSettings = async (): Promise<ShippingSettings> => {
+  if (!db) return DEFAULT_SHIPPING_SETTINGS
+  try {
+    const docRef = doc(db, 'settings', 'shipping')
+    const docSnap = await getDoc(docRef)
+    if (docSnap.exists()) {
+      return docSnap.data() as ShippingSettings
+    }
+    return DEFAULT_SHIPPING_SETTINGS
+  } catch (error) {
+    console.error('Error getting shipping settings:', error)
+    return DEFAULT_SHIPPING_SETTINGS
+  }
+}
+
+// Update shipping settings
+export const updateShippingSettings = async (settings: ShippingSettings): Promise<boolean> => {
+  if (!db) return false
+  try {
+    const docRef = doc(db, 'settings', 'shipping')
+    await setDoc(docRef, {
+      ...settings,
+      updatedAt: new Date().toISOString()
+    })
+    return true
+  } catch (error) {
+    console.error('Error updating shipping settings:', error)
+    return false
+  }
+}

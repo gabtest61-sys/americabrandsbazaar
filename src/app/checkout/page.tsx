@@ -1,17 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check, Truck, Loader2 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
 import { CheckoutFormData } from '@/lib/types'
 import { sendWebhook, createCheckoutPayload, createOrderCompletedPayload } from '@/lib/webhook'
-import { createOrder, OrderItem } from '@/lib/firestore'
+import { createOrder, OrderItem, getShippingSettings, ShippingSettings } from '@/lib/firestore'
 
 type CheckoutStep = 'info' | 'confirm' | 'success'
+
+// Default shipping settings (fallback if Firestore not available)
+const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
+  rates: [
+    { id: 'metro-manila', region: 'Metro Manila', fee: 100 },
+    { id: 'luzon', region: 'Luzon (Provincial)', fee: 150 },
+    { id: 'visayas', region: 'Visayas', fee: 200 },
+    { id: 'mindanao', region: 'Mindanao', fee: 250 },
+  ],
+  freeShippingThreshold: 3000,
+}
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart()
@@ -20,6 +31,25 @@ export default function CheckoutPage() {
   const [isGuest, setIsGuest] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderId, setOrderId] = useState<string>('')
+  const [shippingRegion, setShippingRegion] = useState<string>('')
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings>(DEFAULT_SHIPPING_SETTINGS)
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true)
+
+  // Load shipping settings from Firestore
+  useEffect(() => {
+    const loadShippingSettings = async () => {
+      try {
+        const settings = await getShippingSettings()
+        setShippingSettings(settings)
+      } catch (error) {
+        console.error('Error loading shipping settings:', error)
+        // Keep default settings on error
+      } finally {
+        setIsLoadingSettings(false)
+      }
+    }
+    loadShippingSettings()
+  }, [])
   const [formData, setFormData] = useState<CheckoutFormData>({
     fullName: '',
     email: '',
@@ -31,7 +61,10 @@ export default function CheckoutPage() {
     password: '',
   })
 
-  const shippingFee = 0 // Free shipping for now
+  // Calculate shipping fee - free if above threshold, otherwise based on region
+  const isFreeShipping = subtotal >= shippingSettings.freeShippingThreshold
+  const selectedRate = shippingSettings.rates.find(r => r.id === shippingRegion)
+  const shippingFee = isFreeShipping ? 0 : (selectedRate?.fee || 0)
   const total = subtotal + shippingFee
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -261,6 +294,54 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
+                    {/* Shipping Region */}
+                    <div>
+                      <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
+                        <Truck className="w-5 h-5 text-gold" />
+                        Shipping Region *
+                      </h2>
+                      {isLoadingSettings ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-gold" />
+                          <span className="ml-2 text-gray-500 text-sm">Loading shipping options...</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                          {shippingSettings.rates.map((rate) => (
+                            <button
+                              key={rate.id}
+                              type="button"
+                              onClick={() => setShippingRegion(rate.id)}
+                              className={`p-3 rounded-lg border-2 text-center transition-colors ${
+                                shippingRegion === rate.id
+                                  ? 'border-gold bg-gold/10 text-navy'
+                                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              <p className="font-medium text-sm">{rate.region}</p>
+                              <p className="text-xs mt-1">
+                                {isFreeShipping ? (
+                                  <span className="text-green-600">Free</span>
+                                ) : (
+                                  <span className="text-gray-500">₱{rate.fee.toLocaleString()}</span>
+                                )}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {isFreeShipping && (
+                        <p className="text-sm text-green-600 mb-4">
+                          ✓ You qualify for free shipping on orders ₱{shippingSettings.freeShippingThreshold.toLocaleString()}+
+                        </p>
+                      )}
+                      {!isFreeShipping && (
+                        <p className="text-sm text-gray-500 mb-4">
+                          Add ₱{(shippingSettings.freeShippingThreshold - subtotal).toLocaleString()} more for free shipping!
+                        </p>
+                      )}
+                    </div>
+
                     {/* Delivery Address */}
                     <div>
                       <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
@@ -335,8 +416,12 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
-                    <button type="submit" className="btn-primary w-full text-lg">
-                      Continue to Review
+                    <button
+                      type="submit"
+                      disabled={!shippingRegion}
+                      className="btn-primary w-full text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {!shippingRegion ? 'Select Shipping Region' : 'Continue to Review'}
                     </button>
                   </form>
                 </div>
@@ -450,8 +535,17 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    <span className="text-green-600">Free</span>
+                    {isFreeShipping ? (
+                      <span className="text-green-600">Free</span>
+                    ) : shippingRegion ? (
+                      <span>{formatPrice(shippingFee)}</span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">Select region</span>
+                    )}
                   </div>
+                  {!shippingRegion && !isFreeShipping && (
+                    <p className="text-xs text-amber-600">* Please select shipping region above</p>
+                  )}
                   <div className="flex justify-between text-xl font-bold text-navy pt-2 border-t border-gray-200">
                     <span>Total</span>
                     <span>{formatPrice(total)}</span>
