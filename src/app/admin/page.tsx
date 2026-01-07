@@ -1,24 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   LayoutDashboard, ShoppingBag, Users, Package, TrendingUp,
   DollarSign, Eye, Clock, CheckCircle, XCircle, Truck,
   ChevronRight, Search, Filter, MoreVertical, LogOut, Download, Loader2,
-  AlertTriangle, BarChart3, Plus, Edit2, Trash2, Save, X
+  AlertTriangle, BarChart3, Plus, Edit2, Trash2, Save, X,
+  Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
+  CheckSquare, Square, History, MessageSquare, Printer,
+  FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getAllOrders,
   updateOrderStatus,
+  updateOrderNotes,
   getAllUsers,
   checkIsAdmin,
   FirestoreOrder,
-  UserProfile
+  UserProfile,
+  getFirestoreProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  seedProductsToFirestore,
+  FirestoreProduct,
+  uploadProductImage
 } from '@/lib/firestore'
-import { products as allProducts, Product, brands, categories } from '@/lib/products'
+import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -29,7 +41,20 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
-type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products'
+type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons'
+
+// Coupon interface
+interface Coupon {
+  id: string
+  code: string
+  type: 'percentage' | 'fixed'
+  value: number
+  minPurchase: number
+  maxUses: number
+  usedCount: number
+  expiresAt: string
+  active: boolean
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -44,8 +69,61 @@ export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false)
 
   // Product management state
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [firestoreProducts, setFirestoreProducts] = useState<FirestoreProduct[]>([])
   const [productFilter, setProductFilter] = useState({ category: '', brand: '' })
+  const [showProductForm, setShowProductForm] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<FirestoreProduct | null>(null)
+  const [productFormData, setProductFormData] = useState<Partial<FirestoreProduct>>({})
+  const [isSavingProduct, setIsSavingProduct] = useState(false)
+  const [isSeeding, setIsSeeding] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+
+  // Image upload state
+  const [uploadingImages, setUploadingImages] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
+
+  // Sorting state
+  const [sortField, setSortField] = useState<'name' | 'price' | 'stockQty' | 'createdAt'>('createdAt')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  // Bulk selection state
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set())
+  const [showBulkActions, setShowBulkActions] = useState(false)
+
+  // Date filter state
+  const [dateFilter, setDateFilter] = useState<{ from: string; to: string }>({ from: '', to: '' })
+
+  // Order notes modal
+  const [orderNotesModal, setOrderNotesModal] = useState<{ order: FirestoreOrder; note: string } | null>(null)
+
+  // Customer details view
+  const [selectedCustomer, setSelectedCustomer] = useState<(UserProfile & { id: string }) | null>(null)
+
+  // Unified search
+  const [globalSearch, setGlobalSearch] = useState('')
+
+  // Coupon management
+  const [coupons, setCoupons] = useState<Coupon[]>([
+    { id: '1', code: 'WELCOME10', type: 'percentage', value: 10, minPurchase: 1000, maxUses: 100, usedCount: 23, expiresAt: '2025-12-31', active: true },
+    { id: '2', code: 'FLAT500', type: 'fixed', value: 500, minPurchase: 3000, maxUses: 50, usedCount: 12, expiresAt: '2025-06-30', active: true },
+  ])
+  const [showCouponForm, setShowCouponForm] = useState(false)
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null)
+  const [couponFormData, setCouponFormData] = useState<Partial<Coupon>>({})
+
+  // Order print modal
+  const [printOrder, setPrintOrder] = useState<FirestoreOrder | null>(null)
+
+  // Product import
+  const productImportRef = useRef<HTMLInputElement>(null)
+  const [isImporting, setIsImporting] = useState(false)
+
+  // Revenue chart period
+  const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
   // Check admin access and redirect if not logged in
   useEffect(() => {
@@ -63,12 +141,14 @@ export default function AdminDashboard() {
       setIsAdmin(adminStatus)
 
       if (adminStatus) {
-        const [ordersData, usersData] = await Promise.all([
+        const [ordersData, usersData, productsData] = await Promise.all([
           getAllOrders(),
-          getAllUsers()
+          getAllUsers(),
+          getFirestoreProducts()
         ])
         setOrders(ordersData)
         setUsers(usersData)
+        setFirestoreProducts(productsData)
       }
       setIsLoadingData(false)
     }
@@ -78,8 +158,22 @@ export default function AdminDashboard() {
     }
   }, [isLoggedIn, user])
 
+  // Combined products - Firestore takes priority, fallback to static
+  const allProducts = firestoreProducts.length > 0 ? firestoreProducts : staticProducts
+
   const filteredOrders = orders.filter(order => {
+    // Date filter
+    if (dateFilter.from) {
+      const orderDate = order.createdAt?.toDate()
+      if (!orderDate || orderDate < new Date(dateFilter.from)) return false
+    }
+    if (dateFilter.to) {
+      const orderDate = order.createdAt?.toDate()
+      if (!orderDate || orderDate > new Date(dateFilter.to + 'T23:59:59')) return false
+    }
+    // Status filter
     if (filterStatus && order.status !== filterStatus) return false
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       return (
@@ -123,16 +217,49 @@ export default function AdminDashboard() {
     products: allProducts.filter(p => p.brand === brand)
   }))
 
-  // Filtered products for product management
-  const filteredProducts = allProducts.filter(p => {
-    if (productFilter.category && p.category !== productFilter.category) return false
-    if (productFilter.brand && p.brand !== productFilter.brand) return false
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
-    }
-    return true
-  })
+  // Filtered products for product management with sorting
+  const filteredProducts = allProducts
+    .filter(p => {
+      if (productFilter.category && p.category !== productFilter.category) return false
+      if (productFilter.brand && p.brand !== productFilter.brand) return false
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return p.name.toLowerCase().includes(query) || (p.id && p.id.toLowerCase().includes(query))
+      }
+      return true
+    })
+    .sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'price':
+          comparison = a.price - b.price
+          break
+        case 'stockQty':
+          comparison = a.stockQty - b.stockQty
+          break
+        case 'createdAt':
+          const getTime = (val: unknown): number => {
+            if (!val) return 0
+            if (typeof val === 'object' && 'toMillis' in (val as object)) {
+              return (val as { toMillis: () => number }).toMillis()
+            }
+            return 0
+          }
+          comparison = getTime(a.createdAt) - getTime(b.createdAt)
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+
+  // Pagination
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const handleStatusChange = async (docId: string, newStatus: FirestoreOrder['status'], isGuestOrder: boolean = false) => {
     const success = await updateOrderStatus(docId, newStatus, isGuestOrder)
@@ -199,6 +326,469 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url)
   }
 
+  // Open product form for create/edit
+  const openProductForm = (product?: FirestoreProduct) => {
+    if (product) {
+      setEditingProduct(product)
+      setProductFormData({ ...product })
+    } else {
+      setEditingProduct(null)
+      setProductFormData({
+        name: '',
+        brand: brands[0],
+        category: 'clothes',
+        subcategory: '',
+        price: 0,
+        originalPrice: undefined,
+        description: '',
+        images: [],
+        colors: [],
+        sizes: [],
+        gender: 'unisex',
+        tags: [],
+        inStock: true,
+        stockQty: 0,
+        featured: false,
+        giftSuitable: true,
+        occasions: [],
+        style: []
+      })
+    }
+    setShowProductForm(true)
+  }
+
+  // Save product (create or update)
+  const handleSaveProduct = async () => {
+    if (!productFormData.name || !productFormData.brand) {
+      alert('Please fill in required fields (Name, Brand)')
+      return
+    }
+
+    setIsSavingProduct(true)
+
+    try {
+      if (editingProduct?.id) {
+        // Update existing product
+        const success = await updateProduct(editingProduct.id, productFormData)
+        if (success) {
+          setFirestoreProducts(prev =>
+            prev.map(p => p.id === editingProduct.id ? { ...p, ...productFormData } : p)
+          )
+          setShowProductForm(false)
+          setEditingProduct(null)
+        } else {
+          alert('Failed to update product')
+        }
+      } else {
+        // Create new product
+        const result = await createProduct(productFormData as Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>)
+        if (result.success && result.id) {
+          const newProduct = { ...productFormData, id: result.id } as FirestoreProduct
+          setFirestoreProducts(prev => [newProduct, ...prev])
+          setShowProductForm(false)
+        } else {
+          alert(result.error || 'Failed to create product')
+        }
+      }
+    } catch (error) {
+      console.error('Error saving product:', error)
+      alert('An error occurred while saving the product')
+    }
+
+    setIsSavingProduct(false)
+  }
+
+  // Delete product
+  const handleDeleteProduct = async (productId: string) => {
+    const success = await deleteProduct(productId)
+    if (success) {
+      setFirestoreProducts(prev => prev.filter(p => p.id !== productId))
+      setDeleteConfirm(null)
+    } else {
+      alert('Failed to delete product')
+    }
+  }
+
+  // Seed static products to Firestore
+  const handleSeedProducts = async () => {
+    if (!confirm('This will copy all static products to Firestore. Continue?')) return
+
+    setIsSeeding(true)
+    const result = await seedProductsToFirestore(staticProducts)
+    if (result.success) {
+      alert(`Successfully seeded ${result.count} products to Firestore`)
+      const productsData = await getFirestoreProducts()
+      setFirestoreProducts(productsData)
+    } else {
+      alert(result.error || 'Failed to seed products')
+    }
+    setIsSeeding(false)
+  }
+
+  // Quick update product fields
+  const handleQuickUpdate = async (productId: string, field: string, value: unknown) => {
+    const success = await updateProduct(productId, { [field]: value })
+    if (success) {
+      setFirestoreProducts(prev =>
+        prev.map(p => p.id === productId ? { ...p, [field]: value } : p)
+      )
+    }
+  }
+
+  // Image upload handler
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    setUploadingImages(true)
+    const currentImages = productFormData.images || []
+    const newImages: string[] = []
+
+    for (const file of Array.from(files)) {
+      const productId = editingProduct?.id || `new-${Date.now()}`
+      const result = await uploadProductImage(file, productId)
+      if (result.success && result.url) {
+        newImages.push(result.url)
+      }
+    }
+
+    setProductFormData(prev => ({
+      ...prev,
+      images: [...currentImages, ...newImages]
+    }))
+    setUploadingImages(false)
+  }
+
+  // Remove image from product
+  const handleRemoveImage = (index: number) => {
+    setProductFormData(prev => ({
+      ...prev,
+      images: (prev.images || []).filter((_, i) => i !== index)
+    }))
+  }
+
+  // Sorting handler
+  const handleSort = (field: 'name' | 'price' | 'stockQty' | 'createdAt') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+    setCurrentPage(1)
+  }
+
+  // Bulk selection handlers
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(productId)) {
+        newSet.delete(productId)
+      } else {
+        newSet.add(productId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllProducts = () => {
+    if (selectedProducts.size === paginatedProducts.length) {
+      setSelectedProducts(new Set())
+    } else {
+      setSelectedProducts(new Set(paginatedProducts.map(p => p.id!).filter(Boolean)))
+    }
+  }
+
+  // Bulk delete products
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedProducts.size} products?`)) return
+
+    let successCount = 0
+    for (const productId of selectedProducts) {
+      const success = await deleteProduct(productId)
+      if (success) successCount++
+    }
+
+    if (successCount > 0) {
+      setFirestoreProducts(prev => prev.filter(p => !p.id || !selectedProducts.has(p.id)))
+      setSelectedProducts(new Set())
+    }
+    alert(`Deleted ${successCount} of ${selectedProducts.size} products`)
+  }
+
+  // Bulk update stock
+  const handleBulkStockUpdate = async (inStock: boolean) => {
+    let successCount = 0
+    for (const productId of selectedProducts) {
+      const success = await updateProduct(productId, { inStock })
+      if (success) successCount++
+    }
+
+    if (successCount > 0) {
+      setFirestoreProducts(prev =>
+        prev.map(p => p.id && selectedProducts.has(p.id) ? { ...p, inStock } : p)
+      )
+    }
+    alert(`Updated ${successCount} products`)
+  }
+
+  // Get customer orders
+  const getCustomerOrders = (customerId: string) => {
+    return orders.filter(o => o.userId === customerId)
+  }
+
+  // Calculate customer lifetime value
+  const getCustomerLifetimeValue = (customerId: string) => {
+    return getCustomerOrders(customerId).reduce((sum, o) => sum + o.total, 0)
+  }
+
+  // Export orders to CSV
+  const exportOrdersToCSV = () => {
+    const headers = ['Order ID', 'Customer', 'Email', 'Phone', 'Items', 'Subtotal', 'Shipping', 'Total', 'Status', 'Date', 'Notes']
+    const rows = filteredOrders.map(o => [
+      o.orderId,
+      o.customerInfo.name,
+      o.customerInfo.email,
+      o.customerInfo.phone,
+      o.items.map(i => `${i.name} x${i.quantity}`).join('; '),
+      o.subtotal.toString(),
+      o.shippingFee.toString(),
+      o.total.toString(),
+      o.status,
+      o.createdAt?.toDate().toISOString().split('T')[0] || 'N/A',
+      o.notes || ''
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lgm-orders-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Export products to CSV (for import template)
+  const exportProductsToCSV = () => {
+    const headers = ['ID', 'Name', 'Brand', 'Category', 'Subcategory', 'Price', 'Original Price', 'Stock', 'Description', 'Colors', 'Sizes', 'Tags', 'Gender', 'Featured', 'In Stock']
+    const rows = allProducts.map(p => [
+      p.id || '',
+      p.name,
+      p.brand,
+      p.category,
+      p.subcategory,
+      p.price.toString(),
+      p.originalPrice?.toString() || '',
+      p.stockQty.toString(),
+      p.description,
+      p.colors.join(';'),
+      p.sizes.join(';'),
+      p.tags.join(';'),
+      p.gender,
+      p.featured ? 'true' : 'false',
+      p.inStock ? 'true' : 'false'
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `lgm-products-export-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Import products from CSV
+  const handleProductImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsImporting(true)
+    const reader = new FileReader()
+
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string
+        const lines = text.split('\n')
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase())
+
+        let importCount = 0
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (!line) continue
+
+          const values = line.match(/("([^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) || []
+
+          const getVal = (key: string) => values[headers.indexOf(key)] || ''
+
+          const productData: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'> = {
+            name: getVal('name'),
+            brand: getVal('brand') || brands[0],
+            category: (getVal('category') as 'clothes' | 'accessories' | 'shoes') || 'clothes',
+            subcategory: getVal('subcategory'),
+            price: parseFloat(getVal('price')) || 0,
+            originalPrice: getVal('original price') ? parseFloat(getVal('original price')) : undefined,
+            stockQty: parseInt(getVal('stock')) || 0,
+            description: getVal('description'),
+            colors: getVal('colors').split(';').filter(Boolean),
+            sizes: getVal('sizes').split(';').filter(Boolean),
+            tags: getVal('tags').split(';').filter(Boolean),
+            gender: (getVal('gender') as 'male' | 'female' | 'unisex') || 'unisex',
+            featured: getVal('featured') === 'true',
+            inStock: getVal('in stock') !== 'false',
+            images: [],
+            occasions: [],
+            style: [],
+            giftSuitable: true
+          }
+
+          if (productData.name && productData.price > 0) {
+            const result = await createProduct(productData)
+            if (result.success) importCount++
+          }
+        }
+
+        alert(`Successfully imported ${importCount} products`)
+        const productsData = await getFirestoreProducts()
+        setFirestoreProducts(productsData)
+      } catch (error) {
+        console.error('Import error:', error)
+        alert('Error importing CSV. Please check the file format.')
+      }
+      setIsImporting(false)
+    }
+
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  // Revenue chart data calculation
+  const getRevenueChartData = () => {
+    const days = chartPeriod === '7d' ? 7 : chartPeriod === '30d' ? 30 : 90
+    const data: { date: string; revenue: number; orders: number }[] = []
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
+
+      const dayOrders = orders.filter(o => {
+        const orderDate = o.createdAt?.toDate()
+        return orderDate?.toISOString().split('T')[0] === dateStr
+      })
+
+      data.push({
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: dayOrders.reduce((sum, o) => sum + o.total, 0),
+        orders: dayOrders.length
+      })
+    }
+    return data
+  }
+
+  // Dashboard comparison stats (today vs yesterday, this week vs last week)
+  const getDashboardComparisons = () => {
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const startOfWeek = new Date(today)
+    startOfWeek.setDate(today.getDate() - today.getDay())
+    const startOfLastWeek = new Date(startOfWeek)
+    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
+
+    const todayOrders = orders.filter(o => o.createdAt?.toDate().toDateString() === today.toDateString())
+    const yesterdayOrders = orders.filter(o => o.createdAt?.toDate().toDateString() === yesterday.toDateString())
+
+    const thisWeekOrders = orders.filter(o => {
+      const d = o.createdAt?.toDate()
+      return d && d >= startOfWeek && d <= today
+    })
+    const lastWeekOrders = orders.filter(o => {
+      const d = o.createdAt?.toDate()
+      return d && d >= startOfLastWeek && d < startOfWeek
+    })
+
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + o.total, 0)
+    const yesterdayRevenue = yesterdayOrders.reduce((sum, o) => sum + o.total, 0)
+    const thisWeekRevenue = thisWeekOrders.reduce((sum, o) => sum + o.total, 0)
+    const lastWeekRevenue = lastWeekOrders.reduce((sum, o) => sum + o.total, 0)
+
+    return {
+      today: { orders: todayOrders.length, revenue: todayRevenue },
+      yesterday: { orders: yesterdayOrders.length, revenue: yesterdayRevenue },
+      thisWeek: { orders: thisWeekOrders.length, revenue: thisWeekRevenue },
+      lastWeek: { orders: lastWeekOrders.length, revenue: lastWeekRevenue },
+      revenueChange: yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100) : 0,
+      weeklyChange: lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue * 100) : 0
+    }
+  }
+
+  // Coupon handlers
+  const openCouponForm = (coupon?: Coupon) => {
+    if (coupon) {
+      setEditingCoupon(coupon)
+      setCouponFormData({ ...coupon })
+    } else {
+      setEditingCoupon(null)
+      setCouponFormData({
+        code: '',
+        type: 'percentage',
+        value: 10,
+        minPurchase: 0,
+        maxUses: 100,
+        usedCount: 0,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        active: true
+      })
+    }
+    setShowCouponForm(true)
+  }
+
+  const handleSaveCoupon = () => {
+    if (!couponFormData.code || !couponFormData.value) {
+      alert('Please fill in required fields')
+      return
+    }
+
+    if (editingCoupon) {
+      setCoupons(prev => prev.map(c => c.id === editingCoupon.id ? { ...c, ...couponFormData } as Coupon : c))
+    } else {
+      const newCoupon: Coupon = {
+        ...couponFormData as Coupon,
+        id: Date.now().toString(),
+        usedCount: 0
+      }
+      setCoupons(prev => [...prev, newCoupon])
+    }
+    setShowCouponForm(false)
+    setEditingCoupon(null)
+  }
+
+  const toggleCouponStatus = (couponId: string) => {
+    setCoupons(prev => prev.map(c => c.id === couponId ? { ...c, active: !c.active } : c))
+  }
+
+  const deleteCoupon = (couponId: string) => {
+    if (confirm('Delete this coupon?')) {
+      setCoupons(prev => prev.filter(c => c.id !== couponId))
+    }
+  }
+
+  // Get chart data
+  const chartData = getRevenueChartData()
+  const comparisons = getDashboardComparisons()
+  const maxRevenue = Math.max(...chartData.map(d => d.revenue), 1)
+
   if (isLoading || isLoadingData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -250,6 +840,7 @@ export default function AdminDashboard() {
             { id: 'inventory', icon: Package, label: 'Inventory' },
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
             { id: 'products', icon: LayoutDashboard, label: 'Products' },
+            { id: 'coupons', icon: Tag, label: 'Coupons' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -306,6 +897,7 @@ export default function AdminDashboard() {
               { id: 'inventory', label: 'Inventory' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'products', label: 'Products' },
+              { id: 'coupons', label: 'Coupons' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -370,32 +962,72 @@ export default function AdminDashboard() {
         {activeTab === 'orders' && (
           <div className="bg-white rounded-xl shadow-sm">
             <div className="p-6 border-b border-gray-100">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-navy">Orders</h2>
-                <div className="flex gap-3">
-                  <div className="relative flex-1 md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h2 className="text-lg font-bold text-navy">Orders ({filteredOrders.length})</h2>
+                  <div className="flex gap-3 flex-wrap">
+                    <button
+                      onClick={exportOrdersToCSV}
+                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export CSV
+                    </button>
+                    <div className="relative flex-1 md:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search orders..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                      />
+                    </div>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                    >
+                      <option value="">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Date Filters */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-500">From:</span>
                     <input
-                      type="text"
-                      placeholder="Search orders..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                      type="date"
+                      value={dateFilter.from}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
                     />
                   </div>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
-                  >
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">To:</span>
+                    <input
+                      type="date"
+                      value={dateFilter.to}
+                      onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
+                    />
+                  </div>
+                  {(dateFilter.from || dateFilter.to) && (
+                    <button
+                      onClick={() => setDateFilter({ from: '', to: '' })}
+                      className="text-sm text-red-500 hover:text-red-600"
+                    >
+                      Clear dates
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -442,12 +1074,29 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="text-gold hover:text-yellow-600"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="text-gold hover:text-yellow-600"
+                            title="View Details"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => setOrderNotesModal({ order, note: order.notes || '' })}
+                            className="text-gray-400 hover:text-blue-600"
+                            title="Add Note"
+                          >
+                            <MessageSquare className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => setPrintOrder(order)}
+                            className="text-gray-400 hover:text-green-600"
+                            title="Print Order"
+                          >
+                            <Printer className="w-5 h-5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -486,39 +1135,50 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Customer</th>
                     <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">AI Dresser Usage</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Preferences</th>
+                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Orders</th>
+                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Lifetime Value</th>
+                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">AI Dresser</th>
+                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {users.map(customer => (
-                    <tr key={customer.id} className="hover:bg-gray-50">
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="font-medium text-navy">{customer.name}</p>
-                          <p className="text-sm text-gray-500">{customer.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-sm text-gray-600">{customer.phone || '-'}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-sm text-gray-600">{customer.aiDresserUsage || 0} sessions</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex flex-wrap gap-1">
-                          {customer.preferences?.styles?.slice(0, 2).map((style, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-gold/10 text-gold text-xs rounded">
-                              {style}
-                            </span>
-                          ))}
-                          {!customer.preferences?.styles?.length && (
-                            <span className="text-xs text-gray-400">No preferences set</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map(customer => {
+                    const customerOrders = getCustomerOrders(customer.id)
+                    const lifetimeValue = getCustomerLifetimeValue(customer.id)
+                    return (
+                      <tr key={customer.id} className="hover:bg-gray-50">
+                        <td className="py-4 px-6">
+                          <div>
+                            <p className="font-medium text-navy">{customer.name}</p>
+                            <p className="text-sm text-gray-500">{customer.email}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600">{customer.phone || '-'}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm font-medium text-navy">{customerOrders.length}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`text-sm font-semibold ${lifetimeValue > 5000 ? 'text-green-600' : 'text-navy'}`}>
+                            ₱{lifetimeValue.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600">{customer.aiDresserUsage || 0}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <button
+                            onClick={() => setSelectedCustomer(customer)}
+                            className="flex items-center gap-1.5 text-sm text-gold hover:text-yellow-600"
+                          >
+                            <History className="w-4 h-4" />
+                            View History
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -677,6 +1337,92 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-navy">Sales Analytics</h2>
 
+            {/* Dashboard Comparison Widgets */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <p className="text-sm text-gray-500 mb-1">Today&apos;s Revenue</p>
+                <p className="text-2xl font-bold text-navy">₱{comparisons.today.revenue.toLocaleString()}</p>
+                <div className="flex items-center gap-1 mt-2">
+                  {comparisons.revenueChange >= 0 ? (
+                    <ArrowUp className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <ArrowDown className="w-4 h-4 text-red-500" />
+                  )}
+                  <span className={`text-sm font-medium ${comparisons.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(comparisons.revenueChange).toFixed(1)}% vs yesterday
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <p className="text-sm text-gray-500 mb-1">Today&apos;s Orders</p>
+                <p className="text-2xl font-bold text-navy">{comparisons.today.orders}</p>
+                <p className="text-sm text-gray-400 mt-2">{comparisons.yesterday.orders} yesterday</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <p className="text-sm text-gray-500 mb-1">This Week Revenue</p>
+                <p className="text-2xl font-bold text-navy">₱{comparisons.thisWeek.revenue.toLocaleString()}</p>
+                <div className="flex items-center gap-1 mt-2">
+                  {comparisons.weeklyChange >= 0 ? (
+                    <ArrowUp className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <ArrowDown className="w-4 h-4 text-red-500" />
+                  )}
+                  <span className={`text-sm font-medium ${comparisons.weeklyChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(comparisons.weeklyChange).toFixed(1)}% vs last week
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <p className="text-sm text-gray-500 mb-1">This Week Orders</p>
+                <p className="text-2xl font-bold text-navy">{comparisons.thisWeek.orders}</p>
+                <p className="text-sm text-gray-400 mt-2">{comparisons.lastWeek.orders} last week</p>
+              </div>
+            </div>
+
+            {/* Revenue Chart */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bold text-navy">Revenue Trends</h3>
+                <div className="flex gap-2">
+                  {(['7d', '30d', '90d'] as const).map(period => (
+                    <button
+                      key={period}
+                      onClick={() => setChartPeriod(period)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        chartPeriod === period
+                          ? 'bg-gold text-navy'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {period === '7d' ? '7 Days' : period === '30d' ? '30 Days' : '90 Days'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-64 flex items-end gap-1">
+                {chartData.map((day, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center group relative">
+                    <div
+                      className="w-full bg-gold/80 hover:bg-gold rounded-t transition-colors cursor-pointer"
+                      style={{ height: `${maxRevenue > 0 ? (day.revenue / maxRevenue) * 100 : 0}%`, minHeight: day.revenue > 0 ? '4px' : '0' }}
+                    />
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-navy text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                      {day.date}: ₱{day.revenue.toLocaleString()} ({day.orders} orders)
+                    </div>
+                    {chartPeriod === '7d' && (
+                      <span className="text-[10px] text-gray-400 mt-1 truncate w-full text-center">
+                        {day.date.split(' ')[0]}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between mt-4 text-sm text-gray-500">
+                <span>{chartData[0]?.date}</span>
+                <span>{chartData[chartData.length - 1]?.date}</span>
+              </div>
+            </div>
+
             {/* Revenue by Category */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="font-bold text-navy mb-6">Revenue by Category</h3>
@@ -738,117 +1484,515 @@ export default function AdminDashboard() {
 
         {/* Products Tab */}
         {activeTab === 'products' && (
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-6 border-b border-gray-100">
+          <div className="space-y-6">
+            {/* Action Bar */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-navy">Product Management ({filteredProducts.length})</h2>
+                <div>
+                  <h2 className="text-lg font-bold text-navy">Product Management</h2>
+                  <p className="text-sm text-gray-500">
+                    {firestoreProducts.length > 0
+                      ? `${firestoreProducts.length} products in database`
+                      : `Using ${staticProducts.length} static products (seed to enable editing)`
+                    }
+                  </p>
+                </div>
                 <div className="flex gap-3 flex-wrap">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search products..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
-                    />
-                  </div>
-                  <select
-                    value={productFilter.category}
-                    onChange={(e) => setProductFilter(prev => ({ ...prev, category: e.target.value }))}
-                    className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                  <button
+                    onClick={() => openProductForm()}
+                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
-                    <option value="">All Categories</option>
-                    {categories.map(cat => (
-                      <option key={cat} value={cat} className="capitalize">{cat}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={productFilter.brand}
-                    onChange={(e) => setProductFilter(prev => ({ ...prev, brand: e.target.value }))}
-                    className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                    <Plus className="w-4 h-4" />
+                    Add Product
+                  </button>
+                  <button
+                    onClick={() => productImportRef.current?.click()}
+                    disabled={isImporting}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    <option value="">All Brands</option>
-                    {brands.map(brand => (
-                      <option key={brand} value={brand}>{brand}</option>
-                    ))}
-                  </select>
+                    {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {isImporting ? 'Importing...' : 'Import CSV'}
+                  </button>
+                  <input
+                    ref={productImportRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleProductImport}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={exportProductsToCSV}
+                    className="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                  {firestoreProducts.length === 0 && (
+                    <button
+                      onClick={handleSeedProducts}
+                      disabled={isSeeding}
+                      className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSeeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      {isSeeding ? 'Seeding...' : 'Seed Products'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Brand</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Price</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Stock</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Featured</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredProducts.slice(0, 30).map(product => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="font-medium text-navy">{product.name}</p>
-                          <p className="text-xs text-gray-500">{product.id}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-sm text-gray-600">{product.brand}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="text-sm text-gray-600 capitalize">{product.category}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div>
-                          <span className="font-semibold text-navy">₱{product.price.toLocaleString()}</span>
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex gap-3 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                  />
+                </div>
+                <select
+                  value={productFilter.category}
+                  onChange={(e) => setProductFilter(prev => ({ ...prev, category: e.target.value }))}
+                  className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat} className="capitalize">{cat}</option>
+                  ))}
+                </select>
+                <select
+                  value={productFilter.brand}
+                  onChange={(e) => setProductFilter(prev => ({ ...prev, brand: e.target.value }))}
+                  className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                >
+                  <option value="">All Brands</option>
+                  {brands.map(brand => (
+                    <option key={brand} value={brand}>{brand}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedProducts.size > 0 && firestoreProducts.length > 0 && (
+              <div className="bg-gold/10 border border-gold/30 rounded-xl p-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-navy">
+                    {selectedProducts.size} product(s) selected
+                  </span>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleBulkStockUpdate(true)}
+                      className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200"
+                    >
+                      Mark In Stock
+                    </button>
+                    <button
+                      onClick={() => handleBulkStockUpdate(false)}
+                      className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-sm hover:bg-yellow-200"
+                    >
+                      Mark Out of Stock
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200"
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedProducts(new Set())}
+                      className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Products Table */}
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {firestoreProducts.length > 0 && (
+                        <th className="py-3 px-4 w-10">
+                          <button
+                            onClick={selectAllProducts}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {selectedProducts.size === paginatedProducts.length && paginatedProducts.length > 0 ? (
+                              <CheckSquare className="w-5 h-5 text-gold" />
+                            ) : (
+                              <Square className="w-5 h-5" />
+                            )}
+                          </button>
+                        </th>
+                      )}
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Image</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">
+                        <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-navy">
+                          Product
+                          {sortField === 'name' && <ArrowUpDown className="w-3 h-3" />}
+                        </button>
+                      </th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Brand</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Category</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">
+                        <button onClick={() => handleSort('price')} className="flex items-center gap-1 hover:text-navy">
+                          Price
+                          {sortField === 'price' && <ArrowUpDown className="w-3 h-3" />}
+                        </button>
+                      </th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">
+                        <button onClick={() => handleSort('stockQty')} className="flex items-center gap-1 hover:text-navy">
+                          Stock
+                          {sortField === 'stockQty' && <ArrowUpDown className="w-3 h-3" />}
+                        </button>
+                      </th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Sale</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Featured</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedProducts.map(product => (
+                      <tr key={product.id} className={`hover:bg-gray-50 ${product.id && selectedProducts.has(product.id) ? 'bg-gold/5' : ''}`}>
+                        {firestoreProducts.length > 0 && (
+                          <td className="py-4 px-4">
+                            <button
+                              onClick={() => product.id && toggleSelectProduct(product.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              {product.id && selectedProducts.has(product.id) ? (
+                                <CheckSquare className="w-5 h-5 text-gold" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                          </td>
+                        )}
+                        <td className="py-4 px-6">
+                          {product.images && product.images.length > 0 ? (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 relative">
+                              <Image
+                                src={product.images[0]}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                              <ImageIcon className="w-5 h-5 text-gray-400" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div>
+                            <p className="font-medium text-navy">{product.name}</p>
+                            <p className="text-xs text-gray-500">{product.id}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600">{product.brand}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600 capitalize">{product.category}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div>
+                            <span className="font-semibold text-navy">₱{product.price.toLocaleString()}</span>
+                            {product.originalPrice && (
+                              <span className="text-xs text-red-500 ml-2">
+                                ({Math.round((1 - product.price / product.originalPrice) * 100)}% off)
+                              </span>
+                            )}
+                          </div>
                           {product.originalPrice && (
-                            <span className="text-xs text-gray-400 line-through ml-2">
+                            <span className="text-xs text-gray-400 line-through">
                               ₱{product.originalPrice.toLocaleString()}
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`text-sm ${product.stockQty < 20 ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-                          {product.stockQty}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          product.featured ? 'bg-gold/20 text-gold' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {product.featured ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/shop/${product.id}`}
-                            target="_blank"
-                            className="text-gray-400 hover:text-blue-600"
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`text-sm font-medium ${
+                            product.stockQty === 0 ? 'text-red-600' :
+                            product.stockQty < 20 ? 'text-yellow-600' : 'text-green-600'
+                          }`}>
+                            {product.stockQty}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            product.originalPrice ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {product.originalPrice ? 'On Sale' : 'Regular'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          {firestoreProducts.length > 0 ? (
+                            <button
+                              onClick={() => handleQuickUpdate(product.id!, 'featured', !product.featured)}
+                              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                product.featured ? 'bg-gold/20 text-gold hover:bg-gold/30' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                              }`}
+                            >
+                              {product.featured ? 'Featured' : 'No'}
+                            </button>
+                          ) : (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              product.featured ? 'bg-gold/20 text-gold' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {product.featured ? 'Yes' : 'No'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/shop/${product.id}`}
+                              target="_blank"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                            {firestoreProducts.length > 0 && (
+                              <>
+                                <button
+                                  onClick={() => openProductForm(product as FirestoreProduct)}
+                                  className="p-1.5 text-gray-400 hover:text-gold hover:bg-gold/10 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                {deleteConfirm === product.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleDeleteProduct(product.id!)}
+                                      className="p-1.5 text-white bg-red-500 hover:bg-red-600 rounded text-xs"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirm(null)}
+                                      className="p-1.5 text-gray-500 hover:text-gray-700 rounded text-xs"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setDeleteConfirm(product.id!)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {paginatedProducts.length === 0 && (
+                <div className="text-center py-12">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No products found</p>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="p-4 border-t border-gray-100">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span>Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length}</span>
+                      <select
+                        value={itemsPerPage}
+                        onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                        className="ml-2 px-2 py-1 border border-gray-200 rounded text-sm"
+                      >
+                        <option value={10}>10/page</option>
+                        <option value={20}>20/page</option>
+                        <option value={50}>50/page</option>
+                        <option value={100}>100/page</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum: number
+                        if (totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i
+                        } else {
+                          pageNum = currentPage - 2 + i
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-1.5 rounded-lg text-sm ${
+                              currentPage === pageNum
+                                ? 'bg-gold text-navy font-medium'
+                                : 'border border-gray-200 hover:bg-gray-50'
+                            }`}
                           >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Coupons Tab */}
+        {activeTab === 'coupons' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-navy">Coupon Management</h2>
+                  <p className="text-sm text-gray-500">{coupons.length} coupons configured</p>
+                </div>
+                <button
+                  onClick={() => openCouponForm()}
+                  className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Coupon
+                </button>
+              </div>
             </div>
 
-            {filteredProducts.length > 30 && (
-              <div className="p-4 text-center text-sm text-gray-500">
-                Showing 30 of {filteredProducts.length} products
+            {/* Coupons List */}
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Code</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Discount</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Min Purchase</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Usage</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Expires</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {coupons.map(coupon => (
+                      <tr key={coupon.id} className="hover:bg-gray-50">
+                        <td className="py-4 px-6">
+                          <span className="font-mono text-sm font-bold text-navy bg-gray-100 px-2 py-1 rounded">
+                            {coupon.code}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            coupon.type === 'percentage' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                          }`}>
+                            {coupon.type === 'percentage' ? 'Percentage' : 'Fixed Amount'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-semibold text-navy">
+                            {coupon.type === 'percentage' ? `${coupon.value}%` : `₱${coupon.value}`}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600">₱{coupon.minPurchase.toLocaleString()}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-gray-600">{coupon.usedCount} / {coupon.maxUses}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`text-sm ${new Date(coupon.expiresAt) < new Date() ? 'text-red-500' : 'text-gray-600'}`}>
+                            {new Date(coupon.expiresAt).toLocaleDateString()}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <button
+                            onClick={() => toggleCouponStatus(coupon.id)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                              coupon.active
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            {coupon.active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openCouponForm(coupon)}
+                              className="p-1.5 text-gray-400 hover:text-gold hover:bg-gold/10 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteCoupon(coupon.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
+
+              {coupons.length === 0 && (
+                <div className="text-center py-12">
+                  <Tag className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No coupons created yet</p>
+                  <button
+                    onClick={() => openCouponForm()}
+                    className="mt-4 text-gold hover:text-yellow-600 font-medium"
+                  >
+                    Create your first coupon
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -943,6 +2087,685 @@ export default function AdminDashboard() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Form Modal */}
+      {showProductForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowProductForm(false)} />
+          <div className="relative bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-navy">
+                    {editingProduct ? 'Edit Product' : 'Add New Product'}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {editingProduct ? `Editing: ${editingProduct.name}` : 'Fill in the product details'}
+                  </p>
+                </div>
+                <button onClick={() => setShowProductForm(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+                  <input
+                    type="text"
+                    value={productFormData.name || ''}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="e.g. Classic Logo T-Shirt"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand *</label>
+                  <select
+                    value={productFormData.brand || brands[0]}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, brand: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  >
+                    {brands.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                  <select
+                    value={productFormData.category || 'clothes'}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, category: e.target.value as 'clothes' | 'accessories' | 'shoes' }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat} className="capitalize">{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+                  <input
+                    type="text"
+                    value={productFormData.subcategory || ''}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, subcategory: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="e.g. t-shirts, sneakers"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                  <select
+                    value={productFormData.gender || 'unisex'}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, gender: e.target.value as 'male' | 'female' | 'unisex' }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  >
+                    <option value="unisex">Unisex</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h4 className="font-semibold text-navy mb-4">Pricing & Inventory</h4>
+                <div className="grid md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Price (₱) *</label>
+                    <input
+                      type="number"
+                      value={productFormData.price || ''}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Original Price (₱)</label>
+                    <input
+                      type="number"
+                      value={productFormData.originalPrice || ''}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, originalPrice: parseFloat(e.target.value) || undefined }))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                      placeholder="Leave empty if not on sale"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Set to enable sale pricing</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
+                    <input
+                      type="number"
+                      value={productFormData.stockQty || ''}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, stockQty: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="flex items-end gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={productFormData.inStock !== false}
+                        onChange={(e) => setProductFormData(prev => ({ ...prev, inStock: e.target.checked }))}
+                        className="w-4 h-4 accent-gold"
+                      />
+                      <span className="text-sm">In Stock</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Image Upload */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h4 className="font-semibold text-navy mb-4">Product Images</h4>
+
+                {/* Current Images */}
+                {productFormData.images && productFormData.images.length > 0 && (
+                  <div className="grid grid-cols-4 md:grid-cols-6 gap-3 mb-4">
+                    {productFormData.images.map((img, index) => (
+                      <div key={index} className="relative group">
+                        <div className="aspect-square rounded-lg overflow-hidden bg-white border border-gray-200">
+                          <Image
+                            src={img}
+                            alt={`Product ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        {index === 0 && (
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-gold text-navy text-[10px] rounded font-medium">
+                            Main
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-gold transition-colors"
+                >
+                  {uploadingImages ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-gold" />
+                      <span className="text-sm text-gray-500">Uploading...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 mb-1">Click to upload images</p>
+                      <p className="text-xs text-gray-400">PNG, JPG up to 5MB each</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageUpload(e.target.files)}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  value={productFormData.description || ''}
+                  onChange={(e) => setProductFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold resize-none"
+                  rows={3}
+                  placeholder="Product description..."
+                />
+              </div>
+
+              {/* Arrays: Colors, Sizes */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Colors (comma separated)</label>
+                  <input
+                    type="text"
+                    value={(productFormData.colors || []).join(', ')}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, colors: e.target.value.split(',').map(c => c.trim()).filter(Boolean) }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="Black, White, Navy"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sizes (comma separated)</label>
+                  <input
+                    type="text"
+                    value={(productFormData.sizes || []).join(', ')}
+                    onChange={(e) => setProductFormData(prev => ({ ...prev, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="S, M, L, XL"
+                  />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma separated)</label>
+                <input
+                  type="text"
+                  value={(productFormData.tags || []).join(', ')}
+                  onChange={(e) => setProductFormData(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  placeholder="casual, cotton, trendy"
+                />
+              </div>
+
+              {/* Flags */}
+              <div className="bg-gold/10 rounded-xl p-4">
+                <h4 className="font-semibold text-navy mb-4">Display Options</h4>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productFormData.featured || false}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, featured: e.target.checked }))}
+                      className="w-4 h-4 accent-gold"
+                    />
+                    <span className="text-sm font-medium">Featured Product</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productFormData.giftSuitable !== false}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, giftSuitable: e.target.checked }))}
+                      className="w-4 h-4 accent-gold"
+                    />
+                    <span className="text-sm font-medium">Gift Suitable</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-white p-6 border-t border-gray-100">
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowProductForm(false)}
+                  className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProduct}
+                  disabled={isSavingProduct}
+                  className="flex items-center gap-2 px-6 py-3 bg-gold text-navy font-semibold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                >
+                  {isSavingProduct ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      {editingProduct ? 'Update Product' : 'Create Product'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer History Modal */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedCustomer(null)} />
+          <div className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-100 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-navy">Customer Details</h3>
+                  <p className="text-sm text-gray-500">{selectedCustomer.email}</p>
+                </div>
+                <button onClick={() => setSelectedCustomer(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Customer Info */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">Name</p>
+                  <p className="font-medium text-navy">{selectedCustomer.name}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">Phone</p>
+                  <p className="font-medium text-navy">{selectedCustomer.phone || 'Not provided'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">Lifetime Value</p>
+                  <p className="font-bold text-green-600 text-lg">
+                    ₱{getCustomerLifetimeValue(selectedCustomer.id).toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500 mb-1">AI Dresser Sessions</p>
+                  <p className="font-medium text-navy">{selectedCustomer.aiDresserUsage || 0}</p>
+                </div>
+              </div>
+
+              {/* Preferences */}
+              {selectedCustomer.preferences && (
+                <div>
+                  <h4 className="font-semibold text-navy mb-3">Style Preferences</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCustomer.preferences.styles?.map((style, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-gold/10 text-gold rounded-full text-sm">
+                        {style}
+                      </span>
+                    ))}
+                    {selectedCustomer.preferences.colors?.map((color, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm">
+                        {color}
+                      </span>
+                    ))}
+                    {!selectedCustomer.preferences.styles?.length && !selectedCustomer.preferences.colors?.length && (
+                      <span className="text-sm text-gray-400">No preferences set</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Order History */}
+              <div>
+                <h4 className="font-semibold text-navy mb-3">Order History ({getCustomerOrders(selectedCustomer.id).length})</h4>
+                <div className="space-y-3">
+                  {getCustomerOrders(selectedCustomer.id).length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-6">No orders yet</p>
+                  ) : (
+                    getCustomerOrders(selectedCustomer.id).map(order => (
+                      <div key={order.id} className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <p className="font-mono text-sm text-navy">{order.orderId}</p>
+                          <p className="text-xs text-gray-500">
+                            {order.createdAt?.toDate().toLocaleDateString()} | {order.items.length} item(s)
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-navy">₱{order.total.toLocaleString()}</p>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[order.status]}`}>
+                            {order.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Notes Modal */}
+      {orderNotesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setOrderNotesModal(null)} />
+          <div className="relative bg-white rounded-2xl max-w-lg w-full">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-navy">Order Notes</h3>
+                  <p className="text-sm text-gray-500 font-mono">{orderNotesModal.order.orderId}</p>
+                </div>
+                <button onClick={() => setOrderNotesModal(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <textarea
+                value={orderNotesModal.note}
+                onChange={(e) => setOrderNotesModal(prev => prev ? { ...prev, note: e.target.value } : null)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold resize-none"
+                rows={4}
+                placeholder="Add internal notes about this order..."
+              />
+              <p className="text-xs text-gray-400 mt-2">Notes are only visible to admins</p>
+            </div>
+
+            <div className="p-6 border-t border-gray-100">
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setOrderNotesModal(null)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (orderNotesModal && orderNotesModal.order.id) {
+                      const isGuestOrder = !orderNotesModal.order.userId
+                      const success = await updateOrderNotes(orderNotesModal.order.id, orderNotesModal.note, isGuestOrder)
+                      if (success) {
+                        // Update local state
+                        setOrders(prev => prev.map(o =>
+                          o.id === orderNotesModal.order.id ? { ...o, notes: orderNotesModal.note } : o
+                        ))
+                        setOrderNotesModal(null)
+                      } else {
+                        alert('Failed to save note')
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 bg-gold text-navy font-semibold rounded-lg hover:bg-yellow-400"
+                >
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Print Modal */}
+      {printOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setPrintOrder(null)} />
+          <div className="relative bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible">
+            <div className="p-6 border-b border-gray-100 print:border-0">
+              <div className="flex items-center justify-between print:hidden">
+                <h3 className="text-lg font-bold text-navy">Print Order / Packing Slip</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print
+                  </button>
+                  <button onClick={() => setPrintOrder(null)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 print:p-8" id="print-content">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold text-navy">LGM Apparel</h1>
+                <p className="text-gray-500">Order Receipt / Packing Slip</p>
+              </div>
+
+              {/* Order Info */}
+              <div className="flex justify-between mb-6">
+                <div>
+                  <p className="text-sm text-gray-500">Order ID</p>
+                  <p className="font-mono font-bold text-navy">{printOrder.orderId}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">Date</p>
+                  <p className="font-medium text-navy">{printOrder.createdAt?.toDate().toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 print:bg-white print:border print:border-gray-200">
+                <h4 className="font-semibold text-navy mb-2">Ship To:</h4>
+                <p className="font-medium">{printOrder.customerInfo.name}</p>
+                {printOrder.customerInfo.address && (
+                  <p className="text-gray-600">{printOrder.customerInfo.address}</p>
+                )}
+                {printOrder.customerInfo.city && (
+                  <p className="text-gray-600">{printOrder.customerInfo.city}</p>
+                )}
+                <p className="text-gray-600">{printOrder.customerInfo.phone}</p>
+              </div>
+
+              {/* Items */}
+              <table className="w-full mb-6">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left py-2 text-sm font-medium text-gray-500">Item</th>
+                    <th className="text-center py-2 text-sm font-medium text-gray-500">Size/Color</th>
+                    <th className="text-center py-2 text-sm font-medium text-gray-500">Qty</th>
+                    <th className="text-right py-2 text-sm font-medium text-gray-500">Price</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {printOrder.items.map((item, i) => (
+                    <tr key={i}>
+                      <td className="py-3">{item.name}</td>
+                      <td className="py-3 text-center text-gray-600 text-sm">
+                        {item.size && item.size} {item.color && `/ ${item.color}`}
+                      </td>
+                      <td className="py-3 text-center">{item.quantity}</td>
+                      <td className="py-3 text-right">₱{(item.price * item.quantity).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Totals */}
+              <div className="border-t-2 border-gray-200 pt-4">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span>₱{printOrder.subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-500">Shipping</span>
+                  <span>{printOrder.shippingFee === 0 ? 'Free' : `₱${printOrder.shippingFee}`}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg text-navy pt-2 border-t">
+                  <span>Total</span>
+                  <span>₱{printOrder.total.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 pt-4 border-t text-center text-sm text-gray-500 print:mt-12">
+                <p>Thank you for shopping with LGM Apparel!</p>
+                <p>For questions, contact us at support@lgmapparel.com</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon Form Modal */}
+      {showCouponForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCouponForm(false)} />
+          <div className="relative bg-white rounded-2xl max-w-lg w-full">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-navy">
+                  {editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}
+                </h3>
+                <button onClick={() => setShowCouponForm(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Coupon Code *</label>
+                <input
+                  type="text"
+                  value={couponFormData.code || ''}
+                  onChange={(e) => setCouponFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold font-mono uppercase"
+                  placeholder="e.g. SUMMER20"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount Type</label>
+                  <select
+                    value={couponFormData.type || 'percentage'}
+                    onChange={(e) => setCouponFormData(prev => ({ ...prev, type: e.target.value as 'percentage' | 'fixed' }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed Amount (₱)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Value {couponFormData.type === 'percentage' ? '(%)' : '(₱)'} *
+                  </label>
+                  <input
+                    type="number"
+                    value={couponFormData.value || ''}
+                    onChange={(e) => setCouponFormData(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Min Purchase (₱)</label>
+                  <input
+                    type="number"
+                    value={couponFormData.minPurchase || ''}
+                    onChange={(e) => setCouponFormData(prev => ({ ...prev, minPurchase: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Uses</label>
+                  <input
+                    type="number"
+                    value={couponFormData.maxUses || ''}
+                    onChange={(e) => setCouponFormData(prev => ({ ...prev, maxUses: parseInt(e.target.value) || 100 }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                    placeholder="100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Expiration Date</label>
+                <input
+                  type="date"
+                  value={couponFormData.expiresAt || ''}
+                  onChange={(e) => setCouponFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={couponFormData.active !== false}
+                  onChange={(e) => setCouponFormData(prev => ({ ...prev, active: e.target.checked }))}
+                  className="w-4 h-4 accent-gold"
+                />
+                <span className="text-sm font-medium">Active (coupon can be used)</span>
+              </label>
+            </div>
+
+            <div className="p-6 border-t border-gray-100">
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowCouponForm(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCoupon}
+                  className="px-4 py-2 bg-gold text-navy font-semibold rounded-lg hover:bg-yellow-400"
+                >
+                  {editingCoupon ? 'Update Coupon' : 'Create Coupon'}
+                </button>
               </div>
             </div>
           </div>

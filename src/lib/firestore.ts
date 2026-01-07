@@ -16,7 +16,44 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore'
-import { db } from './firebase'
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { db, storage } from './firebase'
+
+// ==================== IMAGE UPLOAD ====================
+
+export const uploadProductImage = async (
+  file: File,
+  productId: string
+): Promise<{ success: boolean; url?: string; error?: string }> => {
+  if (!storage) return { success: false, error: 'Storage not configured' }
+
+  try {
+    const timestamp = Date.now()
+    const fileName = `${productId}-${timestamp}-${file.name}`
+    const storageRef = ref(storage, `products/${fileName}`)
+
+    await uploadBytes(storageRef, file)
+    const url = await getDownloadURL(storageRef)
+
+    return { success: true, url }
+  } catch (error) {
+    console.error('Error uploading image:', error)
+    return { success: false, error: 'Failed to upload image' }
+  }
+}
+
+export const deleteProductImage = async (imageUrl: string): Promise<boolean> => {
+  if (!storage) return false
+
+  try {
+    const storageRef = ref(storage, imageUrl)
+    await deleteObject(storageRef)
+    return true
+  } catch (error) {
+    console.error('Error deleting image:', error)
+    return false
+  }
+}
 
 // Types
 export interface OrderItem {
@@ -192,6 +229,28 @@ export const updateOrderStatus = async (
     return true
   } catch (error) {
     console.error('Error updating order:', error)
+    return false
+  }
+}
+
+// Update order notes (admin)
+export const updateOrderNotes = async (
+  orderId: string,
+  notes: string,
+  isGuestOrder: boolean = false
+): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const collectionName = isGuestOrder ? 'guestOrders' : 'orders'
+    const orderRef = doc(db, collectionName, orderId)
+    await updateDoc(orderRef, {
+      notes,
+      updatedAt: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error updating order notes:', error)
     return false
   }
 }
@@ -484,5 +543,146 @@ export const getAllReviews = async (): Promise<Review[]> => {
   } catch (error) {
     console.error('Error fetching all reviews:', error)
     return []
+  }
+}
+
+// ==================== PRODUCTS (Admin CRUD) ====================
+
+export interface FirestoreProduct {
+  id?: string
+  name: string
+  brand: string
+  category: 'clothes' | 'accessories' | 'shoes'
+  subcategory: string
+  price: number
+  originalPrice?: number
+  description: string
+  images: string[]
+  colors: string[]
+  sizes: string[]
+  gender: 'male' | 'female' | 'unisex'
+  tags: string[]
+  inStock: boolean
+  stockQty: number
+  featured: boolean
+  giftSuitable: boolean
+  occasions: string[]
+  style: string[]
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
+// Get all products from Firestore
+export const getFirestoreProducts = async (): Promise<FirestoreProduct[]> => {
+  if (!db) return []
+
+  try {
+    const productsRef = collection(db, 'products')
+    const q = query(productsRef, orderBy('createdAt', 'desc'))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as FirestoreProduct[]
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    return []
+  }
+}
+
+// Get single product
+export const getFirestoreProduct = async (productId: string): Promise<FirestoreProduct | null> => {
+  if (!db) return null
+
+  try {
+    const productRef = doc(db, 'products', productId)
+    const productDoc = await getDoc(productRef)
+
+    if (productDoc.exists()) {
+      return { id: productDoc.id, ...productDoc.data() } as FirestoreProduct
+    }
+    return null
+  } catch (error) {
+    console.error('Error fetching product:', error)
+    return null
+  }
+}
+
+// Create new product
+export const createProduct = async (
+  product: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<{ success: boolean; id?: string; error?: string }> => {
+  if (!db) return { success: false, error: 'Database not configured' }
+
+  try {
+    const productsRef = collection(db, 'products')
+    const docRef = await addDoc(productsRef, {
+      ...product,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })
+    return { success: true, id: docRef.id }
+  } catch (error) {
+    console.error('Error creating product:', error)
+    return { success: false, error: 'Failed to create product' }
+  }
+}
+
+// Update product
+export const updateProduct = async (
+  productId: string,
+  data: Partial<FirestoreProduct>
+): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const productRef = doc(db, 'products', productId)
+    await updateDoc(productRef, {
+      ...data,
+      updatedAt: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error updating product:', error)
+    return false
+  }
+}
+
+// Delete product
+export const deleteProduct = async (productId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    const productRef = doc(db, 'products', productId)
+    await deleteDoc(productRef)
+    return true
+  } catch (error) {
+    console.error('Error deleting product:', error)
+    return false
+  }
+}
+
+// Seed products from static data to Firestore (one-time migration)
+export const seedProductsToFirestore = async (
+  products: Omit<FirestoreProduct, 'createdAt' | 'updatedAt'>[]
+): Promise<{ success: boolean; count: number; error?: string }> => {
+  if (!db) return { success: false, count: 0, error: 'Database not configured' }
+
+  try {
+    let count = 0
+    for (const product of products) {
+      const productRef = doc(db, 'products', product.id || `product-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`)
+      await setDoc(productRef, {
+        ...product,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+      count++
+    }
+    return { success: true, count }
+  } catch (error) {
+    console.error('Error seeding products:', error)
+    return { success: false, count: 0, error: 'Failed to seed products' }
   }
 }

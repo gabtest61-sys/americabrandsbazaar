@@ -9,8 +9,8 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { products, brands, categories, filterProducts, Product } from '@/lib/products'
-import { getWishlist, addToWishlist, removeFromWishlist } from '@/lib/firestore'
+import { products as staticProducts, brands, categories, Product } from '@/lib/products'
+import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 const priceRanges = [
   { label: 'All Prices', min: 0, max: Infinity },
@@ -49,6 +49,29 @@ function ShopContent() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set())
   const [wishlist, setWishlist] = useState<Set<string>>(new Set())
+  const [firestoreProducts, setFirestoreProducts] = useState<(Product | FirestoreProduct)[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+
+  // Load products from Firestore with fallback to static
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const dbProducts = await getFirestoreProducts()
+        if (dbProducts.length > 0) {
+          setFirestoreProducts(dbProducts)
+        } else {
+          setFirestoreProducts(staticProducts)
+        }
+      } catch {
+        setFirestoreProducts(staticProducts)
+      }
+      setProductsLoading(false)
+    }
+    loadProducts()
+  }, [])
+
+  // Combined products - Firestore takes priority
+  const products = firestoreProducts.length > 0 ? firestoreProducts : staticProducts
 
   // Update category when URL changes
   useEffect(() => {
@@ -143,15 +166,24 @@ function ShopContent() {
         break
       case 'newest':
       default:
-        result = [...result].sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
+        result = [...result].sort((a, b) => {
+          const getTime = (val: unknown): number => {
+            if (!val) return 0
+            if (typeof val === 'string') return new Date(val).getTime()
+            if (typeof val === 'object' && 'toDate' in (val as object)) {
+              return ((val as { toDate: () => Date }).toDate()).getTime()
+            }
+            return 0
+          }
+          return getTime(b.createdAt) - getTime(a.createdAt)
+        })
     }
 
     return result
-  }, [searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
+  }, [products, searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: Product | FirestoreProduct) => {
+    if (!product.id) return
     // Convert to the Product type expected by CartContext
     const cartProduct = {
       id: product.id,
@@ -165,11 +197,11 @@ function ShopContent() {
       colors: product.colors,
     }
     addItem(cartProduct, 1, product.sizes[0], product.colors[0])
-    setAddedItems(prev => new Set([...prev, product.id]))
+    setAddedItems(prev => new Set([...prev, product.id!]))
     setTimeout(() => {
       setAddedItems(prev => {
         const newSet = new Set(prev)
-        newSet.delete(product.id)
+        newSet.delete(product.id!)
         return newSet
       })
     }, 2000)
@@ -391,14 +423,14 @@ function ShopContent() {
                           </span>
                         )}
                         <button
-                          onClick={(e) => toggleWishlist(product.id, e)}
+                          onClick={(e) => product.id && toggleWishlist(product.id, e)}
                           className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
-                            wishlist.has(product.id)
+                            product.id && wishlist.has(product.id)
                               ? 'bg-pink-500 text-white opacity-100'
                               : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
                           }`}
                         >
-                          <Heart className={`w-4 h-4 ${wishlist.has(product.id) ? 'fill-current' : ''}`} />
+                          <Heart className={`w-4 h-4 ${product.id && wishlist.has(product.id) ? 'fill-current' : ''}`} />
                         </button>
                       </Link>
 
@@ -427,14 +459,14 @@ function ShopContent() {
                           </div>
                           <button
                             onClick={() => handleAddToCart(product)}
-                            disabled={addedItems.has(product.id)}
+                            disabled={!product.id || addedItems.has(product.id)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                              addedItems.has(product.id)
+                              product.id && addedItems.has(product.id)
                                 ? 'bg-green-500 text-white'
                                 : 'bg-gold text-navy hover:bg-yellow-400'
                             }`}
                           >
-                            {addedItems.has(product.id) ? '✓' : <ShoppingBag className="w-4 h-4" />}
+                            {product.id && addedItems.has(product.id) ? '✓' : <ShoppingBag className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
