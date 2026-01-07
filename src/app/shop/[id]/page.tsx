@@ -549,7 +549,7 @@ export default function ProductDetailPage() {
           )}
 
           {/* Reviews Section */}
-          <ReviewSection productId={product.id} />
+          {product.id && <ReviewSection productId={product.id} />}
         </div>
 
         {/* Size Guide Modal */}
