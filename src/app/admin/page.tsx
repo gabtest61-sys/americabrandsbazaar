@@ -2577,8 +2577,12 @@ export default function AdminDashboard() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Colors (comma separated)</label>
                   <input
                     type="text"
-                    value={(productFormData.colors || []).join(', ')}
-                    onChange={(e) => setProductFormData(prev => ({ ...prev, colors: e.target.value.split(',').map(c => c.trim()).filter(Boolean) }))}
+                    defaultValue={(productFormData.colors || []).join(', ')}
+                    key={`colors-${editingProduct?.id || 'new'}`}
+                    onBlur={(e) => setProductFormData(prev => ({
+                      ...prev,
+                      colors: e.target.value.split(',').map(c => c.trim()).filter(Boolean)
+                    }))}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                     placeholder="Black, White, Navy"
                   />
@@ -2587,8 +2591,12 @@ export default function AdminDashboard() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Sizes (comma separated)</label>
                   <input
                     type="text"
-                    value={(productFormData.sizes || []).join(', ')}
-                    onChange={(e) => setProductFormData(prev => ({ ...prev, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                    defaultValue={(productFormData.sizes || []).join(', ')}
+                    key={`sizes-${editingProduct?.id || 'new'}`}
+                    onBlur={(e) => setProductFormData(prev => ({
+                      ...prev,
+                      sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                    }))}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                     placeholder="S, M, L, XL"
                   />
@@ -2600,8 +2608,12 @@ export default function AdminDashboard() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma separated)</label>
                 <input
                   type="text"
-                  value={(productFormData.tags || []).join(', ')}
-                  onChange={(e) => setProductFormData(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
+                  defaultValue={(productFormData.tags || []).join(', ')}
+                  key={`tags-${editingProduct?.id || 'new'}`}
+                  onBlur={(e) => setProductFormData(prev => ({
+                    ...prev,
+                    tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                  }))}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                   placeholder="casual, cotton, trendy"
                 />

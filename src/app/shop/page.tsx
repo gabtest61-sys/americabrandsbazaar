@@ -44,8 +44,23 @@ function ShopContent() {
   }, [urlSearchQuery])
 
   const [selectedCategory, setSelectedCategory] = useState<string>(urlCategory)
-  const [selectedBrand, setSelectedBrand] = useState<string>('')
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const [selectedColors, setSelectedColors] = useState<string[]>([])
   const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0])
+
+  // Toggle brand selection
+  const toggleBrand = (brand: string) => {
+    setSelectedBrands(prev =>
+      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
+    )
+  }
+
+  // Toggle color selection
+  const toggleColor = (color: string) => {
+    setSelectedColors(prev =>
+      prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]
+    )
+  }
   const [sortBy, setSortBy] = useState('newest')
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -146,9 +161,16 @@ function ShopContent() {
       result = result.filter(p => p.category === selectedCategory)
     }
 
-    // Brand filter
-    if (selectedBrand) {
-      result = result.filter(p => p.brand === selectedBrand)
+    // Brand filter (multi-select)
+    if (selectedBrands.length > 0) {
+      result = result.filter(p => selectedBrands.includes(p.brand))
+    }
+
+    // Color filter (multi-select)
+    if (selectedColors.length > 0) {
+      result = result.filter(p =>
+        p.colors?.some(c => selectedColors.some(sc => c.toLowerCase() === sc.toLowerCase()))
+      )
     }
 
     // Price filter
@@ -183,12 +205,12 @@ function ShopContent() {
     }
 
     return result
-  }, [products, searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
+  }, [products, searchQuery, selectedCategory, selectedBrands, selectedColors, selectedPriceRange, sortBy])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
+  }, [searchQuery, selectedCategory, selectedBrands, selectedColors, selectedPriceRange, sortBy])
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
@@ -265,15 +287,25 @@ function ShopContent() {
   const clearFilters = () => {
     setSearchQuery('')
     setSelectedCategory('')
-    setSelectedBrand('')
+    setSelectedBrands([])
+    setSelectedColors([])
     setSelectedPriceRange(priceRanges[0])
   }
 
-  const activeFiltersCount = [
-    selectedCategory,
-    selectedBrand,
-    selectedPriceRange.min > 0 || selectedPriceRange.max < Infinity
-  ].filter(Boolean).length
+  // Get all unique colors from products
+  const availableColors = useMemo(() => {
+    const colorSet = new Set<string>()
+    products.forEach(p => {
+      p.colors?.forEach(c => colorSet.add(c))
+    })
+    return Array.from(colorSet).sort()
+  }, [products])
+
+  const activeFiltersCount =
+    (selectedCategory ? 1 : 0) +
+    selectedBrands.length +
+    selectedColors.length +
+    (selectedPriceRange.min > 0 || selectedPriceRange.max < Infinity ? 1 : 0)
 
   return (
     <>
@@ -336,29 +368,71 @@ function ShopContent() {
 
                 {/* Brand Filter */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-navy mb-3">Brand</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setSelectedBrand('')}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        !selectedBrand ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      All Brands
-                    </button>
-                    {brands.map(brand => (
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-navy">Brand</h3>
+                    {selectedBrands.length > 0 && (
                       <button
-                        key={brand}
-                        onClick={() => setSelectedBrand(brand)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedBrand === brand ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
-                        }`}
+                        onClick={() => setSelectedBrands([])}
+                        className="text-xs text-gold hover:text-yellow-600"
                       >
-                        {brand}
+                        Clear
                       </button>
+                    )}
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {brands.map(brand => (
+                      <label
+                        key={brand}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBrands.includes(brand)}
+                          onChange={() => toggleBrand(brand)}
+                          className="w-4 h-4 accent-gold rounded"
+                        />
+                        {brand}
+                      </label>
                     ))}
                   </div>
                 </div>
+
+                {/* Color Filter */}
+                {availableColors.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-navy">Color</h3>
+                      {selectedColors.length > 0 && (
+                        <button
+                          onClick={() => setSelectedColors([])}
+                          className="text-xs text-gold hover:text-yellow-600"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {availableColors.map(color => (
+                        <label
+                          key={color}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedColors.includes(color)}
+                            onChange={() => toggleColor(color)}
+                            className="w-4 h-4 accent-gold rounded"
+                          />
+                          <span
+                            className="w-4 h-4 rounded-full border border-gray-300"
+                            style={{ backgroundColor: color.toLowerCase() }}
+                          />
+                          {color}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Price Filter */}
                 <div>
@@ -632,21 +706,70 @@ function ShopContent() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-medium text-navy mb-3">Brand</h3>
-                  <div className="space-y-2">
-                    {['', ...brands].map(brand => (
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-navy">Brand</h3>
+                    {selectedBrands.length > 0 && (
                       <button
-                        key={brand}
-                        onClick={() => setSelectedBrand(brand)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedBrand === brand ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
-                        }`}
+                        onClick={() => setSelectedBrands([])}
+                        className="text-xs text-gold hover:text-yellow-600"
                       >
-                        {brand || 'All Brands'}
+                        Clear
                       </button>
+                    )}
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {brands.map(brand => (
+                      <label
+                        key={brand}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBrands.includes(brand)}
+                          onChange={() => toggleBrand(brand)}
+                          className="w-4 h-4 accent-gold rounded"
+                        />
+                        {brand}
+                      </label>
                     ))}
                   </div>
                 </div>
+
+                {availableColors.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-navy">Color</h3>
+                      {selectedColors.length > 0 && (
+                        <button
+                          onClick={() => setSelectedColors([])}
+                          className="text-xs text-gold hover:text-yellow-600"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {availableColors.map(color => (
+                        <label
+                          key={color}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedColors.includes(color)}
+                            onChange={() => toggleColor(color)}
+                            className="w-4 h-4 accent-gold rounded"
+                          />
+                          <span
+                            className="w-4 h-4 rounded-full border border-gray-300"
+                            style={{ backgroundColor: color.toLowerCase() }}
+                          />
+                          {color}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-sm font-medium text-navy mb-3">Price Range</h3>
