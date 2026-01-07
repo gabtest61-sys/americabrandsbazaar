@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2 } from 'lucide-react'
+import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useCart } from '@/context/CartContext'
@@ -26,6 +26,8 @@ const sortOptions = [
   { label: 'Price: High to Low', value: 'price-desc' },
   { label: 'Name: A-Z', value: 'name-asc' },
 ]
+
+const PRODUCTS_PER_PAGE = 20
 
 function ShopContent() {
   const searchParams = useSearchParams()
@@ -51,6 +53,7 @@ function ShopContent() {
   const [wishlist, setWishlist] = useState<Set<string>>(new Set())
   const [firestoreProducts, setFirestoreProducts] = useState<(Product | FirestoreProduct)[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Load products from Firestore with fallback to static
   useEffect(() => {
@@ -181,6 +184,58 @@ function ShopContent() {
 
     return result
   }, [products, searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedCategory, selectedBrand, selectedPriceRange, sortBy])
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE
+    return filteredProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE)
+  }, [filteredProducts, currentPage])
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = []
+    const maxVisiblePages = 5
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Always show first page
+      pages.push(1)
+
+      if (currentPage > 3) {
+        pages.push('...')
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1)
+      const end = Math.min(totalPages - 1, currentPage + 1)
+
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) {
+          pages.push(i)
+        }
+      }
+
+      if (currentPage < totalPages - 2) {
+        pages.push('...')
+      }
+
+      // Always show last page
+      if (!pages.includes(totalPages)) {
+        pages.push(totalPages)
+      }
+    }
+
+    return pages
+  }
 
   const handleAddToCart = (product: Product | FirestoreProduct) => {
     if (!product.id) return
@@ -390,17 +445,21 @@ function ShopContent() {
 
               {/* Results Count */}
               <div className="mb-4 text-sm text-gray-500">
-                Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
+                {filteredProducts.length > 0 ? (
+                  <>Showing {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}</>
+                ) : (
+                  <>No products found</>
+                )}
               </div>
 
               {/* Products Grid */}
-              {filteredProducts.length > 0 ? (
+              {paginatedProducts.length > 0 ? (
                 <div className={`grid gap-4 ${
                   viewMode === 'grid'
                     ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
                     : 'grid-cols-1'
                 }`}>
-                  {filteredProducts.map(product => (
+                  {paginatedProducts.map(product => (
                     <div
                       key={product.id}
                       className={`bg-white rounded-2xl overflow-hidden shadow-sm group hover:shadow-md transition-shadow ${
@@ -483,6 +542,57 @@ function ShopContent() {
                     className="text-gold hover:text-yellow-600 font-medium"
                   >
                     Clear all filters
+                  </button>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8">
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors ${
+                      currentPage === 1
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 text-navy hover:bg-gold hover:border-gold hover:text-navy'
+                    }`}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  {/* Page Numbers */}
+                  {getPageNumbers().map((page, index) => (
+                    <button
+                      key={index}
+                      onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                      disabled={page === '...'}
+                      className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg border transition-colors ${
+                        page === currentPage
+                          ? 'bg-gold border-gold text-navy font-bold'
+                          : page === '...'
+                          ? 'border-transparent text-gray-400 cursor-default'
+                          : 'border-gray-200 text-navy hover:bg-gold hover:border-gold'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  {/* Next Button */}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors ${
+                      currentPage === totalPages
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                        : 'border-gray-200 text-navy hover:bg-gold hover:border-gold hover:text-navy'
+                    }`}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
               )}

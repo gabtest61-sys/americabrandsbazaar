@@ -786,3 +786,27 @@ export const seedProductsToFirestore = async (
     return { success: false, count: 0, error: 'Failed to seed products' }
   }
 }
+
+// Delete user data from Firestore
+export const deleteUserData = async (userId: string): Promise<boolean> => {
+  if (!db) return false
+  try {
+    // Delete user document
+    await deleteDoc(doc(db, 'users', userId))
+
+    // Delete user's wishlist
+    try {
+      await deleteDoc(doc(db, 'wishlists', userId))
+    } catch {
+      // Wishlist might not exist
+    }
+
+    // Note: Orders are kept for record-keeping purposes
+    // Reviews could optionally be anonymized instead of deleted
+
+    return true
+  } catch (error) {
+    console.error('Error deleting user data:', error)
+    return false
+  }
+}

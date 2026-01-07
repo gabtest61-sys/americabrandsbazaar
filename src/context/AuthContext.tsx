@@ -7,7 +7,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  deleteUser
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
@@ -28,6 +29,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>
   updateUser: (updatedUser: User) => void
 }
 
@@ -185,6 +187,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!auth || !firebaseUser) {
+      return { success: false, error: 'Not authenticated' }
+    }
+    try {
+      const userId = firebaseUser.uid
+
+      // Delete user data from Firestore first
+      if (db) {
+        const { deleteDoc, doc } = await import('firebase/firestore')
+        try {
+          await deleteDoc(doc(db, 'users', userId))
+        } catch {
+          // User doc might not exist
+        }
+        try {
+          await deleteDoc(doc(db, 'wishlists', userId))
+        } catch {
+          // Wishlist might not exist
+        }
+      }
+
+      // Delete user from Firebase Auth
+      await deleteUser(firebaseUser)
+
+      return { success: true }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete account'
+
+      if (errorMessage.includes('requires-recent-login')) {
+        return { success: false, error: 'Please log out and log back in, then try again' }
+      }
+
+      return { success: false, error: 'Failed to delete account. Please try again.' }
+    }
+  }
+
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser)
   }
@@ -198,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      deleteAccount,
       updateUser
     }}>
       {children}

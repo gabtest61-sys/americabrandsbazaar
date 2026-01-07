@@ -7,7 +7,7 @@ import Image from 'next/image'
 import {
   User, Package, Heart, Settings, LogOut, ChevronRight,
   ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle,
-  Shirt, Trash2, Edit2, Save, X, Loader2
+  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -37,7 +37,7 @@ const statusColors = {
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, isLoggedIn, isLoading, logout, updateUser } = useAuth()
+  const { user, isLoggedIn, isLoading, logout, deleteAccount, updateUser } = useAuth()
   const { addItem } = useCart()
   const [orders, setOrders] = useState<Order[]>([])
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
@@ -49,6 +49,12 @@ export default function AccountPage() {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -127,6 +133,37 @@ export default function AccountPage() {
     setEditName(user?.name || '')
     setEditPhone(user?.phone || '')
     setIsEditing(false)
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setDeleteError('Please type DELETE to confirm')
+      return
+    }
+
+    setDeleting(true)
+    setDeleteError('')
+
+    const result = await deleteAccount()
+
+    if (result.success) {
+      router.push('/')
+    } else {
+      setDeleteError(result.error || 'Failed to delete account')
+      setDeleting(false)
+    }
+  }
+
+  const openDeleteModal = () => {
+    setShowDeleteModal(true)
+    setDeleteConfirmText('')
+    setDeleteError('')
+  }
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false)
+    setDeleteConfirmText('')
+    setDeleteError('')
   }
 
   if (isLoading) {
@@ -454,6 +491,21 @@ export default function AccountPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Danger Zone */}
+                  <div className="mt-8 bg-red-50 border border-red-200 rounded-2xl p-6">
+                    <h3 className="text-lg font-semibold text-red-700 mb-2">Danger Zone</h3>
+                    <p className="text-sm text-red-600 mb-4">
+                      Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                    <button
+                      onClick={openDeleteModal}
+                      className="flex items-center gap-2 bg-red-600 text-white font-medium px-4 py-2.5 rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Account
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -461,6 +513,81 @@ export default function AccountPage() {
         </div>
       </main>
       <Footer />
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={closeDeleteModal}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-navy">Delete Account</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete your account? This will permanently remove:
+              </p>
+              <ul className="text-sm text-gray-500 space-y-1 mb-4">
+                <li>• Your profile information</li>
+                <li>• Your wishlist</li>
+                <li>• Your AI Dresser preferences</li>
+              </ul>
+              <p className="text-sm text-gray-600 mb-2">
+                Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                placeholder="Type DELETE"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-red-500"
+              />
+              {deleteError && (
+                <p className="text-sm text-red-600 mt-2">{deleteError}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirmText !== 'DELETE'}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Account
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
