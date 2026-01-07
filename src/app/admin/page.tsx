@@ -2417,7 +2417,21 @@ export default function AdminDashboard() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
                   <select
                     value={productFormData.category || 'clothes'}
-                    onChange={(e) => setProductFormData(prev => ({ ...prev, category: e.target.value as 'clothes' | 'accessories' | 'shoes' }))}
+                    onChange={(e) => {
+                      const newCategory = e.target.value as 'clothes' | 'accessories' | 'shoes'
+                      // Set default sizes based on category
+                      let defaultSizes: string[] = []
+                      if (newCategory === 'shoes') {
+                        defaultSizes = ['38', '39', '40', '41', '42', '43', '44', '45']
+                      } else if (newCategory === 'clothes') {
+                        defaultSizes = ['S', 'M', 'L', 'XL']
+                      }
+                      setProductFormData(prev => ({
+                        ...prev,
+                        category: newCategory,
+                        sizes: prev.sizes && prev.sizes.length > 0 ? prev.sizes : defaultSizes
+                      }))
+                    }}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                   >
                     {categories.map(cat => (
@@ -2592,13 +2606,13 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     defaultValue={(productFormData.sizes || []).join(', ')}
-                    key={`sizes-${editingProduct?.id || 'new'}`}
+                    key={`sizes-${editingProduct?.id || 'new'}-${productFormData.category}`}
                     onBlur={(e) => setProductFormData(prev => ({
                       ...prev,
                       sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                     }))}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                    placeholder="S, M, L, XL"
+                    placeholder={productFormData.category === 'shoes' ? '38, 39, 40, 41, 42, 43, 44, 45' : 'S, M, L, XL'}
                   />
                 </div>
               </div>

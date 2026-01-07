@@ -1,9 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Shirt, Watch, Footprints, ArrowUpRight } from 'lucide-react'
+import { getFirestoreProducts } from '@/lib/firestore'
 
-const categories = [
+const categoryConfig = [
   {
     id: 'clothes',
     name: 'Clothes',
@@ -11,7 +13,6 @@ const categories = [
     icon: Shirt,
     href: '/shop?category=clothes',
     image: '/categories/clothes.jpg',
-    items: '200+',
     color: 'from-blue-500 to-indigo-600',
   },
   {
@@ -21,7 +22,6 @@ const categories = [
     icon: Watch,
     href: '/shop?category=accessories',
     image: '/categories/accessories.jpg',
-    items: '150+',
     color: 'from-gold to-amber-500',
   },
   {
@@ -31,12 +31,32 @@ const categories = [
     icon: Footprints,
     href: '/shop?category=shoes',
     image: '/categories/shoes.jpg',
-    items: '100+',
     color: 'from-slate-600 to-slate-800',
   },
 ]
 
 export default function Categories() {
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({
+    clothes: 0,
+    accessories: 0,
+    shoes: 0,
+  })
+
+  useEffect(() => {
+    const loadCounts = async () => {
+      // Load from Firestore only
+      const products = await getFirestoreProducts()
+
+      const counts = {
+        clothes: products.filter(p => p.category === 'clothes').length,
+        accessories: products.filter(p => p.category === 'accessories').length,
+        shoes: products.filter(p => p.category === 'shoes').length,
+      }
+      setCategoryCounts(counts)
+    }
+
+    loadCounts()
+  }, [])
   return (
     <section className="section-padding bg-gray-50">
       <div className="container-max">
@@ -57,8 +77,9 @@ export default function Categories() {
 
         {/* Category Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {categories.map((category) => {
+          {categoryConfig.map((category) => {
             const Icon = category.icon
+            const count = categoryCounts[category.id] || 0
             return (
               <Link
                 key={category.id}
@@ -94,7 +115,7 @@ export default function Categories() {
                   {/* Bottom - Info */}
                   <div>
                     <div className="mb-4">
-                      <span className="text-white/60 text-sm">{category.items} items</span>
+                      <span className="text-white/60 text-sm">{count} {count === 1 ? 'item' : 'items'}</span>
                     </div>
                     <h3 className="text-3xl md:text-4xl font-bold text-white mb-2 group-hover:translate-x-2 transition-transform duration-300">
                       {category.name}

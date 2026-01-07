@@ -129,26 +129,22 @@ function ShopContent() {
   const [productsLoading, setProductsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
 
-  // Load products from Firestore with fallback to static
+  // Load products from Firestore only
   useEffect(() => {
     const loadProducts = async () => {
       try {
         const dbProducts = await getFirestoreProducts()
-        if (dbProducts.length > 0) {
-          setFirestoreProducts(dbProducts)
-        } else {
-          setFirestoreProducts(staticProducts)
-        }
+        setFirestoreProducts(dbProducts)
       } catch {
-        setFirestoreProducts(staticProducts)
+        setFirestoreProducts([])
       }
       setProductsLoading(false)
     }
     loadProducts()
   }, [])
 
-  // Combined products - Firestore takes priority
-  const products = firestoreProducts.length > 0 ? firestoreProducts : staticProducts
+  // Use only Firestore products
+  const products = firestoreProducts
 
   // Update category when URL changes
   useEffect(() => {

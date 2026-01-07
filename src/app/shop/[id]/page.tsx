@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ChevronRight,
   Heart,
@@ -17,7 +18,8 @@ import {
   X,
   Star,
   Shirt,
-  ZoomIn
+  ZoomIn,
+  Loader2
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -25,7 +27,7 @@ import ReviewSection from '@/components/ReviewSection'
 import { getProductById, products, Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { getWishlist, addToWishlist, removeFromWishlist } from '@/lib/firestore'
+import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProductById, FirestoreProduct } from '@/lib/firestore'
 
 // Size guide data
 const sizeGuideData = {
@@ -69,7 +71,8 @@ export default function ProductDetailPage() {
   const { addItem } = useCart()
   const { user } = useAuth()
 
-  const [product, setProduct] = useState<Product | null>(null)
+  const [product, setProduct] = useState<Product | FirestoreProduct | null>(null)
+  const [loading, setLoading] = useState(true)
   const [selectedColor, setSelectedColor] = useState('')
   const [selectedSize, setSelectedSize] = useState('')
   const [quantity, setQuantity] = useState(1)
@@ -77,41 +80,50 @@ export default function ProductDetailPage() {
   const [isAdded, setIsAdded] = useState(false)
   const [showSizeGuide, setShowSizeGuide] = useState(false)
   const [showZoom, setShowZoom] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([])
 
   useEffect(() => {
-    const productId = params.id as string
-    const foundProduct = getProductById(productId)
+    const loadProduct = async () => {
+      const productId = params.id as string
+      setLoading(true)
 
-    if (foundProduct) {
-      setProduct(foundProduct)
-      setSelectedColor(foundProduct.colors[0])
-      setSelectedSize(foundProduct.sizes[0])
+      // Try Firestore first, then fallback to static products
+      let foundProduct: Product | FirestoreProduct | null = await getFirestoreProductById(productId)
 
-      // Get related products (same category, different product)
-      const related = products
-        .filter(p => p.category === foundProduct.category && p.id !== foundProduct.id)
-        .slice(0, 4)
-      setRelatedProducts(related)
+      if (!foundProduct) {
+        foundProduct = getProductById(productId) || null
+      }
 
-      // Save to recently viewed (localStorage)
-      const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
-      const filtered = viewed.filter((id: string) => id !== productId)
-      const updated = [productId, ...filtered].slice(0, 8)
-      localStorage.setItem('recentlyViewed', JSON.stringify(updated))
+      if (foundProduct) {
+        setProduct(foundProduct)
+        setSelectedColor(foundProduct.colors?.[0] || '')
+        setSelectedSize(foundProduct.sizes?.[0] || '')
+        setSelectedImageIndex(0)
 
-      // Load recently viewed products
-      const recentIds = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
-      const recentProds = recentIds
-        .filter((id: string) => id !== productId)
-        .map((id: string) => getProductById(id))
-        .filter(Boolean)
-        .slice(0, 4)
-      setRecentlyViewed(recentProds)
+        // Get related products (same category, different product)
+        const related = products
+          .filter(p => p.category === foundProduct!.category && p.id !== foundProduct!.id)
+          .slice(0, 4)
+        setRelatedProducts(related)
 
-      // Check if wishlisted (from Firestore if logged in, otherwise localStorage)
-      const checkWishlist = async () => {
+        // Save to recently viewed (localStorage)
+        const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
+        const filtered = viewed.filter((id: string) => id !== productId)
+        const updated = [productId, ...filtered].slice(0, 8)
+        localStorage.setItem('recentlyViewed', JSON.stringify(updated))
+
+        // Load recently viewed products
+        const recentIds = JSON.parse(localStorage.getItem('recentlyViewed') || '[]')
+        const recentProds = recentIds
+          .filter((id: string) => id !== productId)
+          .map((id: string) => getProductById(id))
+          .filter(Boolean)
+          .slice(0, 4)
+        setRecentlyViewed(recentProds)
+
+        // Check if wishlisted (from Firestore if logged in, otherwise localStorage)
         if (user) {
           const wishlist = await getWishlist(user.id)
           setIsWishlisted(wishlist.includes(productId))
@@ -120,8 +132,11 @@ export default function ProductDetailPage() {
           setIsWishlisted(wishlist.includes(productId))
         }
       }
-      checkWishlist()
+
+      setLoading(false)
     }
+
+    loadProduct()
   }, [params.id, user])
 
   const handleAddToCart = () => {
@@ -171,6 +186,18 @@ export default function ProductDetailPage() {
     setIsWishlisted(!isWishlisted)
   }
 
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gold" />
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
   if (!product) {
     return (
       <>
@@ -189,6 +216,8 @@ export default function ProductDetailPage() {
       </>
     )
   }
+
+  const hasImages = product.images && product.images.length > 0 && product.images[0]
 
   const sizeGuide = sizeGuideData[product.category] || sizeGuideData.clothes
 
@@ -221,27 +250,60 @@ export default function ProductDetailPage() {
                 className="relative aspect-square bg-white rounded-2xl overflow-hidden cursor-zoom-in group"
                 onClick={() => setShowZoom(true)}
               >
-                <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100">
-                  <div className="text-center">
-                    <div className="w-32 h-32 rounded-full bg-white shadow-lg flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
-                      <span className="text-navy font-bold text-5xl">{product.brand.charAt(0)}</span>
+                {hasImages ? (
+                  <Image
+                    src={product.images[selectedImageIndex]}
+                    alt={product.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-300 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100">
+                    <div className="text-center">
+                      <div className="w-32 h-32 rounded-full bg-white shadow-lg flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                        <span className="text-navy font-bold text-5xl">{product.brand.charAt(0)}</span>
+                      </div>
+                      <span className="text-gray-400 text-lg font-medium">{product.brand}</span>
                     </div>
-                    <span className="text-gray-400 text-lg font-medium">{product.brand}</span>
                   </div>
-                </div>
+                )}
 
                 {/* Sale Badge */}
                 {product.originalPrice && (
-                  <span className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-full">
+                  <span className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-full z-10">
                     -{Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
                   </span>
                 )}
 
                 {/* Zoom Icon */}
-                <div className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                <div className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10">
                   <ZoomIn className="w-5 h-5 text-navy" />
                 </div>
               </div>
+
+              {/* Thumbnail Gallery */}
+              {hasImages && product.images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {product.images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImageIndex(idx)}
+                      className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                        selectedImageIndex === idx ? 'border-gold' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Image
+                        src={img}
+                        alt={`${product.name} ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Product Info */}
@@ -537,19 +599,31 @@ export default function ProductDetailPage() {
             onClick={() => setShowZoom(false)}
           >
             <button
-              className="absolute top-4 right-4 text-white"
+              className="absolute top-4 right-4 text-white z-10"
               onClick={() => setShowZoom(false)}
             >
               <X className="w-8 h-8" />
             </button>
-            <div className="w-[80vmin] h-[80vmin] bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-48 h-48 rounded-full bg-white shadow-xl flex items-center justify-center mb-6 mx-auto">
-                  <span className="text-navy font-bold text-7xl">{product.brand.charAt(0)}</span>
-                </div>
-                <span className="text-gray-500 text-2xl font-medium">{product.brand}</span>
+            {hasImages ? (
+              <div className="relative w-[90vmin] h-[90vmin] max-w-4xl max-h-4xl">
+                <Image
+                  src={product.images[selectedImageIndex]}
+                  alt={product.name}
+                  fill
+                  className="object-contain"
+                  sizes="90vmin"
+                />
               </div>
-            </div>
+            ) : (
+              <div className="w-[80vmin] h-[80vmin] bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-48 h-48 rounded-full bg-white shadow-xl flex items-center justify-center mb-6 mx-auto">
+                    <span className="text-navy font-bold text-7xl">{product.brand.charAt(0)}</span>
+                  </div>
+                  <span className="text-gray-500 text-2xl font-medium">{product.brand}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

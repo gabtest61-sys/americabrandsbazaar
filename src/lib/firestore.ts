@@ -776,6 +776,47 @@ export const deleteProduct = async (productId: string): Promise<boolean> => {
   }
 }
 
+// Get single product by ID from Firestore
+export const getFirestoreProductById = async (productId: string): Promise<FirestoreProduct | null> => {
+  if (!db) return null
+
+  try {
+    const productRef = doc(db, 'products', productId)
+    const productSnap = await getDoc(productRef)
+
+    if (productSnap.exists()) {
+      const data = productSnap.data()
+      return {
+        id: productSnap.id,
+        name: data.name || '',
+        brand: data.brand || '',
+        category: data.category || 'clothes',
+        subcategory: data.subcategory || '',
+        price: data.price || 0,
+        originalPrice: data.originalPrice,
+        description: data.description || '',
+        images: data.images || [],
+        colors: data.colors || [],
+        sizes: data.sizes || [],
+        gender: data.gender || 'unisex',
+        tags: data.tags || [],
+        inStock: data.inStock !== false,
+        stockQty: data.stockQty || 0,
+        featured: data.featured || false,
+        giftSuitable: data.giftSuitable || false,
+        occasions: data.occasions || [],
+        style: data.style || [],
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      } as FirestoreProduct
+    }
+    return null
+  } catch (error) {
+    console.error('Error fetching product by ID:', error)
+    return null
+  }
+}
+
 // Seed products from static data to Firestore (one-time migration)
 export const seedProductsToFirestore = async (
   products: Omit<FirestoreProduct, 'createdAt' | 'updatedAt'>[]
