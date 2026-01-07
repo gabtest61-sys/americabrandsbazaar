@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, ArrowRight, ArrowLeft, Lock, ShoppingBag,
   Clock, Heart, Share2, Plus, Check,
-  User, Gift, Wallet, Loader2, MessageCircle, Copy, X, RefreshCw
+  User, Gift, Wallet, Loader2, MessageCircle, Copy, X, RefreshCw, Camera
 } from 'lucide-react'
 import ProductImage from '@/components/ai-dresser/ProductImage'
 import Toast, { useToast } from '@/components/ai-dresser/Toast'
@@ -41,6 +41,12 @@ interface QuizAnswers {
   occasion: string
   budget: string
   color: string
+  sizes: {
+    top: string
+    bottom: string
+    shoe: string
+  }
+  photo?: string // Base64 or URL of uploaded photo
 }
 
 // Quiz configuration based on n8n workflow
@@ -63,10 +69,10 @@ const occasionOptions = [
 ]
 
 const budgetOptions = [
-  { id: '2000', label: 'Under ₱2,000', range: 'Budget-friendly' },
-  { id: '5000', label: '₱2,000 - ₱5,000', range: 'Mid-range' },
-  { id: '10000', label: '₱5,000 - ₱10,000', range: 'Premium' },
-  { id: '999999', label: '₱10,000+', range: 'Luxury' },
+  { id: '10000', label: '₱5,000 - ₱10,000', range: 'Budget-friendly' },
+  { id: '15000', label: '₱10,000 - ₱15,000', range: 'Mid-range' },
+  { id: '20000', label: '₱15,000 - ₱20,000', range: 'Premium' },
+  { id: '999999', label: '₱20,000+', range: 'Luxury' },
 ]
 
 const colorOptions = [
@@ -502,7 +508,7 @@ export default function AIDresserPage() {
   const [hasAccess, setHasAccess] = useState(true)
   const [accessType, setAccessType] = useState<'daily_free' | 'bonus' | 'none'>('daily_free')
   const [bonusSessions, setBonusSessions] = useState(0)
-  const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-6 = quiz steps, 7 = loading, 8 = results
+  const [currentStep, setCurrentStep] = useState(0) // 0 = intro, 1-8 = quiz steps, 9 = loading, 10 = results
   const [answers, setAnswers] = useState<QuizAnswers>({
     purpose: null,
     gender: null,
@@ -510,6 +516,12 @@ export default function AIDresserPage() {
     occasion: '',
     budget: '',
     color: '',
+    sizes: {
+      top: '',
+      bottom: '',
+      shoe: '',
+    },
+    photo: undefined,
   })
   const [looks, setLooks] = useState<Look[]>([])
   const [activeLook, setActiveLook] = useState(0)
@@ -520,6 +532,8 @@ export default function AIDresserPage() {
   const [shareUrls, setShareUrls] = useState<{ messenger?: string; whatsapp?: string; copy?: string } | null>(null)
   const [shownProductIds, setShownProductIds] = useState<string[]>([])
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [tryOnImages, setTryOnImages] = useState<string[]>([]) // Virtual try-on images for each look
+  const [isGeneratingTryOn, setIsGeneratingTryOn] = useState(false)
 
   // Toast notifications
   const { toast, showToast, hideToast } = useToast()
@@ -576,9 +590,48 @@ export default function AIDresserPage() {
     checkAccess()
   }, [user])
 
+  // Generate virtual try-on images for looks
+  const generateVirtualTryOn = async (generatedLooks: Look[], userPhoto: string) => {
+    setIsGeneratingTryOn(true)
+    const tryOnResults: string[] = []
+
+    // Generate try-on for each look
+    for (let i = 0; i < generatedLooks.length; i++) {
+      const look = generatedLooks[i]
+      try {
+        const response = await fetch('/api/ai-dresser/virtual-try-on', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userPhoto,
+            productImages: look.items.map(item => ({
+              name: item.product_name,
+              category: item.category,
+              imageUrl: item.image_url
+            })),
+            lookNumber: look.look_number
+          })
+        })
+
+        const data = await response.json()
+        if (data.success && data.tryOnImage) {
+          tryOnResults[i] = data.tryOnImage
+        } else {
+          tryOnResults[i] = ''
+        }
+      } catch (error) {
+        console.error(`Failed to generate try-on for look ${i + 1}:`, error)
+        tryOnResults[i] = ''
+      }
+    }
+
+    setTryOnImages(tryOnResults)
+    setIsGeneratingTryOn(false)
+  }
+
   // Generate recommendations
   const generateRecommendations = async () => {
-    setCurrentStep(7) // Loading state
+    setCurrentStep(9) // Loading state
 
     // Track AI Dresser usage and save preferences
     if (user?.id) {
@@ -637,16 +690,24 @@ export default function AIDresserPage() {
       }))
     )
 
+    let generatedLooks: Look[]
+
     if (aiResponse?.success && aiResponse.looks?.length > 0) {
       // Use AI-generated looks
-      setLooks(aiResponse.looks)
+      generatedLooks = aiResponse.looks
+      setLooks(generatedLooks)
     } else {
       // Fallback to local generation
-      const localLooks = generateLocalRecommendations(answers)
-      setLooks(localLooks)
+      generatedLooks = generateLocalRecommendations(answers)
+      setLooks(generatedLooks)
     }
 
-    setCurrentStep(8) // Results
+    setCurrentStep(10) // Results
+
+    // If user uploaded a photo, generate virtual try-on images in background
+    if (answers.photo && generatedLooks.length > 0) {
+      generateVirtualTryOn(generatedLooks, answers.photo)
+    }
   }
 
   const handleAnswer = (field: keyof QuizAnswers, value: string) => {
@@ -654,7 +715,7 @@ export default function AIDresserPage() {
   }
 
   const nextStep = () => {
-    if (currentStep === 6) {
+    if (currentStep === 8) {
       generateRecommendations()
     } else {
       setCurrentStep(prev => prev + 1)
@@ -672,7 +733,9 @@ export default function AIDresserPage() {
       case 3: return answers.purpose === 'gift' ? answers.recipient !== '' : answers.style !== ''
       case 4: return answers.occasion !== ''
       case 5: return answers.budget !== ''
-      case 6: return answers.color !== ''
+      case 6: return true // Color is optional, AI can decide
+      case 7: return true // Sizes are optional, can skip
+      case 8: return true // Photo is optional, can skip
       default: return true
     }
   }
@@ -867,7 +930,7 @@ export default function AIDresserPage() {
     setShareModalOpen(false)
   }
 
-  const totalSteps = answers.purpose === 'gift' ? 7 : 6
+  const totalSteps = answers.purpose === 'gift' ? 9 : 8
 
   // Render intro screen
   const renderIntro = () => (
@@ -1175,9 +1238,20 @@ export default function AIDresserPage() {
               <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
                 Color preferences?
               </h2>
-              <p className="text-white/50 mb-8">What palette speaks to you?</p>
+              <p className="text-white/50 mb-8">What palette speaks to you? (Optional - AI can decide)</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleAnswer('color', 'ai-decide')}
+                  className={`p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
+                    answers.color === 'ai-decide'
+                      ? 'bg-gold/20 border-gold'
+                      : 'bg-white/5 border-white/10 hover:border-white/30'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 border-2 border-navy" />
+                  <p className="text-white font-medium">Let AI Decide</p>
+                </button>
                 {colorOptions.map(option => (
                   <button
                     key={option.id}
@@ -1200,6 +1274,140 @@ export default function AIDresserPage() {
                     <p className="text-white font-medium">{option.label}</p>
                   </button>
                 ))}
+              </div>
+            </div>
+          )
+
+        case 7: // Sizes
+          return (
+            <div className="space-y-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                What are your sizes?
+              </h2>
+              <p className="text-white/50 mb-8">Help us find the perfect fit (Optional)</p>
+
+              <div className="space-y-6">
+                {/* Top Size */}
+                <div>
+                  <label className="text-white/70 text-sm mb-2 block">Top Size (Shirt/Jacket)</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setAnswers(prev => ({ ...prev, sizes: { ...prev.sizes, top: size } }))}
+                        className={`py-3 rounded-xl border-2 transition-all font-medium ${
+                          answers.sizes.top === size
+                            ? 'bg-gold/20 border-gold text-gold'
+                            : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Size */}
+                <div>
+                  <label className="text-white/70 text-sm mb-2 block">Bottom Size (Pants/Shorts)</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38'].map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setAnswers(prev => ({ ...prev, sizes: { ...prev.sizes, bottom: size } }))}
+                        className={`py-3 rounded-xl border-2 transition-all font-medium ${
+                          answers.sizes.bottom === size
+                            ? 'bg-gold/20 border-gold text-gold'
+                            : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Shoe Size */}
+                <div>
+                  <label className="text-white/70 text-sm mb-2 block">Shoe Size</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'].map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setAnswers(prev => ({ ...prev, sizes: { ...prev.sizes, shoe: size } }))}
+                        className={`py-3 rounded-xl border-2 transition-all font-medium ${
+                          answers.sizes.shoe === size
+                            ? 'bg-gold/20 border-gold text-gold'
+                            : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+
+        case 8: // Photo Upload
+          return (
+            <div className="space-y-4">
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                Upload your photo
+              </h2>
+              <p className="text-white/50 mb-8">A full body photo helps AI understand your body type (Optional)</p>
+
+              <div className="space-y-4">
+                {answers.photo ? (
+                  <div className="relative">
+                    <div className="aspect-[3/4] max-w-xs mx-auto rounded-2xl overflow-hidden bg-white/10">
+                      <img
+                        src={answers.photo}
+                        alt="Your photo"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setAnswers(prev => ({ ...prev, photo: undefined }))}
+                      className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed border-white/20 rounded-2xl p-8 text-center hover:border-gold/50 transition-colors">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/10 flex items-center justify-center">
+                        <Camera className="w-8 h-8 text-white/50" />
+                      </div>
+                      <p className="text-white font-medium mb-1">Upload a full body photo</p>
+                      <p className="text-white/40 text-sm">JPG, PNG up to 5MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            setAnswers(prev => ({ ...prev, photo: reader.result as string }))
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+
+                <button
+                  onClick={() => nextStep()}
+                  className="w-full py-3 rounded-xl border-2 border-white/10 text-white/50 hover:border-white/30 hover:text-white transition-all text-sm"
+                >
+                  Skip this step
+                </button>
               </div>
             </div>
           )
@@ -1252,7 +1460,7 @@ export default function AIDresserPage() {
                 : 'bg-white/10 text-white/30 cursor-not-allowed'
             }`}
           >
-            {currentStep === 6 ? 'Get My Looks' : 'Continue'}
+            {currentStep === 8 ? 'Get My Looks' : 'Continue'}
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -1383,59 +1591,176 @@ export default function AIDresserPage() {
             </div>
           </div>
 
-          {/* Items Grid */}
+          {/* Items Grid - Virtual Try-On or Product Cards */}
           <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {looks[activeLook].items.map((item) => (
-                <Link
-                  key={item.product_id}
-                  href={item.product_url}
-                  className="bg-white/5 rounded-xl overflow-hidden group block"
-                >
-                  <div className="relative">
-                    {/* Product Image with Fallback */}
-                    <ProductImage
-                      src={item.image_url}
-                      alt={item.product_name}
-                      brand={item.brand}
-                      category={item.category}
+            {/* Virtual Try-On View (when photo uploaded) */}
+            {answers.photo && tryOnImages[activeLook] ? (
+              <div className="mb-6">
+                {/* Try-On Image */}
+                <div className="relative aspect-[3/4] max-w-md mx-auto mb-6 rounded-2xl overflow-hidden bg-white/10">
+                  {isGeneratingTryOn ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <Loader2 className="w-10 h-10 text-gold animate-spin mb-3" />
+                      <p className="text-white/70 text-sm">Creating your virtual try-on...</p>
+                    </div>
+                  ) : (
+                    <img
+                      src={tryOnImages[activeLook]}
+                      alt={`Virtual try-on for ${looks[activeLook].look_name}`}
+                      className="w-full h-full object-cover"
                     />
+                  )}
+                  <div className="absolute top-3 left-3 bg-gold/90 text-navy text-xs font-bold px-3 py-1 rounded-full">
+                    Virtual Try-On
+                  </div>
+                </div>
 
-                    {/* Add to Cart Button */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        addToCart(item)
-                      }}
-                      className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 ${
-                        addedItems.has(item.product_id)
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gold text-navy opacity-0 group-hover:opacity-100'
-                      }`}
+                {/* Product Thumbnails */}
+                <p className="text-white/50 text-sm text-center mb-3">Items in this look:</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {looks[activeLook].items.map((item) => (
+                    <Link
+                      key={item.product_id}
+                      href={item.product_url}
+                      className="bg-white/5 rounded-lg overflow-hidden group block"
                     >
-                      {addedItems.has(item.product_id) ? (
-                        <Check className="w-5 h-5" />
-                      ) : (
-                        <Plus className="w-5 h-5" />
-                      )}
-                    </button>
+                      <div className="relative aspect-square">
+                        <ProductImage
+                          src={item.image_url}
+                          alt={item.product_name}
+                          brand={item.brand}
+                          category={item.category}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            addToCart(item)
+                          }}
+                          className={`absolute bottom-1 right-1 w-7 h-7 rounded-full flex items-center justify-center transition-all z-10 ${
+                            addedItems.has(item.product_id)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gold text-navy opacity-0 group-hover:opacity-100'
+                          }`}
+                        >
+                          {addedItems.has(item.product_id) ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <Plus className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-white text-xs font-medium truncate">{item.product_name}</p>
+                        <p className="text-gold text-xs font-semibold">₱{item.price.toLocaleString()}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : answers.photo && !tryOnImages[activeLook] ? (
+              /* Photo uploaded but try-on not yet generated */
+              <div className="mb-6">
+                <div className="relative aspect-[3/4] max-w-md mx-auto mb-6 rounded-2xl overflow-hidden bg-white/10">
+                  <img
+                    src={answers.photo}
+                    alt="Your uploaded photo"
+                    className="w-full h-full object-cover opacity-50"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
+                    <Camera className="w-12 h-12 text-gold mb-3" />
+                    <p className="text-white font-medium text-center px-4">Virtual try-on coming soon!</p>
+                    <p className="text-white/50 text-sm text-center px-4 mt-1">AI is analyzing your photo to create personalized looks</p>
                   </div>
+                </div>
 
-                  <div className="p-3">
-                    <p className="text-white/60 text-xs mb-0.5">{item.brand}</p>
-                    <p className="text-white text-sm font-medium truncate">
-                      {item.product_name}
-                    </p>
-                    <p className="text-gold font-semibold">
-                      ₱{item.price.toLocaleString()}
-                    </p>
-                    <p className="text-white/40 text-xs mt-1 line-clamp-2">
-                      {item.styling_note}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                {/* Regular Product Grid below photo */}
+                <p className="text-white/50 text-sm text-center mb-3">Recommended items:</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {looks[activeLook].items.map((item) => (
+                    <Link
+                      key={item.product_id}
+                      href={item.product_url}
+                      className="bg-white/5 rounded-xl overflow-hidden group block"
+                    >
+                      <div className="relative">
+                        <ProductImage
+                          src={item.image_url}
+                          alt={item.product_name}
+                          brand={item.brand}
+                          category={item.category}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            addToCart(item)
+                          }}
+                          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 ${
+                            addedItems.has(item.product_id)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gold text-navy opacity-0 group-hover:opacity-100'
+                          }`}
+                        >
+                          {addedItems.has(item.product_id) ? (
+                            <Check className="w-5 h-5" />
+                          ) : (
+                            <Plus className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="p-3">
+                        <p className="text-white/60 text-xs mb-0.5">{item.brand}</p>
+                        <p className="text-white text-sm font-medium truncate">{item.product_name}</p>
+                        <p className="text-gold font-semibold">₱{item.price.toLocaleString()}</p>
+                        <p className="text-white/40 text-xs mt-1 line-clamp-2">{item.styling_note}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* No photo - Regular Product Cards */
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {looks[activeLook].items.map((item) => (
+                  <Link
+                    key={item.product_id}
+                    href={item.product_url}
+                    className="bg-white/5 rounded-xl overflow-hidden group block"
+                  >
+                    <div className="relative">
+                      <ProductImage
+                        src={item.image_url}
+                        alt={item.product_name}
+                        brand={item.brand}
+                        category={item.category}
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          addToCart(item)
+                        }}
+                        className={`absolute bottom-2 right-2 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 ${
+                          addedItems.has(item.product_id)
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gold text-navy opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        {addedItems.has(item.product_id) ? (
+                          <Check className="w-5 h-5" />
+                        ) : (
+                          <Plus className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-white/60 text-xs mb-0.5">{item.brand}</p>
+                      <p className="text-white text-sm font-medium truncate">{item.product_name}</p>
+                      <p className="text-gold font-semibold">₱{item.price.toLocaleString()}</p>
+                      <p className="text-white/40 text-xs mt-1 line-clamp-2">{item.styling_note}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
 
             {/* Style Tip */}
             <div className="bg-gold/10 border border-gold/20 rounded-xl p-4 mb-6">
@@ -1519,11 +1844,12 @@ export default function AIDresserPage() {
         <button
           onClick={() => {
             setCurrentStep(0)
-            setAnswers({ purpose: null, gender: null, style: '', occasion: '', budget: '', color: '' })
+            setAnswers({ purpose: null, gender: null, style: '', occasion: '', budget: '', color: '', sizes: { top: '', bottom: '', shoe: '' }, photo: undefined })
             setLooks([])
             setActiveLook(0)
             setAddedItems(new Set())
             setSavedLooks(new Set())
+            setTryOnImages([])
           }}
           className="text-white/50 hover:text-white transition-colors text-sm"
         >
@@ -1546,9 +1872,9 @@ export default function AIDresserPage() {
         <div className="container-max px-4 md:px-8 relative z-10 py-12">
           <AnimatePresence mode="wait">
             {currentStep === 0 && renderIntro()}
-            {currentStep >= 1 && currentStep <= 6 && renderQuizStep()}
-            {currentStep === 7 && renderLoading()}
-            {currentStep === 8 && renderResults()}
+            {currentStep >= 1 && currentStep <= 8 && renderQuizStep()}
+            {currentStep === 9 && renderLoading()}
+            {currentStep === 10 && renderResults()}
           </AnimatePresence>
         </div>
       </main>

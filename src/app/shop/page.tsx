@@ -373,7 +373,7 @@ function ShopContent() {
               {selectedCategory ? `Shop ${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}` : 'Shop All Products'}
             </h1>
             <p className="text-white/60">
-              Discover premium brands: Calvin Klein, Nike, GAP, Ralph Lauren & Michael Kors
+              Discover premium brands like Calvin Klein, Nike, GAP, Ralph Lauren, Michael Kors, and more
             </p>
           </div>
         </div>
