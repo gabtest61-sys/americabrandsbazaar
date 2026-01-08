@@ -38,6 +38,7 @@ import {
   Review
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
+import { sampleProducts } from '@/lib/sample-products'
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -48,7 +49,7 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
-type TabType = 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'reviews' | 'settings'
+type TabType = 'dashboard' | 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'reviews' | 'settings'
 
 // Coupon interface
 interface Coupon {
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<FirestoreOrder | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<TabType>('orders')
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -484,6 +485,34 @@ export default function AdminDashboard() {
       setFirestoreProducts(productsData)
     } else {
       alert(result.error || 'Failed to seed products')
+    }
+    setIsSeeding(false)
+  }
+
+  // Seed sample products (52 diverse products for AI Dresser testing)
+  const handleSeedSampleProducts = async () => {
+    if (!confirm(`This will add ${sampleProducts.length} sample products to Firestore. Continue?`)) return
+
+    setIsSeeding(true)
+    let successCount = 0
+    let errorCount = 0
+
+    for (const product of sampleProducts) {
+      const result = await createProduct(product)
+      if (result.success) {
+        successCount++
+      } else {
+        errorCount++
+        console.error(`Failed to create ${product.name}:`, result.error)
+      }
+    }
+
+    if (successCount > 0) {
+      alert(`Successfully added ${successCount} products${errorCount > 0 ? ` (${errorCount} failed)` : ''}`)
+      const productsData = await getFirestoreProducts()
+      setFirestoreProducts(productsData)
+    } else {
+      alert('Failed to add products')
     }
     setIsSeeding(false)
   }
@@ -920,11 +949,12 @@ export default function AdminDashboard() {
 
         <nav className="space-y-2">
           {[
+            { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
             { id: 'orders', icon: ShoppingBag, label: 'Orders' },
             { id: 'customers', icon: Users, label: 'Customers' },
             { id: 'inventory', icon: Package, label: 'Inventory' },
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
-            { id: 'products', icon: LayoutDashboard, label: 'Products' },
+            { id: 'products', icon: Package, label: 'Products' },
             { id: 'reviews', icon: Star, label: 'Reviews' },
             { id: 'coupons', icon: Tag, label: 'Coupons' },
             { id: 'settings', icon: Settings, label: 'Settings' },
@@ -984,6 +1014,7 @@ export default function AdminDashboard() {
         <div className="lg:hidden mb-6 overflow-x-auto">
           <div className="flex gap-2 min-w-max">
             {[
+              { id: 'dashboard', label: 'Dashboard' },
               { id: 'orders', label: 'Orders' },
               { id: 'customers', label: 'Customers' },
               { id: 'inventory', label: 'Inventory' },
@@ -1006,95 +1037,212 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6 text-blue-600" />
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <ShoppingBag className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-navy">{stats.totalOrders}</p>
+                <p className="text-gray-500 text-sm">Total Orders</p>
               </div>
-            </div>
-            <p className="text-2xl font-bold text-navy">{stats.totalOrders}</p>
-            <p className="text-gray-500 text-sm">Total Orders</p>
-          </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-yellow-600" />
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-yellow-600" />
+                  </div>
+                  {stats.pendingOrders > 0 && (
+                    <span className="text-yellow-500 text-sm font-medium">Action</span>
+                  )}
+                </div>
+                <p className="text-2xl font-bold text-navy">{stats.pendingOrders}</p>
+                <p className="text-gray-500 text-sm">Pending Orders</p>
               </div>
-              {stats.pendingOrders > 0 && (
-                <span className="text-yellow-500 text-sm font-medium">Action</span>
-              )}
-            </div>
-            <p className="text-2xl font-bold text-navy">{stats.pendingOrders}</p>
-            <p className="text-gray-500 text-sm">Pending Orders</p>
-          </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-green-600" />
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-navy">₱{stats.totalRevenue.toLocaleString()}</p>
+                <p className="text-gray-500 text-sm">Total Revenue</p>
               </div>
-            </div>
-            <p className="text-2xl font-bold text-navy">₱{stats.totalRevenue.toLocaleString()}</p>
-            <p className="text-gray-500 text-sm">Total Revenue</p>
-          </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-navy">{stats.totalCustomers}</p>
+                <p className="text-gray-500 text-sm">Total Customers</p>
               </div>
             </div>
-            <p className="text-2xl font-bold text-navy">{stats.totalCustomers}</p>
-            <p className="text-gray-500 text-sm">Total Customers</p>
-          </div>
-        </div>
 
-        {/* Payment Status Summary */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Paid</p>
-                <p className="text-xl font-bold text-navy">{paymentStats.paidOrders}</p>
+            {/* Payment Status Summary */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Paid</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.paidOrders}</p>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="text-xs text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()}</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-            <p className="text-xs text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Pending Payment</p>
-                <p className="text-xl font-bold text-navy">{paymentStats.pendingPayments}</p>
+              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-yellow-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Pending Payment</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.pendingPayments}</p>
+                  </div>
+                  <Clock className="w-8 h-8 text-yellow-500" />
+                </div>
+                <p className="text-xs text-yellow-600 mt-1">Awaiting payment</p>
               </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-            <p className="text-xs text-yellow-600 mt-1">Awaiting payment</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Online Payments</p>
-                <p className="text-xl font-bold text-navy">{paymentStats.onlineOrders}</p>
+              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Online Payments</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.onlineOrders}</p>
+                  </div>
+                  <CreditCard className="w-8 h-8 text-blue-500" />
+                </div>
+                <p className="text-xs text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
               </div>
-              <CreditCard className="w-8 h-8 text-blue-500" />
-            </div>
-            <p className="text-xs text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-amber-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">COD Orders</p>
-                <p className="text-xl font-bold text-navy">{paymentStats.codOrders}</p>
+              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-amber-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">COD Orders</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.codOrders}</p>
+                  </div>
+                  <Wallet className="w-8 h-8 text-amber-500" />
+                </div>
+                <p className="text-xs text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
               </div>
-              <Wallet className="w-8 h-8 text-amber-500" />
             </div>
-            <p className="text-xs text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
-          </div>
-        </div>
+
+            {/* Quick Actions & Overview */}
+            <div className="grid lg:grid-cols-2 gap-6 mb-8">
+              {/* Recent Orders */}
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-semibold text-navy">Recent Orders</h3>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className="text-sm text-gold hover:underline"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="p-4">
+                  {orders.slice(0, 5).map(order => (
+                    <div key={order.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                      <div>
+                        <p className="font-medium text-navy text-sm">#{order.id?.slice(-6).toUpperCase()}</p>
+                        <p className="text-xs text-gray-500">{order.customerInfo?.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-navy text-sm">₱{order.total.toLocaleString()}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {orders.length === 0 && (
+                    <p className="text-gray-500 text-sm text-center py-4">No orders yet</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Low Stock & Inventory Alerts */}
+              <div className="bg-white rounded-xl shadow-sm">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-semibold text-navy">Inventory Alerts</h3>
+                  <button
+                    onClick={() => setActiveTab('inventory')}
+                    className="text-sm text-gold hover:underline"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="p-4">
+                  {lowStockProducts.slice(0, 5).map(product => (
+                    <div key={product.id} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <Package className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-navy text-sm">{product.name}</p>
+                          <p className="text-xs text-gray-500">{product.brand}</p>
+                        </div>
+                      </div>
+                      <span className="text-red-500 text-sm font-medium">
+                        {product.stockQty} left
+                      </span>
+                    </div>
+                  ))}
+                  {lowStockProducts.length === 0 && (
+                    <div className="text-center py-4">
+                      <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">All products in stock</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Package className="w-8 h-8 text-blue-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-navy">{allProducts.length}</p>
+                    <p className="text-xs text-gray-500">Total Products</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-navy">{lowStockProducts.length}</p>
+                    <p className="text-xs text-gray-500">Low Stock Items</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Star className="w-8 h-8 text-yellow-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-navy">{reviews.length}</p>
+                    <p className="text-xs text-gray-500">Reviews</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Tag className="w-8 h-8 text-purple-500" />
+                  <div>
+                    <p className="text-2xl font-bold text-navy">{coupons.filter(c => c.active).length}</p>
+                    <p className="text-xs text-gray-500">Active Coupons</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Orders Tab */}
         {activeTab === 'orders' && (
@@ -1866,6 +2014,15 @@ export default function AdminDashboard() {
                       {isSeeding ? 'Seeding...' : 'Seed Products'}
                     </button>
                   )}
+                  <button
+                    onClick={handleSeedSampleProducts}
+                    disabled={isSeeding}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    title="Add 52 sample products for AI Dresser testing"
+                  >
+                    {isSeeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {isSeeding ? 'Adding...' : 'Add Sample Products (52)'}
+                  </button>
                 </div>
               </div>
             </div>
