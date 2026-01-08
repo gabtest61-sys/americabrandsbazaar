@@ -79,6 +79,8 @@ export default function AdminDashboard() {
   // Product management state
   const [firestoreProducts, setFirestoreProducts] = useState<FirestoreProduct[]>([])
   const [productFilter, setProductFilter] = useState({ category: '', brand: '' })
+  const [productPage, setProductPage] = useState(1)
+  const productsPerPage = 12
   const [showProductForm, setShowProductForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<FirestoreProduct | null>(null)
   const [productFormData, setProductFormData] = useState<Partial<FirestoreProduct>>({})
@@ -1571,33 +1573,98 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Low Stock Alert */}
-            {lowStockProducts.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                  <h3 className="font-bold text-yellow-800">Low Stock Alert</h3>
+            {/* Low Stock Products Card */}
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-navy">Low Stock Products</h3>
+                      <p className="text-sm text-gray-500">Products with stock below 20 units</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                    {lowStockProducts.length} items
+                  </span>
                 </div>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {lowStockProducts.slice(0, 6).map(product => (
-                    <div key={product.id} className="bg-white rounded-lg p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-navy">{product.name}</p>
-                        <p className="text-xs text-gray-500">{product.brand}</p>
+              </div>
+
+              {lowStockProducts.length === 0 ? (
+                <div className="p-8 text-center">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">All products are well stocked!</p>
+                  <p className="text-gray-400 text-sm">No products below 20 units</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                  {lowStockProducts
+                    .sort((a, b) => a.stockQty - b.stockQty)
+                    .map(product => (
+                    <div key={product.id} className="p-4 hover:bg-gray-50 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {product.images && product.images[0] ? (
+                            <Image
+                              src={product.images[0]}
+                              alt={product.name}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <Package className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-navy truncate">{product.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{product.brand}</span>
+                            <span>•</span>
+                            <span className="capitalize">{product.category}</span>
+                            <span>•</span>
+                            <span>₱{product.price.toLocaleString()}</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className={`text-sm font-bold ${product.stockQty === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
-                        {product.stockQty} left
-                      </span>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${
+                            product.stockQty === 0 ? 'text-red-600' :
+                            product.stockQty <= 5 ? 'text-orange-600' :
+                            'text-yellow-600'
+                          }`}>
+                            {product.stockQty}
+                          </p>
+                          <p className="text-xs text-gray-500">in stock</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          product.stockQty === 0
+                            ? 'bg-red-100 text-red-700'
+                            : product.stockQty <= 5
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {product.stockQty === 0 ? 'Out of Stock' : product.stockQty <= 5 ? 'Critical' : 'Low'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setActiveTab('products')
+                            openProductForm(product as FirestoreProduct)
+                          }}
+                          className="p-2 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Edit product"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-                {lowStockProducts.length > 6 && (
-                  <p className="text-sm text-yellow-700 mt-3">
-                    +{lowStockProducts.length - 6} more products with low stock
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Full Inventory Table */}
             <div className="bg-white rounded-xl shadow-sm">
@@ -2035,7 +2102,10 @@ export default function AdminDashboard() {
                   <div className="flex gap-3">
                     <select
                       value={productFilter.category}
-                      onChange={(e) => setProductFilter(prev => ({ ...prev, category: e.target.value }))}
+                      onChange={(e) => {
+                        setProductFilter(prev => ({ ...prev, category: e.target.value }))
+                        setProductPage(1)
+                      }}
                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
                     >
                       <option value="">All Categories</option>
@@ -2045,7 +2115,10 @@ export default function AdminDashboard() {
                     </select>
                     <select
                       value={productFilter.brand}
-                      onChange={(e) => setProductFilter(prev => ({ ...prev, brand: e.target.value }))}
+                      onChange={(e) => {
+                        setProductFilter(prev => ({ ...prev, brand: e.target.value }))
+                        setProductPage(1)
+                      }}
                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
                     >
                       <option value="">All Brands</option>
@@ -2060,95 +2133,165 @@ export default function AdminDashboard() {
 
               {/* Products Grid */}
               <div className="p-6">
-                {allProducts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p>No products yet. Add your first product or seed from static data.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {allProducts
-                      .filter(p => {
-                        if (productFilter.category && p.category !== productFilter.category) return false
-                        if (productFilter.brand && p.brand !== productFilter.brand) return false
-                        return true
-                      })
-                      .slice(0, 20)
-                      .map(product => (
-                        <div
-                          key={product.id}
-                          className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100 hover:border-gold/50 transition-colors group"
-                        >
-                          {/* Product Image */}
-                          <div className="relative aspect-square bg-white">
-                            {product.images && product.images[0] ? (
-                              <Image
-                                src={product.images[0]}
-                                alt={product.name}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 50vw, 25vw"
-                              />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                                <Package className="w-12 h-12" />
-                              </div>
-                            )}
-                            {/* Actions overlay */}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                              <button
-                                onClick={() => openProductForm(product as FirestoreProduct)}
-                                className="p-2 bg-white rounded-lg hover:bg-gold transition-colors"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-4 h-4 text-navy" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(product.id || null)}
-                                className="p-2 bg-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                            {/* Featured badge */}
-                            {product.featured && (
-                              <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
-                                Featured
-                              </span>
-                            )}
-                          </div>
+                {(() => {
+                  const filteredProducts = allProducts.filter(p => {
+                    if (productFilter.category && p.category !== productFilter.category) return false
+                    if (productFilter.brand && p.brand !== productFilter.brand) return false
+                    return true
+                  })
+                  const totalPages = Math.ceil(filteredProducts.length / productsPerPage)
+                  const startIndex = (productPage - 1) * productsPerPage
+                  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + productsPerPage)
 
-                          {/* Product Info */}
-                          <div className="p-3">
-                            <p className="text-xs text-gold font-medium mb-0.5">{product.brand}</p>
-                            <p className="text-sm font-medium text-navy truncate" title={product.name}>
-                              {product.name}
-                            </p>
-                            <div className="flex items-center justify-between mt-2">
-                              <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
-                              <span className={`text-xs px-2 py-0.5 rounded ${
-                                product.stockQty > 20 ? 'bg-green-100 text-green-700' :
-                                product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {product.stockQty} in stock
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1 font-mono truncate" title={product.id}>
-                              ID: {product.id}
-                            </p>
-                          </div>
+                  return (
+                    <>
+                      {filteredProducts.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                          <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                          <p>No products found. {productFilter.category || productFilter.brand ? 'Try adjusting filters.' : 'Add your first product or seed from static data.'}</p>
                         </div>
-                      ))}
-                  </div>
-                )}
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {paginatedProducts.map(product => (
+                              <div
+                                key={product.id}
+                                className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100 hover:border-gold/50 transition-colors group"
+                              >
+                                {/* Product Image */}
+                                <div className="relative aspect-square bg-white">
+                                  {product.images && product.images[0] ? (
+                                    <Image
+                                      src={product.images[0]}
+                                      alt={product.name}
+                                      fill
+                                      className="object-cover"
+                                      sizes="(max-width: 768px) 50vw, 25vw"
+                                    />
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                                      <Package className="w-12 h-12" />
+                                    </div>
+                                  )}
+                                  {/* Actions overlay */}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                    <button
+                                      onClick={() => openProductForm(product as FirestoreProduct)}
+                                      className="p-2 bg-white rounded-lg hover:bg-gold transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Edit2 className="w-4 h-4 text-navy" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirm(product.id || null)}
+                                      className="p-2 bg-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  {/* Featured badge */}
+                                  {product.featured && (
+                                    <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
+                                      Featured
+                                    </span>
+                                  )}
+                                </div>
 
-                {allProducts.length > 20 && (
-                  <p className="text-center text-sm text-gray-500 mt-4">
-                    Showing 20 of {allProducts.length} products. Use Inventory tab for full list with pagination.
-                  </p>
-                )}
+                                {/* Product Info */}
+                                <div className="p-3">
+                                  <p className="text-xs text-gold font-medium mb-0.5">{product.brand}</p>
+                                  <p className="text-sm font-medium text-navy truncate" title={product.name}>
+                                    {product.name}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
+                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                      product.stockQty > 20 ? 'bg-green-100 text-green-700' :
+                                      product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-red-100 text-red-700'
+                                    }`}>
+                                      {product.stockQty} in stock
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-1 font-mono truncate" title={product.id}>
+                                    ID: {product.id}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Pagination Controls */}
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+                              <p className="text-sm text-gray-500">
+                                Showing {startIndex + 1}-{Math.min(startIndex + productsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setProductPage(1)}
+                                  disabled={productPage === 1}
+                                  className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  First
+                                </button>
+                                <button
+                                  onClick={() => setProductPage(p => Math.max(1, p - 1))}
+                                  disabled={productPage === 1}
+                                  className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    let pageNum
+                                    if (totalPages <= 5) {
+                                      pageNum = i + 1
+                                    } else if (productPage <= 3) {
+                                      pageNum = i + 1
+                                    } else if (productPage >= totalPages - 2) {
+                                      pageNum = totalPages - 4 + i
+                                    } else {
+                                      pageNum = productPage - 2 + i
+                                    }
+                                    return (
+                                      <button
+                                        key={pageNum}
+                                        onClick={() => setProductPage(pageNum)}
+                                        className={`w-8 h-8 text-sm rounded-lg ${
+                                          productPage === pageNum
+                                            ? 'bg-gold text-navy font-semibold'
+                                            : 'border border-gray-200 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        {pageNum}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                <button
+                                  onClick={() => setProductPage(p => Math.min(totalPages, p + 1))}
+                                  disabled={productPage === totalPages}
+                                  className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setProductPage(totalPages)}
+                                  disabled={productPage === totalPages}
+                                  className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Last
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
 

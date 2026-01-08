@@ -827,9 +827,10 @@ export default function AIDresserPage() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {styleOptions.map(option => (
                         <button
+                          type="button"
                           key={option.id}
                           onClick={() => handleAnswer('style', option.id)}
-                          className={`p-4 rounded-xl border-2 transition-all text-left ${
+                          className={`p-4 rounded-xl border-2 transition-all text-left cursor-pointer ${
                             answers.style === option.id
                               ? 'bg-gold/20 border-gold'
                               : 'bg-white/5 border-white/10 hover:border-white/30'
@@ -857,9 +858,10 @@ export default function AIDresserPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {styleOptions.map(option => (
                   <button
+                    type="button"
                     key={option.id}
                     onClick={() => handleAnswer('style', option.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    className={`p-4 rounded-xl border-2 transition-all text-left cursor-pointer ${
                       answers.style === option.id
                         ? 'bg-gold/20 border-gold'
                         : 'bg-white/5 border-white/10 hover:border-white/30'
