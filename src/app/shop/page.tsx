@@ -600,21 +600,31 @@ function ShopContent() {
                       {/* Image */}
                       <Link
                         href={`/shop/${productId}`}
-                        className={`relative block bg-gray-100 ${
-                          viewMode === 'list' ? 'w-40 flex-shrink-0' : 'aspect-[3/4]'
+                        className={`relative block bg-gray-100 overflow-hidden ${
+                          viewMode === 'list' ? 'w-40 h-40 flex-shrink-0' : 'aspect-[3/4]'
                         }`}
                       >
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                          <Shirt className="w-16 h-16" />
-                        </div>
+                        {product.images && product.images.length > 0 && product.images[0] ? (
+                          <Image
+                            src={product.images[0]}
+                            alt={product.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            sizes={viewMode === 'list' ? '160px' : '(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw'}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                            <Shirt className="w-16 h-16" />
+                          </div>
+                        )}
                         {product.originalPrice && (
-                          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10">
                             SALE
                           </span>
                         )}
                         <button
                           onClick={(e) => toggleWishlist(productId, e)}
-                          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
+                          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md z-10 ${
                             wishlist.has(productId)
                               ? 'bg-pink-500 text-white opacity-100'
                               : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'

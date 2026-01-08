@@ -11,16 +11,16 @@ const footerLinks = {
     { name: 'Shoes', href: '/shop?category=shoes' },
   ],
   support: [
-    { name: 'Contact Us', href: '/contact' },
-    { name: 'Shipping Info', href: '/shipping' },
-    { name: 'Returns', href: '/returns' },
-    { name: 'Size Guide', href: '/size-guide' },
+    { name: 'Contact Us', href: '#contact' },
+    { name: 'Shipping Info', href: '#shipping' },
+    { name: 'Returns', href: '#returns' },
+    { name: 'Size Guide', href: '#size-guide' },
   ],
   company: [
-    { name: 'About Us', href: '/about' },
+    { name: 'About Us', href: '#about' },
     { name: 'AI Dresser', href: '/ai-dresser' },
-    { name: 'Privacy Policy', href: '/privacy' },
-    { name: 'Terms of Service', href: '/terms' },
+    { name: 'Privacy Policy', href: '#privacy' },
+    { name: 'Terms of Service', href: '#terms' },
   ],
 }
 
@@ -154,8 +154,8 @@ export default function Footer() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-white/40 text-xs">
             <p>&copy; {new Date().getFullYear()} {BRAND.name}. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <Link href="/privacy" className="hover:text-gold transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-gold transition-colors">Terms</Link>
+              <Link href="#privacy" className="hover:text-gold transition-colors">Privacy</Link>
+              <Link href="#terms" className="hover:text-gold transition-colors">Terms</Link>
               <span>EST. {BRAND.established}</span>
             </div>
           </div>

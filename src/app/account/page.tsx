@@ -13,7 +13,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { getOrdersByUser, getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct, FirestoreOrder } from '@/lib/firestore'
+import { getOrdersByUser, getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct, FirestoreOrder, getSavedLooks, deleteSavedLook, SavedLook } from '@/lib/firestore'
 
 const statusIcons = {
   pending: Clock,
@@ -38,9 +38,11 @@ export default function AccountPage() {
   const { user, isLoggedIn, isLoading, logout, deleteAccount, updateUser } = useAuth()
   const { addItem } = useCart()
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
-  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'settings'>('orders')
+  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'saved-looks' | 'settings'>('orders')
   const [wishlistProducts, setWishlistProducts] = useState<FirestoreProduct[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [savedLooks, setSavedLooks] = useState<SavedLook[]>([])
+  const [savedLooksLoading, setSavedLooksLoading] = useState(false)
 
   // Settings editing state
   const [isEditing, setIsEditing] = useState(false)
@@ -97,6 +99,23 @@ export default function AccountPage() {
     loadWishlist()
   }, [user, activeTab])
 
+  // Load saved looks when tab is active
+  useEffect(() => {
+    const loadSavedLooks = async () => {
+      if (user && activeTab === 'saved-looks') {
+        setSavedLooksLoading(true)
+        try {
+          const looks = await getSavedLooks(user.id)
+          setSavedLooks(looks)
+        } catch (error) {
+          console.error('Error loading saved looks:', error)
+        }
+        setSavedLooksLoading(false)
+      }
+    }
+    loadSavedLooks()
+  }, [user, activeTab])
+
   const handleLogout = () => {
     logout()
     router.push('/')
@@ -121,6 +140,29 @@ export default function AccountPage() {
       sizes: product.sizes || [],
       colors: product.colors || [],
     }, 1, product.sizes?.[0] || '', product.colors?.[0] || '')
+  }
+
+  const handleDeleteSavedLook = async (lookId: string) => {
+    const deleted = await deleteSavedLook(lookId)
+    if (deleted) {
+      setSavedLooks(prev => prev.filter(look => look.id !== lookId))
+    }
+  }
+
+  const handleAddLookToCart = (look: SavedLook) => {
+    look.items.forEach(item => {
+      addItem({
+        id: item.productId,
+        name: item.productName,
+        brand: item.brand,
+        price: item.price,
+        originalPrice: item.price,
+        image: item.imageUrl || '/placeholder.jpg',
+        category: item.category as 'clothes' | 'accessories' | 'shoes',
+        sizes: [],
+        colors: [],
+      }, 1)
+    })
   }
 
   const handleSaveProfile = async () => {
@@ -228,6 +270,16 @@ export default function AccountPage() {
                   >
                     <Heart className="w-5 h-5" />
                     <span className="font-medium">Wishlist</span>
+                    <ChevronRight className="w-4 h-4 ml-auto" />
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('saved-looks')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                      activeTab === 'saved-looks' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-medium">Saved Looks</span>
                     <ChevronRight className="w-4 h-4 ml-auto" />
                   </button>
                   <button
@@ -420,6 +472,109 @@ export default function AccountPage() {
                       >
                         <ShoppingBag className="w-5 h-5" />
                         Browse Products
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'saved-looks' && (
+                <div>
+                  <h1 className="text-2xl font-bold text-navy mb-6">Saved Looks</h1>
+                  {savedLooksLoading ? (
+                    <div className="bg-white rounded-2xl shadow-sm p-12 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-gold" />
+                    </div>
+                  ) : savedLooks.length > 0 ? (
+                    <div className="space-y-6">
+                      {savedLooks.map(look => (
+                        <div key={look.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                          {/* Look Header */}
+                          <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-navy to-navy/90">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="text-lg font-bold text-white">{look.lookName}</h3>
+                                <p className="text-white/60 text-sm">{look.lookDescription}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-white/60 text-xs">Total</p>
+                                <p className="text-xl font-bold text-gold">₱{look.totalPrice.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Look Items */}
+                          <div className="p-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                              {look.items.map((item, index) => (
+                                <Link
+                                  key={index}
+                                  href={item.productUrl || `/shop/${item.productId}`}
+                                  className="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                                >
+                                  <div className="aspect-square relative bg-gray-100">
+                                    {item.imageUrl ? (
+                                      <Image
+                                        src={item.imageUrl}
+                                        alt={item.productName}
+                                        fill
+                                        className="object-cover"
+                                        sizes="150px"
+                                      />
+                                    ) : (
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <Shirt className="w-8 h-8 text-gray-300" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="p-2">
+                                    <p className="text-xs text-gold font-medium">{item.brand}</p>
+                                    <p className="text-sm font-medium text-navy truncate">{item.productName}</p>
+                                    <p className="text-sm font-bold text-navy">₱{item.price.toLocaleString()}</p>
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
+
+                            {/* Style Tip */}
+                            {look.styleTip && (
+                              <div className="bg-gold/10 border border-gold/20 rounded-xl p-3 mb-4">
+                                <p className="text-xs text-gold font-medium mb-1">Style Tip</p>
+                                <p className="text-sm text-gray-700">{look.styleTip}</p>
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleAddLookToCart(look)}
+                                className="flex-1 flex items-center justify-center gap-2 bg-gold text-navy font-semibold py-3 rounded-xl hover:bg-yellow-400 transition-colors"
+                              >
+                                <ShoppingBag className="w-4 h-4" />
+                                Add All to Cart
+                              </button>
+                              <button
+                                onClick={() => look.id && handleDeleteSavedLook(look.id)}
+                                className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+                      <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-navy mb-2">No saved looks yet</h3>
+                      <p className="text-gray-500 mb-6">Save your favorite AI Dresser outfits to view them here</p>
+                      <Link
+                        href="/ai-dresser"
+                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+                      >
+                        <Sparkles className="w-5 h-5" />
+                        Try AI Dresser
                       </Link>
                     </div>
                   )}

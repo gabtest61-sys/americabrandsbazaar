@@ -64,6 +64,11 @@ interface Coupon {
   active: boolean
 }
 
+// Size options for different categories
+const clothesSizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']
+const shoeSizeOptions = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46']
+const accessorySizeOptions = ['One Size', 'S', 'M', 'L']
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, isLoggedIn, isLoading, logout } = useAuth()
@@ -113,6 +118,13 @@ export default function AdminDashboard() {
 
   // Customer details view
   const [selectedCustomer, setSelectedCustomer] = useState<(UserProfile & { id: string }) | null>(null)
+
+  // Search states for different tabs
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [inventorySearch, setInventorySearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
+  const [brandSearch, setBrandSearch] = useState('')
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false)
 
   // Unified search
   const [globalSearch, setGlobalSearch] = useState('')
@@ -388,6 +400,8 @@ export default function AdminDashboard() {
 
   // Open product form for create/edit
   const openProductForm = (product?: FirestoreProduct) => {
+    setBrandSearch('')
+    setShowBrandDropdown(false)
     if (product) {
       setEditingProduct(product)
       setProductFormData({ ...product })
@@ -396,7 +410,7 @@ export default function AdminDashboard() {
       setEditingProduct(null)
       setProductFormData({
         name: '',
-        brand: brands[0],
+        brand: '',
         category: 'clothes',
         subcategory: '',
         price: 0,
@@ -1453,14 +1467,31 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl shadow-sm">
             <div className="p-6 border-b border-gray-100">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-navy">Customers ({users.length})</h2>
-                <button
-                  onClick={exportUsersToCSV}
-                  className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Export CSV
-                </button>
+                <h2 className="text-lg font-bold text-navy">Customers ({users.filter(u =>
+                  !customerSearch ||
+                  u.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                  u.email?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                  u.phone?.toLowerCase().includes(customerSearch.toLowerCase())
+                ).length})</h2>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search customers..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold w-64"
+                    />
+                  </div>
+                  <button
+                    onClick={exportUsersToCSV}
+                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1477,7 +1508,12 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {users.map(customer => {
+                  {users.filter(u =>
+                    !customerSearch ||
+                    u.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    u.email?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    u.phone?.toLowerCase().includes(customerSearch.toLowerCase())
+                  ).map(customer => {
                     const customerOrders = getCustomerOrders(customer.id)
                     const lifetimeValue = getCustomerLifetimeValue(customer.id)
                     return (
@@ -1673,16 +1709,39 @@ export default function AdminDashboard() {
                   <div>
                     <h2 className="text-lg font-bold text-navy">Inventory</h2>
                     <p className="text-sm text-gray-500">
-                      Showing {((inventoryPage - 1) * INVENTORY_PER_PAGE) + 1}-{Math.min(inventoryPage * INVENTORY_PER_PAGE, allProducts.length)} of {allProducts.length} products
+                      {(() => {
+                        const filtered = allProducts.filter(p =>
+                          !inventorySearch ||
+                          p.name?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+                          p.brand?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+                          p.category?.toLowerCase().includes(inventorySearch.toLowerCase())
+                        )
+                        return `Showing ${((inventoryPage - 1) * INVENTORY_PER_PAGE) + 1}-${Math.min(inventoryPage * INVENTORY_PER_PAGE, filtered.length)} of ${filtered.length} products`
+                      })()}
                     </p>
                   </div>
-                  <button
-                    onClick={exportInventoryToCSV}
-                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export CSV
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search inventory..."
+                        value={inventorySearch}
+                        onChange={(e) => {
+                          setInventorySearch(e.target.value)
+                          setInventoryPage(1)
+                        }}
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold w-64"
+                      />
+                    </div>
+                    <button
+                      onClick={exportInventoryToCSV}
+                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export CSV
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1700,6 +1759,12 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {allProducts
+                      .filter(p =>
+                        !inventorySearch ||
+                        p.name?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+                        p.brand?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+                        p.category?.toLowerCase().includes(inventorySearch.toLowerCase())
+                      )
                       .slice((inventoryPage - 1) * INVENTORY_PER_PAGE, inventoryPage * INVENTORY_PER_PAGE)
                       .map(product => (
                       <tr key={product.id} className="hover:bg-gray-50">
@@ -2099,7 +2164,20 @@ export default function AdminDashboard() {
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h3 className="font-semibold text-navy">All Products</h3>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-wrap">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value)
+                          setProductPage(1)
+                        }}
+                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold w-48"
+                      />
+                    </div>
                     <select
                       value={productFilter.category}
                       onChange={(e) => {
@@ -2137,6 +2215,12 @@ export default function AdminDashboard() {
                   const filteredProducts = allProducts.filter(p => {
                     if (productFilter.category && p.category !== productFilter.category) return false
                     if (productFilter.brand && p.brand !== productFilter.brand) return false
+                    if (productSearch) {
+                      const search = productSearch.toLowerCase()
+                      return p.name?.toLowerCase().includes(search) ||
+                             p.brand?.toLowerCase().includes(search) ||
+                             p.id?.toLowerCase().includes(search)
+                    }
                     return true
                   })
                   const totalPages = Math.ceil(filteredProducts.length / productsPerPage)
@@ -2984,31 +3068,64 @@ export default function AdminDashboard() {
                     placeholder="e.g. Classic Logo T-Shirt"
                   />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Brand *</label>
-                  <select
-                    value={brands.includes(productFormData.brand || '') ? (productFormData.brand || brands[0]) : 'Other'}
-                    onChange={(e) => {
-                      if (e.target.value === 'Other') {
-                        setProductFormData(prev => ({ ...prev, brand: '' }))
-                      } else {
-                        setProductFormData(prev => ({ ...prev, brand: e.target.value }))
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                  >
-                    {brands.map(brand => (
-                      <option key={brand} value={brand}>{brand}</option>
-                    ))}
-                  </select>
-                  {(!brands.includes(productFormData.brand || '') || productFormData.brand === '') && (
+                  <div className="relative">
                     <input
                       type="text"
-                      value={productFormData.brand || ''}
-                      onChange={(e) => setProductFormData(prev => ({ ...prev, brand: e.target.value }))}
-                      className="w-full mt-2 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                      placeholder="Enter custom brand name"
+                      value={brandSearch || productFormData.brand || ''}
+                      onChange={(e) => {
+                        setBrandSearch(e.target.value)
+                        setShowBrandDropdown(true)
+                      }}
+                      onFocus={() => setShowBrandDropdown(true)}
+                      placeholder="Search or enter brand..."
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                     />
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                  {showBrandDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      {brands
+                        .filter(b => b !== 'Other' && b.toLowerCase().includes((brandSearch || '').toLowerCase()))
+                        .map(brand => (
+                          <button
+                            key={brand}
+                            type="button"
+                            onClick={() => {
+                              setProductFormData(prev => ({ ...prev, brand }))
+                              setBrandSearch('')
+                              setShowBrandDropdown(false)
+                            }}
+                            className={`w-full px-4 py-2.5 text-left hover:bg-gold/10 transition-colors ${
+                              productFormData.brand === brand ? 'bg-gold/20 font-medium' : ''
+                            }`}
+                          >
+                            {brand}
+                          </button>
+                        ))}
+                      {brandSearch && !brands.includes(brandSearch) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductFormData(prev => ({ ...prev, brand: brandSearch }))
+                            setBrandSearch('')
+                            setShowBrandDropdown(false)
+                          }}
+                          className="w-full px-4 py-2.5 text-left hover:bg-gold/10 transition-colors text-gold font-medium border-t border-gray-100"
+                        >
+                          + Add &quot;{brandSearch}&quot; as custom brand
+                        </button>
+                      )}
+                      {!brandSearch && brands.filter(b => b !== 'Other').length === 0 && (
+                        <div className="px-4 py-3 text-gray-500 text-sm">No brands available</div>
+                      )}
+                    </div>
+                  )}
+                  {productFormData.brand && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Selected: <span className="font-medium text-navy">{productFormData.brand}</span>
+                    </p>
                   )}
                 </div>
               </div>
@@ -3090,14 +3207,11 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500 mt-1">Set to enable sale pricing</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
-                    <input
-                      type="number"
-                      value={productFormData.stockQty || ''}
-                      onChange={(e) => setProductFormData(prev => ({ ...prev, stockQty: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                      placeholder="0"
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Total Stock</label>
+                    <div className="px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600">
+                      {Object.values(productFormData.stockBySize || {}).reduce((sum, qty) => sum + qty, 0) || productFormData.stockQty || 0}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Auto-calculated from sizes</p>
                   </div>
                   <div className="flex items-end gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -3186,35 +3300,102 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Arrays: Colors, Sizes */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Colors (comma separated)</label>
-                  <input
-                    type="text"
-                    defaultValue={(productFormData.colors || []).join(', ')}
-                    key={`colors-${editingProduct?.id || 'new'}`}
-                    onBlur={(e) => setProductFormData(prev => ({
-                      ...prev,
-                      colors: e.target.value.split(',').map(c => c.trim()).filter(Boolean)
-                    }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                    placeholder="Black, White, Navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sizes (comma separated)</label>
-                  <input
-                    type="text"
-                    defaultValue={(productFormData.sizes || []).join(', ')}
-                    key={`sizes-${editingProduct?.id || 'new'}-${productFormData.category}`}
-                    onBlur={(e) => setProductFormData(prev => ({
-                      ...prev,
-                      sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                    placeholder={productFormData.category === 'shoes' ? '38, 39, 40, 41, 42, 43, 44, 45' : 'S, M, L, XL'}
-                  />
+              {/* Colors */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Colors (comma separated)</label>
+                <input
+                  type="text"
+                  defaultValue={(productFormData.colors || []).join(', ')}
+                  key={`colors-${editingProduct?.id || 'new'}`}
+                  onBlur={(e) => setProductFormData(prev => ({
+                    ...prev,
+                    colors: e.target.value.split(',').map(c => c.trim()).filter(Boolean)
+                  }))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                  placeholder="Black, White, Navy"
+                />
+              </div>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h4 className="font-semibold text-navy mb-4">Sizes & Stock per Size</h4>
+                <p className="text-sm text-gray-500 mb-4">Select available sizes and enter stock quantity for each</p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {(productFormData.category === 'shoes'
+                    ? shoeSizeOptions
+                    : productFormData.category === 'accessories'
+                    ? accessorySizeOptions
+                    : clothesSizeOptions
+                  ).map(size => {
+                    const isSelected = (productFormData.sizes || []).includes(size)
+                    const stockForSize = productFormData.stockBySize?.[size] || 0
+
+                    return (
+                      <div
+                        key={size}
+                        className={`border-2 rounded-xl p-3 transition-all ${
+                          isSelected
+                            ? 'border-gold bg-gold/5'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <label className="flex items-center gap-2 cursor-pointer mb-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newSizes = e.target.checked
+                                ? [...(productFormData.sizes || []), size]
+                                : (productFormData.sizes || []).filter(s => s !== size)
+
+                              const newStockBySize = { ...(productFormData.stockBySize || {}) }
+                              if (!e.target.checked) {
+                                delete newStockBySize[size]
+                              }
+
+                              const totalStock = Object.values(newStockBySize).reduce((sum, qty) => sum + qty, 0)
+
+                              setProductFormData(prev => ({
+                                ...prev,
+                                sizes: newSizes,
+                                stockBySize: newStockBySize,
+                                stockQty: totalStock,
+                                inStock: totalStock > 0
+                              }))
+                            }}
+                            className="w-4 h-4 accent-gold"
+                          />
+                          <span className={`font-medium ${isSelected ? 'text-navy' : 'text-gray-500'}`}>
+                            {size}
+                          </span>
+                        </label>
+
+                        {isSelected && (
+                          <input
+                            type="number"
+                            min="0"
+                            value={stockForSize}
+                            onChange={(e) => {
+                              const qty = parseInt(e.target.value) || 0
+                              const newStockBySize = {
+                                ...(productFormData.stockBySize || {}),
+                                [size]: qty
+                              }
+                              const totalStock = Object.values(newStockBySize).reduce((sum, q) => sum + q, 0)
+
+                              setProductFormData(prev => ({
+                                ...prev,
+                                stockBySize: newStockBySize,
+                                stockQty: totalStock,
+                                inStock: totalStock > 0
+                              }))
+                            }}
+                            placeholder="0"
+                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-center"
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 

@@ -7,7 +7,7 @@ import { useCart } from '@/context/CartContext'
 import { formatPrice } from '@/lib/constants'
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCart()
+  const { items, isOpen, closeCart, removeItem, updateQuantity, clearCart, subtotal, itemCount } = useCart()
   const [isAnimating, setIsAnimating] = useState(false)
   const [removingItem, setRemovingItem] = useState<string | null>(null)
 
@@ -34,6 +34,12 @@ export default function CartDrawer() {
       removeItem(productId)
       setRemovingItem(null)
     }, 300)
+  }
+
+  const handleClearCart = () => {
+    if (confirm('Remove all items from your cart?')) {
+      clearCart()
+    }
   }
 
   if (!isOpen && !isAnimating) return null
@@ -72,6 +78,19 @@ export default function CartDrawer() {
             <X className="w-5 h-5 text-white" />
           </button>
         </div>
+
+        {/* Clear All Button */}
+        {items.length > 0 && (
+          <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
+            <button
+              onClick={handleClearCart}
+              className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Remove All
+            </button>
+          </div>
+        )}
 
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto">

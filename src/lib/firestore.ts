@@ -926,6 +926,7 @@ export interface FirestoreProduct {
   tags: string[]
   inStock: boolean
   stockQty: number
+  stockBySize?: Record<string, number> // e.g., { 'S': 5, 'M': 10, 'L': 3 }
   featured: boolean
   giftSuitable: boolean
   occasions: string[]

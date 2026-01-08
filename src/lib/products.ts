@@ -1724,6 +1724,8 @@ export const brands = [
   'Lacoste',
   'Fred Perry',
   'Hugo Boss',
+  // Classic
+  'Penguin',
   // Other
   'Other'
 ]

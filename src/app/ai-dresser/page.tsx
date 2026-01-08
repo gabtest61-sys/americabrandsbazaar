@@ -15,7 +15,7 @@ import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { incrementAIDresserUsage, updateUserPreferences, consumeBonusAIDresserSession, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
+import { incrementAIDresserUsage, updateUserPreferences, consumeBonusAIDresserSession, getFirestoreProducts, FirestoreProduct, saveAIDresserLook, deleteSavedLook } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { regenerateLooks } from '@/lib/ai-dresser-engine'
 import {
@@ -126,7 +126,7 @@ export default function AIDresserPage() {
   const [looks, setLooks] = useState<Look[]>([])
   const [activeLook, setActiveLook] = useState(0)
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set())
-  const [savedLooks, setSavedLooks] = useState<Set<number>>(new Set())
+  const [savedLooks, setSavedLooks] = useState<Map<number, string>>(new Map()) // Map<lookNumber, firestoreDocId>
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareUrls, setShareUrls] = useState<{ messenger?: string; whatsapp?: string; copy?: string } | null>(null)
@@ -497,29 +497,61 @@ export default function AIDresserPage() {
 
   const saveLook = async (lookNumber: number) => {
     const look = looks.find(l => l.look_number === lookNumber)
-    const isAlreadySaved = savedLooks.has(lookNumber)
+    const existingDocId = savedLooks.get(lookNumber)
+    const isAlreadySaved = !!existingDocId
 
-    setSavedLooks(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(lookNumber)) {
-        newSet.delete(lookNumber)
-      } else {
-        newSet.add(lookNumber)
-      }
-      return newSet
-    })
-
-    // Show toast notification
-    if (isAlreadySaved) {
-      showToast('Look removed from wishlist', 'info')
-    } else {
-      showToast(`${look?.look_name || 'Look'} saved to wishlist`, 'wishlist')
+    if (!user) {
+      showToast('Please login to save looks', 'error')
+      setIsAuthModalOpen(true)
+      return
     }
 
-    // Try to save to n8n webhook
-    if (look && !isAlreadySaved) {
+    if (isAlreadySaved && existingDocId) {
+      // Remove from Firestore
+      const deleted = await deleteSavedLook(existingDocId)
+      if (deleted) {
+        setSavedLooks(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(lookNumber)
+          return newMap
+        })
+        showToast('Look removed from wishlist', 'info')
+      }
+    } else if (look) {
+      // Save to Firestore
+      const docId = await saveAIDresserLook(user.id, {
+        sessionId,
+        lookNumber: look.look_number,
+        lookName: look.look_name,
+        lookDescription: look.look_description,
+        items: look.items.map(item => ({
+          productId: item.product_id,
+          productName: item.product_name,
+          brand: item.brand,
+          category: item.category,
+          price: item.price,
+          imageUrl: item.image_url,
+          productUrl: item.product_url,
+          stylingNote: item.styling_note
+        })),
+        totalPrice: look.total_price,
+        styleTip: look.style_tip
+      })
+
+      if (docId) {
+        setSavedLooks(prev => {
+          const newMap = new Map(prev)
+          newMap.set(lookNumber, docId)
+          return newMap
+        })
+        showToast(`${look.look_name} saved to wishlist`, 'wishlist')
+      } else {
+        showToast('Failed to save look', 'error')
+      }
+
+      // Also try n8n webhook
       try {
-        await saveLookToWishlist(sessionId, user?.id || '', look)
+        await saveLookToWishlist(sessionId, user.id, look)
       } catch {
         // Silently fail if webhook not configured
       }
@@ -542,7 +574,7 @@ export default function AIDresserPage() {
       setLooks(newLooks)
       setActiveLook(0)
       setAddedItems(new Set())
-      setSavedLooks(new Set())
+      setSavedLooks(new Map())
       showToast('New looks generated!', 'success')
     } else {
       // If no new looks possible, reset exclusions and regenerate
@@ -1549,7 +1581,7 @@ export default function AIDresserPage() {
             setLooks([])
             setActiveLook(0)
             setAddedItems(new Set())
-            setSavedLooks(new Set())
+            setSavedLooks(new Map())
             setTryOnImages([])
           }}
           className="text-white/50 hover:text-white transition-colors text-sm"
