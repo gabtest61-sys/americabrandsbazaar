@@ -12,7 +12,7 @@ import {
   Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
   CheckSquare, Square, History, MessageSquare, Printer,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
-  Settings, Star
+  Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -149,6 +149,16 @@ export default function AdminDashboard() {
   const [reviewFilter, setReviewFilter] = useState<'all' | 'verified' | 'unverified'>('all')
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null)
 
+  // Payment filter state
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('')
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('')
+
+  // Bulk order selection
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
+
+  // Low stock threshold setting
+  const [lowStockThreshold, setLowStockThreshold] = useState(5)
+
   // Check admin access and redirect if not logged in
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -201,6 +211,10 @@ export default function AdminDashboard() {
     }
     // Status filter
     if (filterStatus && order.status !== filterStatus) return false
+    // Payment status filter
+    if (paymentStatusFilter && order.paymentStatus !== paymentStatusFilter) return false
+    // Payment method filter
+    if (paymentMethodFilter && order.paymentMethod !== paymentMethodFilter) return false
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -221,8 +235,20 @@ export default function AdminDashboard() {
     totalCustomers: users.length,
   }
 
+  // Payment stats
+  const paymentStats = {
+    paidOrders: orders.filter(o => o.paymentStatus === 'paid').length,
+    pendingPayments: orders.filter(o => o.paymentStatus === 'pending').length,
+    failedPayments: orders.filter(o => o.paymentStatus === 'failed').length,
+    paidRevenue: orders.filter(o => o.paymentStatus === 'paid').reduce((sum, o) => sum + o.total, 0),
+    codOrders: orders.filter(o => o.paymentMethod === 'cod').length,
+    onlineOrders: orders.filter(o => o.paymentMethod === 'online').length,
+    codRevenue: orders.filter(o => o.paymentMethod === 'cod').reduce((sum, o) => sum + o.total, 0),
+    onlineRevenue: orders.filter(o => o.paymentMethod === 'online').reduce((sum, o) => sum + o.total, 0),
+  }
+
   // Inventory stats - Low stock threshold
-  const LOW_STOCK_THRESHOLD = 5
+  const LOW_STOCK_THRESHOLD = lowStockThreshold
   const lowStockProducts = allProducts.filter(p => p.stockQty > 0 && p.stockQty < LOW_STOCK_THRESHOLD)
   const outOfStockProducts = allProducts.filter(p => p.stockQty === 0)
   const totalInventoryValue = allProducts.reduce((sum, p) => sum + (p.price * p.stockQty), 0)
@@ -598,7 +624,7 @@ export default function AdminDashboard() {
 
   // Export orders to CSV
   const exportOrdersToCSV = () => {
-    const headers = ['Order ID', 'Customer', 'Email', 'Phone', 'Items', 'Subtotal', 'Shipping', 'Total', 'Status', 'Date', 'Notes']
+    const headers = ['Order ID', 'Customer', 'Email', 'Phone', 'Items', 'Subtotal', 'Shipping', 'Total', 'Status', 'Payment Method', 'Payment Status', 'Date', 'Notes']
     const rows = filteredOrders.map(o => [
       o.orderId,
       o.customerInfo.name,
@@ -609,6 +635,8 @@ export default function AdminDashboard() {
       o.shippingFee.toString(),
       o.total.toString(),
       o.status,
+      o.paymentMethod || 'N/A',
+      o.paymentStatus || 'N/A',
       o.createdAt?.toDate().toISOString().split('T')[0] || 'N/A',
       o.notes || ''
     ])
@@ -1022,6 +1050,50 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Payment Status Summary */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Paid</p>
+                <p className="text-xl font-bold text-navy">{paymentStats.paidOrders}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+            <p className="text-xs text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-yellow-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Pending Payment</p>
+                <p className="text-xl font-bold text-navy">{paymentStats.pendingPayments}</p>
+              </div>
+              <Clock className="w-8 h-8 text-yellow-500" />
+            </div>
+            <p className="text-xs text-yellow-600 mt-1">Awaiting payment</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Online Payments</p>
+                <p className="text-xl font-bold text-navy">{paymentStats.onlineOrders}</p>
+              </div>
+              <CreditCard className="w-8 h-8 text-blue-500" />
+            </div>
+            <p className="text-xs text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-amber-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">COD Orders</p>
+                <p className="text-xl font-bold text-navy">{paymentStats.codOrders}</p>
+              </div>
+              <Wallet className="w-8 h-8 text-amber-500" />
+            </div>
+            <p className="text-xs text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
+          </div>
+        </div>
+
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="bg-white rounded-xl shadow-sm">
@@ -1059,6 +1131,26 @@ export default function AdminDashboard() {
                       <option value="shipped">Shipped</option>
                       <option value="delivered">Delivered</option>
                       <option value="cancelled">Cancelled</option>
+                    </select>
+                    <select
+                      value={paymentStatusFilter}
+                      onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                    >
+                      <option value="">All Payments</option>
+                      <option value="pending">Payment Pending</option>
+                      <option value="paid">Paid</option>
+                      <option value="failed">Failed</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
+                    <select
+                      value={paymentMethodFilter}
+                      onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                      className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gold text-sm"
+                    >
+                      <option value="">All Methods</option>
+                      <option value="online">Online Payment</option>
+                      <option value="cod">COD</option>
                     </select>
                   </div>
                 </div>
@@ -1100,44 +1192,71 @@ export default function AdminDashboard() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Customer</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Items</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Total</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Customer</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Payment</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredOrders.map(order => (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
                         <span className="font-mono text-sm text-navy">{order.orderId}</span>
+                        <p className="text-xs text-gray-400">{order.items.length} item(s)</p>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
                         <div>
                           <p className="font-medium text-navy">{order.customerInfo.name}</p>
-                          <p className="text-sm text-gray-500">{order.customerInfo.email}</p>
+                          <p className="text-xs text-gray-500">{order.customerInfo.email}</p>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className="text-sm text-gray-600">{order.items.length} item(s)</span>
-                      </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
                         <span className="font-semibold text-navy">₱{order.total.toLocaleString()}</span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                            order.paymentMethod === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {order.paymentMethod === 'online' ? (
+                              <><CreditCard className="w-3 h-3" /> Online</>
+                            ) : (
+                              <><Wallet className="w-3 h-3" /> COD</>
+                            )}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                            order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                            order.paymentStatus === 'failed' ? 'bg-red-100 text-red-700' :
+                            order.paymentStatus === 'refunded' ? 'bg-purple-100 text-purple-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {order.paymentStatus === 'paid' ? (
+                              <><CheckCircle className="w-3 h-3" /> Paid</>
+                            ) : order.paymentStatus === 'failed' ? (
+                              <><XCircle className="w-3 h-3" /> Failed</>
+                            ) : order.paymentStatus === 'refunded' ? (
+                              <><BanknoteIcon className="w-3 h-3" /> Refunded</>
+                            ) : (
+                              <><Clock className="w-3 h-3" /> Pending</>
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
                           {order.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
                         <span className="text-sm text-gray-500">
                           {order.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setSelectedOrder(order)}
@@ -1503,6 +1622,87 @@ export default function AdminDashboard() {
                 <p className="text-sm text-gray-500 mb-1">This Week Orders</p>
                 <p className="text-2xl font-bold text-navy">{comparisons.thisWeek.orders}</p>
                 <p className="text-sm text-gray-400 mt-2">{comparisons.lastWeek.orders} last week</p>
+              </div>
+            </div>
+
+            {/* Payment Analytics */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  </div>
+                  <p className="text-sm text-gray-500">Paid Orders</p>
+                </div>
+                <p className="text-2xl font-bold text-navy">{paymentStats.paidOrders}</p>
+                <p className="text-sm text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()} confirmed</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-yellow-600" />
+                  </div>
+                  <p className="text-sm text-gray-500">Pending Payments</p>
+                </div>
+                <p className="text-2xl font-bold text-navy">{paymentStats.pendingPayments}</p>
+                <p className="text-sm text-yellow-600 mt-1">Awaiting payment</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <p className="text-sm text-gray-500">Online Payments</p>
+                </div>
+                <p className="text-2xl font-bold text-navy">{paymentStats.onlineOrders}</p>
+                <p className="text-sm text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <Wallet className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <p className="text-sm text-gray-500">COD Orders</p>
+                </div>
+                <p className="text-2xl font-bold text-navy">{paymentStats.codOrders}</p>
+                <p className="text-sm text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Payment Method Breakdown */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-bold text-navy mb-4">Payment Method Breakdown</h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600">Online Payments</span>
+                    <span className="font-semibold text-navy">
+                      {stats.totalOrders > 0 ? Math.round((paymentStats.onlineOrders / stats.totalOrders) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all"
+                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.onlineOrders / stats.totalOrders) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{paymentStats.onlineOrders} orders • ₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600">Cash on Delivery</span>
+                    <span className="font-semibold text-navy">
+                      {stats.totalOrders > 0 ? Math.round((paymentStats.codOrders / stats.totalOrders) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.codOrders / stats.totalOrders) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{paymentStats.codOrders} orders • ₱{paymentStats.codRevenue.toLocaleString()}</p>
+                </div>
               </div>
             </div>
 
@@ -2341,6 +2541,56 @@ export default function AdminDashboard() {
                     <span>Total</span>
                     <span>₱{selectedOrder.total.toLocaleString()}</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Payment Information */}
+              <div>
+                <h4 className="font-semibold text-navy mb-3">Payment Information</h4>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Payment Method</span>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedOrder.paymentMethod === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {selectedOrder.paymentMethod === 'online' ? (
+                        <><CreditCard className="w-4 h-4" /> Online Payment</>
+                      ) : (
+                        <><Wallet className="w-4 h-4" /> Cash on Delivery</>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Payment Status</span>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                      selectedOrder.paymentStatus === 'failed' ? 'bg-red-100 text-red-700' :
+                      selectedOrder.paymentStatus === 'refunded' ? 'bg-purple-100 text-purple-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {selectedOrder.paymentStatus === 'paid' ? (
+                        <><CheckCircle className="w-4 h-4" /> Paid</>
+                      ) : selectedOrder.paymentStatus === 'failed' ? (
+                        <><XCircle className="w-4 h-4" /> Failed</>
+                      ) : selectedOrder.paymentStatus === 'refunded' ? (
+                        <><BanknoteIcon className="w-4 h-4" /> Refunded</>
+                      ) : (
+                        <><Clock className="w-4 h-4" /> Pending</>
+                      )}
+                    </span>
+                  </div>
+                  {selectedOrder.paymentId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Payment ID</span>
+                      <span className="font-mono text-sm">{selectedOrder.paymentId}</span>
+                    </div>
+                  )}
+                  {selectedOrder.paidAt && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Paid At</span>
+                      <span>{selectedOrder.paidAt.toDate().toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
