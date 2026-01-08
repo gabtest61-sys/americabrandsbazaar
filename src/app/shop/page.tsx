@@ -4,13 +4,20 @@ import { useState, useMemo, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight, Eye, Clock } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import ProductQuickView from '@/components/ProductQuickView'
+import { ProductGridSkeleton } from '@/components/ProductSkeleton'
+import Breadcrumb from '@/components/Breadcrumb'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { products as staticProducts, brands, categories, Product } from '@/lib/products'
 import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
+
+// Recently viewed storage key
+const RECENTLY_VIEWED_KEY = 'lgm_recently_viewed'
+const MAX_RECENTLY_VIEWED = 8
 
 const priceRanges = [
   { label: 'All Prices', min: 0, max: Infinity },
@@ -128,6 +135,27 @@ function ShopContent() {
   const [firestoreProducts, setFirestoreProducts] = useState<(Product | FirestoreProduct)[]>([])
   const [productsLoading, setProductsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+
+  // Quick view state
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | FirestoreProduct | null>(null)
+
+  // Recently viewed state
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([])
+
+  // Search autocomplete state
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Load recently viewed from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(RECENTLY_VIEWED_KEY)
+    if (stored) {
+      try {
+        setRecentlyViewed(JSON.parse(stored))
+      } catch {
+        setRecentlyViewed([])
+      }
+    }
+  }, [])
 
   // Load products from Firestore only
   useEffect(() => {
@@ -347,6 +375,76 @@ function ShopContent() {
     setSelectedPriceRange(priceRanges[0])
   }
 
+  // Track recently viewed products
+  const trackRecentlyViewed = (productId: string) => {
+    const updated = [productId, ...recentlyViewed.filter(id => id !== productId)].slice(0, MAX_RECENTLY_VIEWED)
+    setRecentlyViewed(updated)
+    localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated))
+  }
+
+  // Handle quick view open
+  const openQuickView = (product: Product | FirestoreProduct, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setQuickViewProduct(product)
+    if (product.id) trackRecentlyViewed(product.id)
+  }
+
+  // Handle add to cart from quick view
+  const handleQuickViewAddToCart = (product: Product | FirestoreProduct, quantity: number, size: string, color: string) => {
+    if (!product.id) return
+    const cartProduct = {
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      price: product.price,
+      originalPrice: product.originalPrice || product.price,
+      image: product.images[0] || '/placeholder.jpg',
+      category: product.category as 'clothes' | 'accessories' | 'shoes',
+      sizes: product.sizes,
+      colors: product.colors,
+    }
+    addItem(cartProduct, quantity, size, color)
+  }
+
+  // Handle wishlist toggle from quick view
+  const handleQuickViewWishlistToggle = async (productId: string) => {
+    const isWishlisted = wishlist.has(productId)
+
+    if (user) {
+      if (isWishlisted) {
+        await removeFromWishlist(user.id, productId)
+      } else {
+        await addToWishlist(user.id, productId)
+      }
+    } else {
+      const items = JSON.parse(localStorage.getItem('wishlist') || '[]')
+      if (isWishlisted) {
+        const updated = items.filter((id: string) => id !== productId)
+        localStorage.setItem('wishlist', JSON.stringify(updated))
+      } else {
+        localStorage.setItem('wishlist', JSON.stringify([...items, productId]))
+      }
+    }
+
+    setWishlist(prev => {
+      const newSet = new Set(prev)
+      if (isWishlisted) {
+        newSet.delete(productId)
+      } else {
+        newSet.add(productId)
+      }
+      return newSet
+    })
+  }
+
+  // Get recently viewed products
+  const recentlyViewedProducts = useMemo(() => {
+    return recentlyViewed
+      .map(id => products.find(p => p.id === id))
+      .filter((p): p is Product | FirestoreProduct => p !== undefined)
+  }, [recentlyViewed, products])
+
   // Get all unique colors from products
   const availableColors = useMemo(() => {
     const colorSet = new Set<string>()
@@ -364,6 +462,63 @@ function ShopContent() {
     })
     return Array.from(brandSet).sort()
   }, [products])
+
+  // Search autocomplete suggestions
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery || searchQuery.length < 2) return []
+
+    const query = searchQuery.toLowerCase()
+    const suggestions: { type: 'product' | 'brand' | 'category'; label: string; value: string; image?: string }[] = []
+
+    // Product name matches (limit to 5)
+    const productMatches = products
+      .filter(p => p.name.toLowerCase().includes(query))
+      .slice(0, 5)
+      .map(p => ({
+        type: 'product' as const,
+        label: p.name,
+        value: p.name,
+        image: p.images?.[0]
+      }))
+    suggestions.push(...productMatches)
+
+    // Brand matches
+    const brandMatches = availableBrands
+      .filter(b => b.toLowerCase().includes(query))
+      .slice(0, 3)
+      .map(b => ({
+        type: 'brand' as const,
+        label: b,
+        value: b
+      }))
+    suggestions.push(...brandMatches)
+
+    // Category matches
+    const categoryMatches = categories
+      .filter(c => c.toLowerCase().includes(query))
+      .map(c => ({
+        type: 'category' as const,
+        label: c.charAt(0).toUpperCase() + c.slice(1),
+        value: c
+      }))
+    suggestions.push(...categoryMatches)
+
+    return suggestions.slice(0, 8)
+  }, [searchQuery, products, availableBrands])
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = (suggestion: typeof searchSuggestions[0]) => {
+    if (suggestion.type === 'category') {
+      setSelectedCategory(suggestion.value)
+      setSearchQuery('')
+    } else if (suggestion.type === 'brand') {
+      setSelectedBrands([suggestion.value])
+      setSearchQuery('')
+    } else {
+      setSearchQuery(suggestion.value)
+    }
+    setShowSuggestions(false)
+  }
 
   const activeFiltersCount =
     (selectedCategory ? 1 : 0) +
@@ -388,6 +543,15 @@ function ShopContent() {
         </div>
 
         <div className="container-max px-4 md:px-8 py-8">
+          {/* Breadcrumb */}
+          <Breadcrumb
+            items={[
+              { label: 'Shop', href: selectedCategory ? '/shop' : undefined },
+              ...(selectedCategory ? [{ label: selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1) }] : [])
+            ]}
+            className="mb-6"
+          />
+
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar Filters - Desktop */}
             <aside className="hidden lg:block w-64 flex-shrink-0">
@@ -523,16 +687,78 @@ function ShopContent() {
               {/* Search & Controls */}
               <div className="bg-white rounded-2xl p-4 shadow-sm mb-6">
                 <div className="flex flex-col md:flex-row gap-4">
-                  {/* Search */}
+                  {/* Search with Autocomplete */}
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
                     <input
                       type="text"
-                      placeholder="Search products..."
+                      placeholder="Search products, brands, categories..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setShowSuggestions(true)
+                      }}
+                      onFocus={() => {
+                        if (searchQuery.length >= 2) setShowSuggestions(true)
+                      }}
+                      onBlur={() => {
+                        // Delay hiding to allow clicking suggestions
+                        setTimeout(() => setShowSuggestions(false), 200)
+                      }}
                       className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                     />
+                    {/* Clear button */}
+                    {searchQuery && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('')
+                          setShowSuggestions(false)
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* Autocomplete Suggestions Dropdown */}
+                    {showSuggestions && searchSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                        {searchSuggestions.map((suggestion, idx) => (
+                          <button
+                            key={`${suggestion.type}-${suggestion.value}-${idx}`}
+                            onClick={() => handleSuggestionSelect(suggestion)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-0"
+                          >
+                            {suggestion.type === 'product' && suggestion.image ? (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                <Image
+                                  src={suggestion.image}
+                                  alt={suggestion.label}
+                                  width={40}
+                                  height={40}
+                                  className="object-cover w-full h-full"
+                                />
+                              </div>
+                            ) : (
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                suggestion.type === 'brand' ? 'bg-gold/10 text-gold' :
+                                suggestion.type === 'category' ? 'bg-navy/10 text-navy' :
+                                'bg-gray-100 text-gray-400'
+                              }`}>
+                                {suggestion.type === 'brand' && <span className="font-bold text-sm">{suggestion.label.charAt(0)}</span>}
+                                {suggestion.type === 'category' && <Shirt className="w-5 h-5" />}
+                                {suggestion.type === 'product' && <Shirt className="w-5 h-5" />}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-navy truncate">{suggestion.label}</p>
+                              <p className="text-xs text-gray-400 capitalize">{suggestion.type}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Mobile Filter Button */}
@@ -583,7 +809,9 @@ function ShopContent() {
 
               {/* Results Count */}
               <div className="mb-4 text-sm text-gray-500">
-                {filteredProducts.length > 0 ? (
+                {productsLoading ? (
+                  <span className="inline-block w-48 h-4 bg-gray-200 rounded animate-pulse" />
+                ) : filteredProducts.length > 0 ? (
                   <>Showing {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}</>
                 ) : (
                   <>No products found</>
@@ -591,7 +819,9 @@ function ShopContent() {
               </div>
 
               {/* Products Grid */}
-              {paginatedProducts.length > 0 ? (
+              {productsLoading ? (
+                <ProductGridSkeleton count={8} viewMode={viewMode} />
+              ) : paginatedProducts.length > 0 ? (
                 <div className={`grid gap-4 ${
                   viewMode === 'grid'
                     ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
@@ -626,21 +856,44 @@ function ShopContent() {
                             <Shirt className="w-16 h-16" />
                           </div>
                         )}
-                        {product.originalPrice && (
-                          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10">
-                            SALE
-                          </span>
-                        )}
-                        <button
-                          onClick={(e) => toggleWishlist(productId, e)}
-                          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md z-10 ${
-                            wishlist.has(productId)
-                              ? 'bg-pink-500 text-white opacity-100'
-                              : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
-                          }`}
-                        >
-                          <Heart className={`w-4 h-4 ${wishlist.has(productId) ? 'fill-current' : ''}`} />
-                        </button>
+                        {/* Badges */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                          {product.originalPrice && (
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                              SALE
+                            </span>
+                          )}
+                          {product.stockQty === 0 && (
+                            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded-full">
+                              Out of Stock
+                            </span>
+                          )}
+                          {product.stockQty > 0 && product.stockQty <= 5 && (
+                            <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                              Only {product.stockQty} left
+                            </span>
+                          )}
+                        </div>
+                        {/* Action buttons */}
+                        <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
+                          <button
+                            onClick={(e) => toggleWishlist(productId, e)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
+                              wishlist.has(productId)
+                                ? 'bg-pink-500 text-white opacity-100'
+                                : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
+                            }`}
+                          >
+                            <Heart className={`w-4 h-4 ${wishlist.has(productId) ? 'fill-current' : ''}`} />
+                          </button>
+                          <button
+                            onClick={(e) => openQuickView(product, e)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gold hover:text-navy"
+                            title="Quick View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
                       </Link>
 
                       {/* Info */}
@@ -883,8 +1136,60 @@ function ShopContent() {
             </div>
           </div>
         )}
+
+        {/* Recently Viewed Section */}
+        {recentlyViewedProducts.length > 0 && (
+          <div className="container-max px-4 md:px-8 pb-12">
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <Clock className="w-5 h-5 text-gold" />
+                <h2 className="text-lg font-bold text-navy">Recently Viewed</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                {recentlyViewedProducts.slice(0, 8).map(product => (
+                  <Link
+                    key={product.id}
+                    href={`/shop/${product.id}`}
+                    className="group"
+                  >
+                    <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden mb-2">
+                      {product.images && product.images[0] ? (
+                        <Image
+                          src={product.images[0]}
+                          alt={product.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform"
+                          sizes="120px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Shirt className="w-8 h-8 text-gray-300" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gold font-medium">{product.brand}</p>
+                    <p className="text-sm font-medium text-navy truncate">{product.name}</p>
+                    <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
       <Footer />
+
+      {/* Quick View Modal */}
+      {quickViewProduct && (
+        <ProductQuickView
+          product={quickViewProduct}
+          isOpen={!!quickViewProduct}
+          onClose={() => setQuickViewProduct(null)}
+          onAddToCart={handleQuickViewAddToCart}
+          onToggleWishlist={handleQuickViewWishlistToggle}
+          isWishlisted={wishlist.has(quickViewProduct.id!)}
+        />
+      )}
     </>
   )
 }

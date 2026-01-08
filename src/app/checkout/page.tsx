@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check, Truck, Loader2, CreditCard, Wallet, Building2 } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, Mail, Phone, MapPin, FileText, Lock, Check, Truck, Loader2, CreditCard, Wallet, Building2, Tag, X } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
@@ -25,6 +25,22 @@ const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
   freeShippingThreshold: 3000,
 }
 
+// Sample coupon codes
+interface Coupon {
+  code: string
+  type: 'percentage' | 'fixed'
+  value: number
+  minPurchase?: number
+  description: string
+}
+
+const VALID_COUPONS: Coupon[] = [
+  { code: 'WELCOME10', type: 'percentage', value: 10, description: '10% off your order' },
+  { code: 'SAVE500', type: 'fixed', value: 500, minPurchase: 3000, description: '₱500 off orders ₱3,000+' },
+  { code: 'FREESHIP', type: 'fixed', value: 0, description: 'Free shipping (applied separately)' },
+  { code: 'VIP20', type: 'percentage', value: 20, minPurchase: 5000, description: '20% off orders ₱5,000+' },
+]
+
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart()
   const { user, isLoggedIn } = useAuth()
@@ -36,6 +52,12 @@ export default function CheckoutPage() {
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings>(DEFAULT_SHIPPING_SETTINGS)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online')
+
+  // Coupon code state
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
+  const [couponError, setCouponError] = useState('')
+  const [couponSuccess, setCouponSuccess] = useState('')
 
   // Load shipping settings from Firestore
   useEffect(() => {
@@ -64,10 +86,54 @@ export default function CheckoutPage() {
   })
 
   // Calculate shipping fee - free if above threshold, otherwise based on region
-  const isFreeShipping = subtotal >= shippingSettings.freeShippingThreshold
+  const isFreeShipping = subtotal >= shippingSettings.freeShippingThreshold || appliedCoupon?.code === 'FREESHIP'
   const selectedRate = shippingSettings.rates.find(r => r.id === shippingRegion)
   const shippingFee = isFreeShipping ? 0 : (selectedRate?.fee || 0)
-  const total = subtotal + shippingFee
+
+  // Calculate discount from coupon
+  const calculateDiscount = () => {
+    if (!appliedCoupon || appliedCoupon.code === 'FREESHIP') return 0
+    if (appliedCoupon.type === 'percentage') {
+      return Math.round(subtotal * (appliedCoupon.value / 100))
+    }
+    return appliedCoupon.value
+  }
+  const discount = calculateDiscount()
+  const total = subtotal - discount + shippingFee
+
+  // Apply coupon code
+  const handleApplyCoupon = () => {
+    setCouponError('')
+    setCouponSuccess('')
+
+    const code = couponInput.toUpperCase().trim()
+    if (!code) {
+      setCouponError('Please enter a coupon code')
+      return
+    }
+
+    const coupon = VALID_COUPONS.find(c => c.code === code)
+    if (!coupon) {
+      setCouponError('Invalid coupon code')
+      return
+    }
+
+    if (coupon.minPurchase && subtotal < coupon.minPurchase) {
+      setCouponError(`Minimum purchase of ₱${coupon.minPurchase.toLocaleString()} required`)
+      return
+    }
+
+    setAppliedCoupon(coupon)
+    setCouponSuccess(`Coupon applied: ${coupon.description}`)
+    setCouponInput('')
+  }
+
+  // Remove applied coupon
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponError('')
+    setCouponSuccess('')
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -730,12 +796,68 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
+                {/* Coupon Code */}
+                <div className="border-t border-gray-200 pt-4 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tag className="w-4 h-4 text-gold" />
+                    <span className="text-sm font-medium text-navy">Have a coupon?</span>
+                  </div>
+
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div>
+                        <p className="font-mono font-bold text-green-700 text-sm">{appliedCoupon.code}</p>
+                        <p className="text-xs text-green-600">{appliedCoupon.description}</p>
+                      </div>
+                      <button
+                        onClick={handleRemoveCoupon}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={(e) => {
+                          setCouponInput(e.target.value.toUpperCase())
+                          setCouponError('')
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                        placeholder="Enter code"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold uppercase"
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        className="px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  )}
+
+                  {couponError && (
+                    <p className="text-xs text-red-500 mt-2">{couponError}</p>
+                  )}
+                  {couponSuccess && !appliedCoupon && (
+                    <p className="text-xs text-green-600 mt-2">{couponSuccess}</p>
+                  )}
+                </div>
+
                 {/* Totals */}
                 <div className="border-t border-gray-200 pt-4 space-y-2">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal</span>
                     <span>{formatPrice(subtotal)}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount</span>
+                      <span>-{formatPrice(discount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
                     {isFreeShipping ? (

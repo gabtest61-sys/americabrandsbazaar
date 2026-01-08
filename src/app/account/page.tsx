@@ -7,7 +7,7 @@ import Image from 'next/image'
 import {
   User, Package, Heart, Settings, LogOut, ChevronRight,
   ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle,
-  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle
+  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle, RotateCcw
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -163,6 +163,31 @@ export default function AccountPage() {
         colors: [],
       }, 1)
     })
+  }
+
+  // Reorder - add all items from an order to cart
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
+
+  const handleReorder = (order: FirestoreOrder) => {
+    const orderId = order.id || order.orderId
+    setReorderingId(orderId)
+
+    order.items.forEach(item => {
+      addItem({
+        id: item.productId || item.id || `reorder-${Date.now()}`,
+        name: item.name,
+        brand: item.brand || 'Unknown',
+        price: item.price,
+        originalPrice: item.price,
+        image: item.image || '/placeholder.jpg',
+        category: 'clothes' as const,
+        sizes: [],
+        colors: [],
+      }, item.quantity, item.size || '', item.color || '')
+    })
+
+    // Reset after animation
+    setTimeout(() => setReorderingId(null), 2000)
   }
 
   const handleSaveProfile = async () => {
@@ -377,9 +402,23 @@ export default function AccountPage() {
                                   <span className="text-gray-500 text-sm">Total: </span>
                                   <span className="font-bold text-navy">₱{order.total.toLocaleString()}</span>
                                 </div>
-                                <button className="text-gold font-medium text-sm hover:text-yellow-600">
-                                  View Details
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => handleReorder(order)}
+                                    disabled={reorderingId === (order.id || order.orderId)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-sm transition-all ${
+                                      reorderingId === (order.id || order.orderId)
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gold/10 text-gold hover:bg-gold hover:text-navy'
+                                    }`}
+                                  >
+                                    <RotateCcw className={`w-4 h-4 ${reorderingId === (order.id || order.orderId) ? 'animate-spin' : ''}`} />
+                                    {reorderingId === (order.id || order.orderId) ? 'Added!' : 'Reorder'}
+                                  </button>
+                                  <button className="text-gold font-medium text-sm hover:text-yellow-600">
+                                    View Details
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>

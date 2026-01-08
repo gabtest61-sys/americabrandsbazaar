@@ -2095,6 +2095,112 @@ export default function AdminDashboard() {
                 })}
               </div>
             </div>
+
+            {/* Top Selling Products */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-bold text-navy mb-6">Top Selling Products</h3>
+              {(() => {
+                // Calculate product sales from orders
+                const productSales: Record<string, { name: string; brand: string; quantity: number; revenue: number; image?: string }> = {}
+                orders.filter(o => o.status !== 'cancelled').forEach(order => {
+                  order.items.forEach(item => {
+                    const productId = item.productId || item.name
+                    if (!productSales[productId]) {
+                      productSales[productId] = {
+                        name: item.name,
+                        brand: item.brand || 'Unknown',
+                        quantity: 0,
+                        revenue: 0,
+                        image: item.image
+                      }
+                    }
+                    productSales[productId].quantity += item.quantity
+                    productSales[productId].revenue += item.price * item.quantity
+                  })
+                })
+
+                const topProducts = Object.entries(productSales)
+                  .sort((a, b) => b[1].revenue - a[1].revenue)
+                  .slice(0, 10)
+
+                return topProducts.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No sales data yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {topProducts.map(([id, product], index) => (
+                      <div key={id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl">
+                        <div className="w-8 h-8 bg-gold/20 rounded-full flex items-center justify-center text-gold font-bold text-sm">
+                          {index + 1}
+                        </div>
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                          {product.image ? (
+                            <Image src={product.image} alt={product.name} width={48} height={48} className="object-cover w-full h-full" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="w-6 h-6 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-navy truncate">{product.name}</p>
+                          <p className="text-xs text-gray-500">{product.brand}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-navy">₱{product.revenue.toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">{product.quantity} sold</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Conversion Metrics */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-bold text-navy mb-6">Conversion Metrics</h3>
+              {(() => {
+                const completedOrders = orders.filter(o => o.status === 'delivered').length
+                const totalOrders = orders.filter(o => o.status !== 'cancelled').length
+                const cancelledOrders = orders.filter(o => o.status === 'cancelled').length
+                const fulfillmentRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0
+                const cancellationRate = orders.length > 0 ? (cancelledOrders / orders.length) * 100 : 0
+                const avgOrderValue = totalOrders > 0
+                  ? orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0) / totalOrders
+                  : 0
+                const repeatCustomers = new Set(orders.filter(o => {
+                  const customerOrders = orders.filter(ord => ord.customerInfo.email === o.customerInfo.email)
+                  return customerOrders.length > 1
+                }).map(o => o.customerInfo.email)).size
+                const totalCustomers = new Set(orders.map(o => o.customerInfo.email)).size
+                const repeatRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0
+
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500 mb-1">Fulfillment Rate</p>
+                      <p className="text-2xl font-bold text-green-600">{fulfillmentRate.toFixed(1)}%</p>
+                      <p className="text-xs text-gray-400">{completedOrders} delivered of {totalOrders}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500 mb-1">Cancellation Rate</p>
+                      <p className="text-2xl font-bold text-red-600">{cancellationRate.toFixed(1)}%</p>
+                      <p className="text-xs text-gray-400">{cancelledOrders} cancelled</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500 mb-1">Average Order Value</p>
+                      <p className="text-2xl font-bold text-navy">₱{avgOrderValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                      <p className="text-xs text-gray-400">Per order</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500 mb-1">Repeat Customer Rate</p>
+                      <p className="text-2xl font-bold text-blue-600">{repeatRate.toFixed(1)}%</p>
+                      <p className="text-xs text-gray-400">{repeatCustomers} of {totalCustomers} customers</p>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         )}
 
@@ -2214,6 +2320,44 @@ export default function AdminDashboard() {
                     </select>
                   </div>
                 </div>
+
+                {/* Bulk Actions Bar */}
+                {selectedProducts.size > 0 && (
+                  <div className="mt-4 flex items-center justify-between p-3 bg-gold/10 border border-gold/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className="w-5 h-5 text-gold" />
+                      <span className="text-sm font-medium text-navy">
+                        {selectedProducts.size} product{selectedProducts.size !== 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleBulkStockUpdate(true)}
+                        className="px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors"
+                      >
+                        Mark In Stock
+                      </button>
+                      <button
+                        onClick={() => handleBulkStockUpdate(false)}
+                        className="px-3 py-1.5 text-sm font-medium bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors"
+                      >
+                        Mark Out of Stock
+                      </button>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+                      >
+                        Delete Selected
+                      </button>
+                      <button
+                        onClick={() => setSelectedProducts(new Set())}
+                        className="px-3 py-1.5 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Clear Selection
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Products Grid */}
@@ -2243,11 +2387,40 @@ export default function AdminDashboard() {
                         </div>
                       ) : (
                         <>
+                          {/* Select All */}
+                          <div className="flex items-center gap-3 mb-4 p-2 bg-gray-50 rounded-lg">
+                            <button
+                              onClick={() => {
+                                if (selectedProducts.size === paginatedProducts.length) {
+                                  setSelectedProducts(new Set())
+                                } else {
+                                  setSelectedProducts(new Set(paginatedProducts.map(p => p.id!).filter(Boolean)))
+                                }
+                              }}
+                              className="flex items-center gap-2 text-sm text-gray-600 hover:text-navy transition-colors"
+                            >
+                              {selectedProducts.size === paginatedProducts.length && paginatedProducts.length > 0 ? (
+                                <CheckSquare className="w-5 h-5 text-gold" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                              Select All ({paginatedProducts.length})
+                            </button>
+                            {selectedProducts.size > 0 && (
+                              <span className="text-xs text-gray-400">
+                                • {selectedProducts.size} selected
+                              </span>
+                            )}
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {paginatedProducts.map(product => (
                               <div
                                 key={product.id}
-                                className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100 hover:border-gold/50 transition-colors group"
+                                className={`bg-gray-50 rounded-xl overflow-hidden border transition-colors group ${
+                                  selectedProducts.has(product.id!)
+                                    ? 'border-gold ring-2 ring-gold/30'
+                                    : 'border-gray-100 hover:border-gold/50'
+                                }`}
                               >
                                 {/* Product Image */}
                                 <div className="relative aspect-square bg-white">
@@ -2264,6 +2437,21 @@ export default function AdminDashboard() {
                                       <Package className="w-12 h-12" />
                                     </div>
                                   )}
+                                  {/* Selection checkbox */}
+                                  <button
+                                    onClick={() => toggleSelectProduct(product.id!)}
+                                    className={`absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center transition-all z-10 ${
+                                      selectedProducts.has(product.id!)
+                                        ? 'bg-gold text-navy'
+                                        : 'bg-white/90 text-gray-400 opacity-0 group-hover:opacity-100'
+                                    }`}
+                                  >
+                                    {selectedProducts.has(product.id!) ? (
+                                      <CheckSquare className="w-4 h-4" />
+                                    ) : (
+                                      <Square className="w-4 h-4" />
+                                    )}
+                                  </button>
                                   {/* Actions overlay */}
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                                     <button

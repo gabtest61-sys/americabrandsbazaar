@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
-  ChevronRight,
   Heart,
   ShoppingBag,
   Minus,
@@ -18,12 +17,13 @@ import {
   X,
   Star,
   Shirt,
-  ZoomIn,
-  Loader2
+  ZoomIn
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ReviewSection from '@/components/ReviewSection'
+import Breadcrumb from '@/components/Breadcrumb'
+import { ProductDetailSkeleton } from '@/components/ProductSkeleton'
 import { getProductById, Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
@@ -191,8 +191,8 @@ export default function ProductDetailPage() {
     return (
       <>
         <Header />
-        <main className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-gold" />
+        <main className="min-h-screen bg-gray-50 pt-24">
+          <ProductDetailSkeleton />
         </main>
         <Footer />
       </>
@@ -229,17 +229,13 @@ export default function ProductDetailPage() {
         {/* Breadcrumbs */}
         <div className="bg-white border-b">
           <div className="container-max px-4 md:px-8 py-3">
-            <nav className="flex items-center gap-2 text-sm">
-              <Link href="/" className="text-gray-500 hover:text-gold">Home</Link>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-              <Link href="/shop" className="text-gray-500 hover:text-gold">Shop</Link>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-              <Link href={`/shop?category=${product.category}`} className="text-gray-500 hover:text-gold capitalize">
-                {product.category}
-              </Link>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-              <span className="text-navy font-medium truncate max-w-[200px]">{product.name}</span>
-            </nav>
+            <Breadcrumb
+              items={[
+                { label: 'Shop', href: '/shop' },
+                { label: product.category.charAt(0).toUpperCase() + product.category.slice(1), href: `/shop?category=${product.category}` },
+                { label: product.name }
+              ]}
+            />
           </div>
         </div>
 
