@@ -3,6 +3,11 @@
 
 const WEBHOOK_BASE = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || ''
 
+// Debug: Log webhook URL on load (remove after testing)
+if (typeof window !== 'undefined') {
+  console.log('N8N Webhook URL:', WEBHOOK_BASE || 'NOT CONFIGURED')
+}
+
 export interface AIDresserAccessResponse {
   success: boolean
   access_granted: boolean
@@ -240,11 +245,21 @@ export const getAIRecommendations = async (
     })
 
     if (!response.ok) {
-      console.error('n8n webhook error:', response.status, response.statusText)
+      const errorText = await response.text()
+      console.error('n8n webhook error:', response.status, response.statusText, errorText)
       return null
     }
 
-    return await response.json()
+    const responseText = await response.text()
+    console.log('n8n raw response:', responseText.substring(0, 500)) // Debug: first 500 chars
+
+    try {
+      return JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('Failed to parse n8n response as JSON:', parseError)
+      console.error('Raw response:', responseText)
+      return null
+    }
   } catch (error) {
     console.error('Error getting AI recommendations from n8n:', error)
     return null

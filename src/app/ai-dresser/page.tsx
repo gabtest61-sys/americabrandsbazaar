@@ -351,6 +351,11 @@ export default function AIDresserPage() {
       if (answers.photo && generatedLooks.length > 0) {
         generateVirtualTryOn(generatedLooks, answers.photo)
       }
+    } else if (aiResponse?.success && aiResponse.looks?.length === 0) {
+      // n8n returned success but no looks (not enough products match criteria)
+      console.log('n8n returned no looks:', aiResponse.stylist_message)
+      showToast('Not enough products match your criteria. Try a higher budget or different style.', 'error')
+      setCurrentStep(5) // Go back to budget step
     } else {
       // n8n failed - show error with option to retry
       console.error('n8n AI recommendations failed:', aiResponse)
