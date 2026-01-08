@@ -266,7 +266,9 @@ export default function AdminDashboard() {
     }, 0)
   }))
 
-  const brandBreakdown = brands.map(brand => ({
+  // Get all unique brands from actual products (includes custom brands)
+  const uniqueBrands = [...new Set(allProducts.map(p => p.brand))].sort()
+  const brandBreakdown = uniqueBrands.map(brand => ({
     brand,
     count: allProducts.filter(p => p.brand === brand).length,
     products: allProducts.filter(p => p.brand === brand)
@@ -1890,7 +1892,8 @@ export default function AdminDashboard() {
                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold"
                     >
                       <option value="">All Brands</option>
-                      {brands.map(brand => (
+                      {/* Show all unique brands from products (includes custom brands) */}
+                      {[...new Set([...brands.filter(b => b !== 'Other'), ...allProducts.map(p => p.brand)])].sort().map(brand => (
                         <option key={brand} value={brand}>{brand}</option>
                       ))}
                     </select>
@@ -2684,14 +2687,29 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Brand *</label>
                   <select
-                    value={productFormData.brand || brands[0]}
-                    onChange={(e) => setProductFormData(prev => ({ ...prev, brand: e.target.value }))}
+                    value={brands.includes(productFormData.brand || '') ? (productFormData.brand || brands[0]) : 'Other'}
+                    onChange={(e) => {
+                      if (e.target.value === 'Other') {
+                        setProductFormData(prev => ({ ...prev, brand: '' }))
+                      } else {
+                        setProductFormData(prev => ({ ...prev, brand: e.target.value }))
+                      }
+                    }}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
                   >
                     {brands.map(brand => (
                       <option key={brand} value={brand}>{brand}</option>
                     ))}
                   </select>
+                  {(!brands.includes(productFormData.brand || '') || productFormData.brand === '') && (
+                    <input
+                      type="text"
+                      value={productFormData.brand || ''}
+                      onChange={(e) => setProductFormData(prev => ({ ...prev, brand: e.target.value }))}
+                      className="w-full mt-2 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
+                      placeholder="Enter custom brand name"
+                    />
+                  )}
                 </div>
               </div>
 

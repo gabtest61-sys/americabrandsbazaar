@@ -1692,5 +1692,39 @@ export function filterProducts(filters: {
   })
 }
 
-export const brands = ['Calvin Klein', 'Nike', 'GAP', 'Ralph Lauren', 'Michael Kors']
+export const brands = [
+  // Premium Brands
+  'Calvin Klein',
+  'Ralph Lauren',
+  'Michael Kors',
+  'Tommy Hilfiger',
+  'Coach',
+  'Kate Spade',
+  'Guess',
+  // Athletic/Sportswear
+  'Nike',
+  'Adidas',
+  'Puma',
+  'Under Armour',
+  'New Balance',
+  'Reebok',
+  'Fila',
+  // Casual/Fast Fashion
+  'GAP',
+  'H&M',
+  'Zara',
+  'Uniqlo',
+  'Mango',
+  'Forever 21',
+  // Denim
+  'Levi\'s',
+  'Wrangler',
+  'Lee',
+  // Luxury
+  'Lacoste',
+  'Fred Perry',
+  'Hugo Boss',
+  // Other
+  'Other'
+]
 export const categories = ['clothes', 'accessories', 'shoes'] as const
