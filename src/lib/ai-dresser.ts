@@ -109,6 +109,12 @@ export interface CollectedData {
   recipient?: string
   relationship?: string
   event_type?: string
+  sizes?: {
+    top: string
+    bottom: string
+    shoe: string
+  }
+  photo?: string // Base64 photo for virtual try-on
 }
 
 // Check if user can access AI Dresser
@@ -189,13 +195,16 @@ export interface ProductForAI {
   category: string
   subcategory?: string
   colors?: string[]
+  sizes?: string[]
   style?: string[]
+  occasions?: string[]
+  tags?: string[]
   images: string[]
   gender?: string
   giftSuitable?: boolean
 }
 
-// Get AI recommendations from n8n (sends products from frontend)
+// Get AI recommendations from n8n workflow (sends products from frontend)
 export const getAIRecommendations = async (
   sessionId: string,
   userId: string,
@@ -203,7 +212,7 @@ export const getAIRecommendations = async (
   products: ProductForAI[]
 ): Promise<RecommendationsResponse | null> => {
   if (!WEBHOOK_BASE) {
-    console.log('n8n webhook not configured, skipping AI recommendations')
+    console.error('n8n webhook URL not configured - set NEXT_PUBLIC_N8N_WEBHOOK_URL')
     return null
   }
 
@@ -215,19 +224,29 @@ export const getAIRecommendations = async (
         session_id: sessionId,
         user_id: userId,
         preferences: {
-          purpose: preferences.purpose,
-          gender: preferences.gender,
-          style: preferences.style,
-          occasion: preferences.occasion,
-          budget: preferences.budget,
-          color: preferences.color
+          purpose: preferences.purpose || 'personal',
+          gender: preferences.gender || 'unisex',
+          style: preferences.style || '',
+          occasion: preferences.occasion || '',
+          budget: preferences.budget || '10000',
+          color: preferences.color || 'ai-decide',
+          sizes: preferences.sizes || { top: '', bottom: '', shoe: '' },
+          photo: preferences.photo || null,
+          recipient: preferences.recipient || '',
+          relationship: preferences.relationship || ''
         },
         products: products
       })
     })
+
+    if (!response.ok) {
+      console.error('n8n webhook error:', response.status, response.statusText)
+      return null
+    }
+
     return await response.json()
   } catch (error) {
-    console.error('Error getting AI recommendations:', error)
+    console.error('Error getting AI recommendations from n8n:', error)
     return null
   }
 }

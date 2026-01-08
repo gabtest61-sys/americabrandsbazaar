@@ -614,6 +614,115 @@ export const removeFromWishlist = async (userId: string, productId: string): Pro
   }
 }
 
+// ==================== AI DRESSER SAVED LOOKS ====================
+
+export interface SavedLook {
+  id?: string
+  userId: string
+  sessionId: string
+  lookNumber: number
+  lookName: string
+  lookDescription: string
+  items: {
+    productId: string
+    productName: string
+    brand: string
+    category: string
+    price: number
+    imageUrl: string
+    productUrl: string
+    stylingNote: string
+  }[]
+  totalPrice: number
+  styleTip: string
+  savedAt: Timestamp | null
+}
+
+// Save AI Dresser look to user's saved looks
+export const saveAIDresserLook = async (
+  userId: string,
+  look: Omit<SavedLook, 'id' | 'userId' | 'savedAt'>
+): Promise<string | null> => {
+  if (!db) return null
+
+  try {
+    const savedLooksRef = collection(db, 'savedLooks')
+    const docRef = await addDoc(savedLooksRef, {
+      userId,
+      ...look,
+      savedAt: serverTimestamp()
+    })
+    return docRef.id
+  } catch (error) {
+    console.error('Error saving AI Dresser look:', error)
+    return null
+  }
+}
+
+// Get user's saved AI Dresser looks
+export const getSavedLooks = async (userId: string): Promise<SavedLook[]> => {
+  if (!db) return []
+
+  try {
+    const savedLooksRef = collection(db, 'savedLooks')
+    const q = query(
+      savedLooksRef,
+      where('userId', '==', userId),
+      orderBy('savedAt', 'desc')
+    )
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as SavedLook))
+  } catch (error) {
+    console.error('Error fetching saved looks:', error)
+    return []
+  }
+}
+
+// Delete a saved look
+export const deleteSavedLook = async (lookId: string): Promise<boolean> => {
+  if (!db) return false
+
+  try {
+    await deleteDoc(doc(db, 'savedLooks', lookId))
+    return true
+  } catch (error) {
+    console.error('Error deleting saved look:', error)
+    return false
+  }
+}
+
+// Check if a look is already saved (by look number and session)
+export const isLookSaved = async (
+  userId: string,
+  sessionId: string,
+  lookNumber: number
+): Promise<string | null> => {
+  if (!db) return null
+
+  try {
+    const savedLooksRef = collection(db, 'savedLooks')
+    const q = query(
+      savedLooksRef,
+      where('userId', '==', userId),
+      where('sessionId', '==', sessionId),
+      where('lookNumber', '==', lookNumber)
+    )
+    const snapshot = await getDocs(q)
+
+    if (!snapshot.empty) {
+      return snapshot.docs[0].id
+    }
+    return null
+  } catch (error) {
+    console.error('Error checking if look is saved:', error)
+    return null
+  }
+}
+
 // ==================== REVIEWS ====================
 
 export interface Review {

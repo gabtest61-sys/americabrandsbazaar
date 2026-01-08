@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAIDresserDailyAccess } from '@/lib/firestore'
 
 // SOP 6.1: Access Check Endpoint
 // POST /api/ai-dresser/check-access
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { auth_token, user_id } = body
+    const { user_id } = body
 
-    // TODO: In production, verify JWT token and check user session limits
-    // For now, return mock access granted response
-
-    // Simulate checking if user is authenticated
-    if (!auth_token && !user_id) {
+    // Check if user ID is provided
+    if (!user_id) {
       return NextResponse.json({
         success: false,
         access_granted: false,
@@ -22,27 +20,46 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    // Simulate session ID generation
+    // Check real Firestore access
+    const accessResult = await checkAIDresserDailyAccess(user_id)
+
+    // Generate session ID
     const sessionId = `ai_session_${Date.now()}_${Math.random().toString(36).substring(7)}`
 
-    // Return access granted (mock for development)
+    if (!accessResult.hasAccess) {
+      return NextResponse.json({
+        success: true,
+        access_granted: false,
+        session_id: null,
+        session_type: 'none',
+        usage_info: {
+          sessions_remaining_today: 0,
+          bonus_sessions: accessResult.bonusSessions,
+          last_use: accessResult.lastUse?.toISOString() || null,
+          total_usage: accessResult.usageCount
+        },
+        action: 'show_limit_reached',
+        message: 'You\'ve used your free styling session for today. Come back tomorrow or make a purchase to earn bonus sessions!',
+        next_reset: getNextMidnight().toISOString()
+      })
+    }
+
+    // Access granted
     return NextResponse.json({
       success: true,
       access_granted: true,
       session_id: sessionId,
-      session_type: 'daily_free',
-      user: {
-        id: user_id || 'demo_user',
-        name: 'Demo User',
-        email: 'demo@lgmapparel.com'
-      },
+      session_type: accessResult.accessType,
       usage_info: {
-        sessions_remaining_today: 0,
-        bonus_sessions: 0,
-        total_purchases: 0
+        sessions_remaining_today: accessResult.accessType === 'daily_free' ? 1 : 0,
+        bonus_sessions: accessResult.bonusSessions,
+        last_use: accessResult.lastUse?.toISOString() || null,
+        total_usage: accessResult.usageCount
       },
       action: 'start_quiz',
-      message: 'Welcome! Let\'s find your perfect style.',
+      message: accessResult.accessType === 'bonus'
+        ? `Welcome back! Using 1 of ${accessResult.bonusSessions} bonus session${accessResult.bonusSessions > 1 ? 's' : ''}.`
+        : 'Welcome! Let\'s find your perfect style.',
       endpoints: {
         start_quiz: '/api/ai-dresser/start-session',
         submit_answers: '/api/ai-dresser/submit-quiz',
@@ -56,4 +73,11 @@ export async function POST(request: NextRequest) {
       error: 'Internal server error'
     }, { status: 500 })
   }
+}
+
+// Helper to get next midnight
+function getNextMidnight(): Date {
+  const now = new Date()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0)
+  return tomorrow
 }

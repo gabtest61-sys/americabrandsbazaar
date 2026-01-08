@@ -24,6 +24,11 @@ export interface QuizAnswers {
   occasion: string
   budget: string
   color: string
+  sizes?: {
+    top: string
+    bottom: string
+    shoe: string
+  }
 }
 
 // Product scoring result
@@ -70,8 +75,14 @@ export const scoreProduct = (
     }
   }
 
-  // Color harmony matching
-  const preferredColors = colorHarmony[answers.color] || []
+  // Color harmony matching (handle 'ai-decide' option)
+  let preferredColors: string[] = []
+  if (answers.color === 'ai-decide' || !answers.color) {
+    // AI Decide: consider all colors as valid, give bonus for variety
+    preferredColors = ['black', 'white', 'gray', 'beige', 'navy', 'brown', 'red', 'blue', 'green', 'pink', 'yellow', 'orange', 'purple', 'burgundy', 'olive', 'tan', 'cream', 'charcoal', 'forest', 'mint', 'lavender', 'peach', 'rust']
+  } else {
+    preferredColors = colorHarmony[answers.color] || []
+  }
   const productColors = product.colors?.map(c => c.toLowerCase()) || []
 
   for (const color of productColors) {
@@ -84,6 +95,45 @@ export const scoreProduct = (
         reasons.push('Adds color variety')
       }
       break
+    }
+  }
+
+  // Size availability scoring
+  if (answers.sizes) {
+    const productSizes = product.sizes?.map(s => s.toUpperCase()) || []
+    let sizeMatch = false
+
+    // Check if product has user's preferred size based on category
+    if (product.category === 'clothes') {
+      const subcategory = (product.subcategory || '').toLowerCase()
+      // Check for top sizes (shirts, jackets, hoodies, etc.)
+      if (subcategory.includes('shirt') || subcategory.includes('jacket') || subcategory.includes('hoodie') || subcategory.includes('top') || subcategory.includes('tee') || subcategory.includes('polo')) {
+        if (answers.sizes.top && productSizes.includes(answers.sizes.top.toUpperCase())) {
+          sizeMatch = true
+        }
+      }
+      // Check for bottom sizes (pants, shorts, jeans, etc.)
+      if (subcategory.includes('pant') || subcategory.includes('short') || subcategory.includes('jean') || subcategory.includes('trouser') || subcategory.includes('chino')) {
+        if (answers.sizes.bottom && productSizes.includes(answers.sizes.bottom.toUpperCase())) {
+          sizeMatch = true
+        }
+      }
+      // If subcategory not clear, check both
+      if (!sizeMatch && (answers.sizes.top || answers.sizes.bottom)) {
+        if ((answers.sizes.top && productSizes.includes(answers.sizes.top.toUpperCase())) ||
+            (answers.sizes.bottom && productSizes.includes(answers.sizes.bottom.toUpperCase()))) {
+          sizeMatch = true
+        }
+      }
+    } else if (product.category === 'shoes') {
+      if (answers.sizes.shoe && productSizes.includes(answers.sizes.shoe)) {
+        sizeMatch = true
+      }
+    }
+
+    if (sizeMatch) {
+      score += 15 // Significant bonus for size match
+      reasons.push('Size available')
     }
   }
 

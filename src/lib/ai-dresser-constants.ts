@@ -20,10 +20,10 @@ export const occasionOptions = [
 ]
 
 export const budgetOptions = [
-  { id: '2000', label: 'Under ₱2,000', range: 'Budget-friendly' },
-  { id: '5000', label: '₱2,000 - ₱5,000', range: 'Mid-range' },
-  { id: '10000', label: '₱5,000 - ₱10,000', range: 'Premium' },
-  { id: '999999', label: '₱10,000+', range: 'Luxury' },
+  { id: '5000', label: 'Under ₱5,000', range: 'Budget-friendly' },
+  { id: '10000', label: '₱5,000 - ₱10,000', range: 'Mid-range' },
+  { id: '15000', label: '₱10,000 - ₱15,000', range: 'Premium' },
+  { id: '999999', label: '₱15,000+', range: 'Luxury' },
 ]
 
 export const colorOptions = [

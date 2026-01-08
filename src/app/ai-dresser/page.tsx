@@ -26,6 +26,7 @@ import {
   Look,
   LookItem
 } from '@/lib/ai-dresser'
+import { budgetOptions } from '@/lib/ai-dresser-constants'
 
 // Quiz step types
 type Purpose = 'personal' | 'gift' | null
@@ -67,12 +68,7 @@ const occasionOptions = [
   { id: 'party', label: 'Party / Night Out', icon: '🎉' },
 ]
 
-const budgetOptions = [
-  { id: '10000', label: '₱5,000 - ₱10,000', range: 'Budget-friendly' },
-  { id: '15000', label: '₱10,000 - ₱15,000', range: 'Mid-range' },
-  { id: '20000', label: '₱15,000 - ₱20,000', range: 'Premium' },
-  { id: '999999', label: '₱20,000+', range: 'Luxury' },
-]
+// budgetOptions imported from ai-dresser-constants
 
 const colorOptions = [
   { id: 'neutrals', label: 'Neutrals', colors: ['#000', '#fff', '#888', '#d4b896'] },
@@ -100,409 +96,8 @@ const giftOccasionOptions = [
 ]
 
 
-// SOP 7.1 - Color Matching Rules (Fashion Color Theory)
-const colorHarmony: Record<string, string[]> = {
-  neutrals: ['black', 'white', 'gray', 'beige', 'navy', 'brown'],
-  dark: ['black', 'navy', 'charcoal', 'burgundy', 'forest', 'brown'],
-  earth: ['brown', 'tan', 'olive', 'rust', 'beige', 'forest'],
-  bright: ['red', 'blue', 'yellow', 'orange', 'green', 'pink'],
-  pastels: ['pink', 'blue', 'lavender', 'mint', 'peach', 'cream'],
-}
-
-// SOP 7.1 - Style to Product Tag Mapping
-const styleMapping: Record<string, string[]> = {
-  'casual-street': ['casual', 'streetwear', 'urban', 'relaxed', 'everyday'],
-  'smart-casual': ['smart', 'business', 'polished', 'refined', 'classic'],
-  'formal-elegant': ['formal', 'elegant', 'sophisticated', 'dressy', 'luxury'],
-  'athleisure': ['athletic', 'sporty', 'active', 'comfort', 'performance'],
-  'minimalist': ['minimal', 'simple', 'clean', 'basic', 'essential'],
-  'trendy': ['trendy', 'fashion', 'modern', 'contemporary', 'statement'],
-}
-
-// SOP 7.1 - Occasion to Tags Mapping
-const occasionMapping: Record<string, string[]> = {
-  'daily-wear': ['everyday', 'casual', 'daily', 'versatile'],
-  'work-office': ['office', 'business', 'professional', 'work'],
-  'date-night': ['date', 'evening', 'romantic', 'special'],
-  'wedding-event': ['wedding', 'formal', 'event', 'party'],
-  'vacation': ['vacation', 'travel', 'resort', 'leisure'],
-  'party': ['party', 'night', 'club', 'celebration'],
-  'birthday': ['gift', 'special', 'celebration'],
-  'anniversary': ['gift', 'romantic', 'special', 'luxury'],
-  'christmas': ['gift', 'holiday', 'festive'],
-  'valentines': ['gift', 'romantic', 'love'],
-  'graduation': ['gift', 'celebration', 'formal'],
-  'just-because': ['gift', 'versatile', 'everyday'],
-}
-
-// SOP 7.2 - Scoring function for product relevance
-interface ProductScore {
-  product: FirestoreProduct
-  score: number
-  reasons: string[]
-}
-
-const scoreProduct = (
-  product: FirestoreProduct,
-  answers: QuizAnswers,
-  usedColors: Set<string>
-): ProductScore => {
-  let score = 0
-  const reasons: string[] = []
-
-  // Style matching (SOP 7.1)
-  const styleKeywords = styleMapping[answers.style] || []
-  const productTags = product.tags?.map((t: string) => t.toLowerCase()) || []
-  const productStyles = product.style?.map((s: string) => s.toLowerCase()) || []
-
-  for (const keyword of styleKeywords) {
-    const styleMatch = productStyles.some((s: string) => s.includes(keyword))
-    if (productTags.some((t: string) => t.includes(keyword)) || styleMatch) {
-      score += 15
-      reasons.push(`Style match: ${keyword}`)
-      break
-    }
-  }
-
-  // Occasion matching (SOP 7.1)
-  const occasionKeywords = occasionMapping[answers.occasion] || []
-  const productOccasions = product.occasions?.map((o: string) => o.toLowerCase()) || []
-
-  for (const keyword of occasionKeywords) {
-    if (productOccasions.some((o: string) => o.includes(keyword)) || productTags.some((t: string) => t.includes(keyword))) {
-      score += 12
-      reasons.push(`Occasion match: ${keyword}`)
-      break
-    }
-  }
-
-  // Color harmony matching (SOP 7.1)
-  const preferredColors = colorHarmony[answers.color] || []
-  const productColors = product.colors?.map((c: string) => c.toLowerCase()) || []
-
-  for (const color of productColors) {
-    if (preferredColors.some(pc => color.includes(pc) || pc.includes(color))) {
-      score += 10
-      reasons.push(`Color match: ${color}`)
-      // Bonus for color variety in outfit
-      if (!usedColors.has(color)) {
-        score += 3
-      }
-      break
-    }
-  }
-
-  // Gift suitability (SOP 7.1 - Gift logic)
-  if (answers.purpose === 'gift') {
-    if (product.giftSuitable) {
-      score += 20
-      reasons.push('Gift suitable')
-    }
-    // Prefer premium brands for gifts
-    if (['Calvin Klein', 'Ralph Lauren', 'Michael Kors'].includes(product.brand)) {
-      score += 8
-      reasons.push('Premium brand')
-    }
-  }
-
-  // Featured products bonus (popularity indicator)
-  if (product.featured) {
-    score += 8
-    reasons.push('Featured/Popular')
-  }
-
-  // Price balance scoring (SOP 7.2)
-  const budget = parseInt(answers.budget) || 10000
-  const priceRatio = product.price / budget
-
-  if (priceRatio >= 0.3 && priceRatio <= 0.6) {
-    // Sweet spot for good value
-    score += 5
-    reasons.push('Good value')
-  } else if (priceRatio > 0.8) {
-    // Premium item for upsell
-    score += 3
-    reasons.push('Premium pick')
-  }
-
-  // Brand variety bonus
-  score += Math.random() * 5 // Small random factor for variety
-
-  return { product, score, reasons }
-}
-
-// SOP 7.3 - Generate look names based on context
-const generateLookName = (
-  index: number,
-  answers: QuizAnswers,
-  items: LookItem[]
-): { name: string; desc: string } => {
-  const isGift = answers.purpose === 'gift'
-
-  const personalLooks = [
-    { name: 'Everyday Essential', desc: 'Your go-to outfit for daily adventures' },
-    { name: 'Signature Style', desc: 'A look that defines your fashion identity' },
-    { name: 'Weekend Ready', desc: 'Comfortable yet stylish for off-duty days' },
-    { name: 'Statement Maker', desc: 'Turn heads with this bold ensemble' },
-    { name: 'Classic Refined', desc: 'Timeless elegance that never goes out of style' },
-  ]
-
-  const giftSets = [
-    { name: 'Premium Gift Set', desc: 'A luxurious collection they\'ll treasure' },
-    { name: 'Style Starter Kit', desc: 'Everything needed to elevate their wardrobe' },
-    { name: 'Occasion Perfect', desc: 'Curated for your special celebration' },
-    { name: 'Thoughtful Collection', desc: 'A meaningful gift they\'ll love' },
-    { name: 'Complete Look Gift', desc: 'Head-to-toe style in one package' },
-  ]
-
-  const occasionSpecific: Record<string, { name: string; desc: string }> = {
-    'date-night': { name: 'Date Night Perfection', desc: 'Make a lasting impression' },
-    'work-office': { name: 'Office Ready', desc: 'Professional yet stylish' },
-    'wedding-event': { name: 'Event Elegance', desc: 'Stand out at any occasion' },
-    'vacation': { name: 'Vacation Vibes', desc: 'Travel in style' },
-    'party': { name: 'Party Mode', desc: 'Ready to celebrate' },
-  }
-
-  // Use occasion-specific names when available
-  if (!isGift && occasionSpecific[answers.occasion] && index === 0) {
-    return occasionSpecific[answers.occasion]
-  }
-
-  return isGift ? giftSets[index] : personalLooks[index]
-}
-
-// SOP 7.1-7.3 - Main recommendation engine
-const generateLocalRecommendations = (answers: QuizAnswers, allProducts: FirestoreProduct[]): Look[] => {
-  // Step 1: Filter base products by gender and budget (only products with IDs)
-  let filtered = [...allProducts].filter(p => p.id && p.inStock && p.stockQty > 0)
-
-  if (answers.gender && answers.gender !== 'unisex') {
-    filtered = filtered.filter(p =>
-      p.gender === answers.gender || p.gender === 'unisex'
-    )
-  }
-
-  if (answers.budget) {
-    const maxBudget = parseInt(answers.budget)
-    filtered = filtered.filter(p => p.price <= maxBudget)
-  }
-
-  // Step 2: Separate and score by category
-  const clothes = filtered.filter(p => p.category === 'clothes')
-  const accessories = filtered.filter(p => p.category === 'accessories')
-  const shoes = filtered.filter(p => p.category === 'shoes')
-
-  const looks: Look[] = []
-  const usedProducts = new Set<string>()
-
-  // Step 3: Generate 5 complete looks (SOP 7.3)
-  for (let i = 0; i < 5; i++) {
-    const items: LookItem[] = []
-    const usedColors = new Set<string>()
-    let lookBudget = parseInt(answers.budget) || 10000
-
-    // Score and sort available clothes
-    const scoredClothes = clothes
-      .filter(p => p.id && !usedProducts.has(p.id))
-      .map(p => scoreProduct(p, answers, usedColors))
-      .sort((a, b) => b.score - a.score)
-
-    // Pick 1-2 clothing items (balance premium + affordable for SOP 7.2)
-    const clothesToPick = Math.min(2, scoredClothes.length)
-    let pickedClothes = 0
-    let pickPremium = i % 2 === 0 // Alternate premium/affordable focus
-
-    for (const scored of scoredClothes) {
-      if (pickedClothes >= clothesToPick) break
-      if (scored.product.price > lookBudget * 0.7) continue // Leave room for other items
-      if (!scored.product.id) continue
-
-      // Alternate between premium and affordable (SOP 7.2)
-      const isPremium = scored.product.price > lookBudget * 0.3
-      if (pickedClothes === 0 || (pickPremium === isPremium)) {
-        usedProducts.add(scored.product.id)
-        scored.product.colors?.forEach((c: string) => usedColors.add(c.toLowerCase()))
-
-        items.push({
-          product_id: scored.product.id,
-          product_name: scored.product.name,
-          brand: scored.product.brand,
-          category: 'clothes',
-          price: scored.product.price,
-          image_url: scored.product.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${scored.product.id}`,
-          styling_note: scored.reasons[0] || `${scored.product.brand} signature piece`
-        })
-
-        lookBudget -= scored.product.price
-        pickedClothes++
-        pickPremium = !pickPremium
-      }
-    }
-
-    // Score and pick 1 accessory with color harmony
-    const scoredAccessories = accessories
-      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget * 0.5)
-      .map(p => scoreProduct(p, answers, usedColors))
-      .sort((a, b) => b.score - a.score)
-
-    if (scoredAccessories.length > 0) {
-      const accessory = scoredAccessories[0]
-      if (accessory.product.id) {
-        usedProducts.add(accessory.product.id)
-
-        items.push({
-          product_id: accessory.product.id,
-          product_name: accessory.product.name,
-          brand: accessory.product.brand,
-          category: 'accessories',
-          price: accessory.product.price,
-          image_url: accessory.product.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${accessory.product.id}`,
-          styling_note: accessory.reasons[0] || 'The perfect finishing touch'
-        })
-
-        lookBudget -= accessory.product.price
-      }
-    }
-
-    // Score and pick 1 shoe with color harmony
-    const scoredShoes = shoes
-      .filter(p => p.id && !usedProducts.has(p.id) && p.price <= lookBudget)
-      .map(p => scoreProduct(p, answers, usedColors))
-      .sort((a, b) => b.score - a.score)
-
-    if (scoredShoes.length > 0) {
-      const shoe = scoredShoes[0]
-      if (shoe.product.id) {
-        usedProducts.add(shoe.product.id)
-
-        items.push({
-          product_id: shoe.product.id,
-          product_name: shoe.product.name,
-          brand: shoe.product.brand,
-          category: 'shoes',
-          price: shoe.product.price,
-          image_url: shoe.product.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${shoe.product.id}`,
-          styling_note: shoe.reasons[0] || 'Completes the look perfectly'
-        })
-      }
-    }
-
-    // Create look if we have items (SOP 7.2 - complete purchasable sets)
-    if (items.length >= 2) {
-      const { name, desc } = generateLookName(i, answers, items)
-      const totalPrice = items.reduce((sum, item) => sum + item.price, 0)
-
-      // Generate contextual style tip
-      const styleTips = [
-        `This ${answers.style?.replace('-', ' ')} look pairs perfectly together`,
-        items.length >= 3 ? 'A complete head-to-toe ensemble' : 'Mix and match with your existing wardrobe',
-        answers.purpose === 'gift' ? 'A thoughtful gift they\'ll love' : 'Perfect for ' + answers.occasion?.replace('-', ' '),
-        'Each piece complements the others beautifully',
-        `Curated for your ${answers.color} color preference`,
-      ]
-
-      looks.push({
-        look_number: i + 1,
-        look_name: name,
-        look_description: desc,
-        items,
-        total_price: totalPrice,
-        style_tip: styleTips[i] || styleTips[0]
-      })
-    }
-  }
-
-  // Ensure we return at least some looks even if scoring filtered too much
-  if (looks.length === 0) {
-    // Fallback: create basic looks without scoring
-    return generateFallbackLooks(filtered, answers)
-  }
-
-  return looks
-}
-
-// Fallback function if scoring is too restrictive
-const generateFallbackLooks = (products: FirestoreProduct[], answers: QuizAnswers): Look[] => {
-  const clothes = products.filter(p => p.id && p.category === 'clothes')
-  const accessories = products.filter(p => p.id && p.category === 'accessories')
-  const shoes = products.filter(p => p.id && p.category === 'shoes')
-
-  const looks: Look[] = []
-  const used = new Set<string>()
-
-  for (let i = 0; i < Math.min(5, Math.ceil(clothes.length / 2)); i++) {
-    const items: LookItem[] = []
-
-    // Pick clothes (products already filtered to have IDs)
-    for (const c of clothes) {
-      if (!used.has(c.id!) && items.filter(x => x.category === 'clothes').length < 2) {
-        used.add(c.id!)
-        items.push({
-          product_id: c.id!,
-          product_name: c.name,
-          brand: c.brand,
-          category: 'clothes',
-          price: c.price,
-          image_url: c.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${c.id}`,
-          styling_note: `${c.brand} quality`
-        })
-      }
-    }
-
-    // Pick accessory
-    for (const a of accessories) {
-      if (!used.has(a.id!)) {
-        used.add(a.id!)
-        items.push({
-          product_id: a.id!,
-          product_name: a.name,
-          brand: a.brand,
-          category: 'accessories',
-          price: a.price,
-          image_url: a.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${a.id}`,
-          styling_note: 'Adds style'
-        })
-        break
-      }
-    }
-
-    // Pick shoe
-    for (const s of shoes) {
-      if (!used.has(s.id!)) {
-        used.add(s.id!)
-        items.push({
-          product_id: s.id!,
-          product_name: s.name,
-          brand: s.brand,
-          category: 'shoes',
-          price: s.price,
-          image_url: s.images?.[0] || '/placeholder.jpg',
-          product_url: `/shop/${s.id}`,
-          styling_note: 'Completes the look'
-        })
-        break
-      }
-    }
-
-    if (items.length > 0) {
-      looks.push({
-        look_number: i + 1,
-        look_name: answers.purpose === 'gift' ? `Gift Set #${i + 1}` : `Look #${i + 1}`,
-        look_description: 'A curated selection just for you',
-        items,
-        total_price: items.reduce((sum, item) => sum + item.price, 0),
-        style_tip: 'A versatile combination'
-      })
-    }
-  }
-
-  return looks
-}
+// Recommendation engine imported from ai-dresser-engine
+// generateLocalRecommendations and regenerateLooks handle all scoring and look generation
 
 export default function AIDresserPage() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
@@ -653,22 +248,46 @@ export default function AIDresserPage() {
 
     // Track AI Dresser usage and save preferences
     if (user?.id) {
-      // If using bonus session, decrement it
-      if (accessType === 'bonus') {
-        await consumeBonusAIDresserSession(user.id)
-        setBonusSessions(prev => prev - 1)
-      } else {
-        await incrementAIDresserUsage(user.id)
+      try {
+        // If using bonus session, decrement it
+        if (accessType === 'bonus') {
+          const consumed = await consumeBonusAIDresserSession(user.id)
+          if (consumed) {
+            setBonusSessions(prev => prev - 1)
+          }
+        } else {
+          await incrementAIDresserUsage(user.id)
+        }
+      } catch (error) {
+        console.error('Failed to track AI Dresser usage:', error)
+        // Continue with recommendations even if tracking fails
       }
 
-      await updateUserPreferences(user.id, {
-        styles: answers.style ? [answers.style] : [],
-        colors: answers.color ? [answers.color] : [],
-      })
+      try {
+        await updateUserPreferences(user.id, {
+          styles: answers.style ? [answers.style] : [],
+          colors: answers.color ? [answers.color] : [],
+        })
+      } catch (error) {
+        console.error('Failed to update user preferences:', error)
+        // Continue with recommendations even if preferences fail to save
+      }
+    }
+
+    // Fetch fresh product data to ensure accurate stock levels
+    let freshProducts = allProducts
+    try {
+      const latestProducts = await getFirestoreProducts()
+      if (latestProducts.length > 0) {
+        freshProducts = latestProducts
+        setAllProducts(latestProducts) // Update state with fresh data
+      }
+    } catch (error) {
+      console.error('Failed to fetch fresh products, using cached data:', error)
     }
 
     // Prepare products for AI (filter by gender/budget first)
-    let filteredProducts = allProducts.filter(p => p.inStock && p.stockQty > 0)
+    let filteredProducts = freshProducts.filter(p => p.inStock && p.stockQty > 0)
 
     if (answers.gender && answers.gender !== 'unisex') {
       filteredProducts = filteredProducts.filter(p =>
@@ -678,10 +297,13 @@ export default function AIDresserPage() {
 
     if (answers.budget) {
       const maxBudget = parseInt(answers.budget)
-      filteredProducts = filteredProducts.filter(p => p.price <= maxBudget)
+      // Only filter if we have a valid budget number
+      if (!isNaN(maxBudget) && maxBudget > 0) {
+        filteredProducts = filteredProducts.filter(p => p.price <= maxBudget)
+      }
     }
 
-    // Try n8n AI recommendations first (if configured)
+    // Get AI recommendations from n8n workflow
     const aiResponse = await getAIRecommendations(
       sessionId,
       user?.id || 'guest',
@@ -691,7 +313,11 @@ export default function AIDresserPage() {
         style: answers.style,
         occasion: answers.occasion,
         budget: answers.budget,
-        color: answers.color
+        color: answers.color || 'ai-decide',
+        sizes: answers.sizes,
+        photo: answers.photo,
+        recipient: answers.recipient,
+        relationship: answers.relationship
       },
       filteredProducts.filter(p => p.id).map(p => ({
         id: p.id!,
@@ -701,7 +327,10 @@ export default function AIDresserPage() {
         category: p.category,
         subcategory: p.subcategory,
         colors: p.colors,
+        sizes: p.sizes,
         style: p.style,
+        occasions: p.occasions,
+        tags: p.tags,
         images: p.images,
         gender: p.gender,
         giftSuitable: p.giftSuitable
@@ -711,20 +340,20 @@ export default function AIDresserPage() {
     let generatedLooks: Look[]
 
     if (aiResponse?.success && aiResponse.looks?.length > 0) {
-      // Use AI-generated looks
+      // Use AI-generated looks from n8n workflow
       generatedLooks = aiResponse.looks
       setLooks(generatedLooks)
+      setCurrentStep(10) // Results
+
+      // If user uploaded a photo, generate virtual try-on images in background
+      if (answers.photo && generatedLooks.length > 0) {
+        generateVirtualTryOn(generatedLooks, answers.photo)
+      }
     } else {
-      // Fallback to local generation
-      generatedLooks = generateLocalRecommendations(answers, allProducts)
-      setLooks(generatedLooks)
-    }
-
-    setCurrentStep(10) // Results
-
-    // If user uploaded a photo, generate virtual try-on images in background
-    if (answers.photo && generatedLooks.length > 0) {
-      generateVirtualTryOn(generatedLooks, answers.photo)
+      // n8n failed - show error with option to retry
+      console.error('n8n AI recommendations failed:', aiResponse)
+      showToast('Failed to generate recommendations. Please try again.', 'error')
+      setCurrentStep(8) // Go back to last quiz step to retry
     }
   }
 
@@ -748,7 +377,7 @@ export default function AIDresserPage() {
     switch (currentStep) {
       case 1: return answers.purpose !== null
       case 2: return answers.gender !== null
-      case 3: return answers.purpose === 'gift' ? answers.recipient !== '' : answers.style !== ''
+      case 3: return answers.purpose === 'gift' ? (answers.recipient !== '' && answers.style !== '') : answers.style !== ''
       case 4: return answers.occasion !== ''
       case 5: return answers.budget !== ''
       case 6: return true // Color is optional, AI can decide
@@ -764,10 +393,10 @@ export default function AIDresserPage() {
   const addToCart = async (item: LookItem) => {
     // Get the full product details
     const product = getProductById(item.product_id)
-    if (product) {
+    if (product && product.id) {
       // Convert to cart product format
       addItem({
-        id: product.id!,
+        id: product.id,
         name: product.name,
         brand: product.brand,
         price: product.price,
@@ -777,12 +406,18 @@ export default function AIDresserPage() {
         sizes: product.sizes,
         colors: product.colors,
       }, 1)
+      // Only mark as added if product was found and added
+      setAddedItems(prev => new Set([...prev, item.product_id]))
       showToast(`${product.name} added to cart`, 'cart')
+    } else {
+      showToast('Product not available', 'error')
     }
-    setAddedItems(prev => new Set([...prev, item.product_id]))
   }
 
   const addAllToCart = async (look: Look) => {
+    // Track successfully added items
+    const successfullyAdded: string[] = []
+
     // Add each item to cart
     for (const item of look.items) {
       const product = getProductById(item.product_id)
@@ -798,14 +433,19 @@ export default function AIDresserPage() {
           sizes: product.sizes,
           colors: product.colors,
         }, 1)
+        successfullyAdded.push(item.product_id)
       }
     }
 
-    // Mark all items as added
-    const newItems = new Set(addedItems)
-    look.items.forEach(item => newItems.add(item.product_id))
-    setAddedItems(newItems)
-    showToast(`${look.items.length} items added to cart`, 'cart')
+    // Only mark items that were actually added
+    if (successfullyAdded.length > 0) {
+      const newItems = new Set(addedItems)
+      successfullyAdded.forEach(id => newItems.add(id))
+      setAddedItems(newItems)
+      showToast(`${successfullyAdded.length} items added to cart`, 'cart')
+    } else {
+      showToast('No items could be added to cart', 'error')
+    }
 
     // Try to notify n8n webhook
     try {
@@ -951,7 +591,7 @@ export default function AIDresserPage() {
     setShareModalOpen(false)
   }
 
-  const totalSteps = answers.purpose === 'gift' ? 9 : 8
+  const totalSteps = 8 // Both personal and gift flows have 8 quiz steps
 
   // Render intro screen
   const renderIntro = () => (
@@ -1140,31 +780,62 @@ export default function AIDresserPage() {
             </div>
           )
 
-        case 3: // Style (personal) or Recipient (gift)
+        case 3: // Style (personal) or Recipient + Style (gift)
           if (answers.purpose === 'gift') {
             return (
-              <div className="space-y-4">
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                  Who are you shopping for?
-                </h2>
-                <p className="text-white/50 mb-8">Tell us about the recipient</p>
+              <div className="space-y-6">
+                {/* Recipient Selection */}
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                    Who are you shopping for?
+                  </h2>
+                  <p className="text-white/50 mb-4">Tell us about the recipient</p>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {recipientOptions.map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleAnswer('recipient', option.id)}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        answers.recipient === option.id
-                          ? 'bg-gold/20 border-gold'
-                          : 'bg-white/5 border-white/10 hover:border-white/30'
-                      }`}
-                    >
-                      <div className="text-2xl mb-2">{option.icon}</div>
-                      <p className="text-white text-sm font-medium">{option.label}</p>
-                    </button>
-                  ))}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {recipientOptions.map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => handleAnswer('recipient', option.id)}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          answers.recipient === option.id
+                            ? 'bg-gold/20 border-gold'
+                            : 'bg-white/5 border-white/10 hover:border-white/30'
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">{option.icon}</div>
+                        <p className="text-white text-sm font-medium">{option.label}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Style Selection for Gift Recipient */}
+                {answers.recipient && (
+                  <div className="pt-4 border-t border-white/10">
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      What style suits them best?
+                    </h3>
+                    <p className="text-white/50 mb-4">Pick their style preference</p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {styleOptions.map(option => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleAnswer('style', option.id)}
+                          className={`p-4 rounded-xl border-2 transition-all text-left ${
+                            answers.style === option.id
+                              ? 'bg-gold/20 border-gold'
+                              : 'bg-white/5 border-white/10 hover:border-white/30'
+                          }`}
+                        >
+                          <div className="text-2xl mb-2">{option.icon}</div>
+                          <p className="text-white font-medium text-sm">{option.label}</p>
+                          <p className="text-white/40 text-xs">{option.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           }
