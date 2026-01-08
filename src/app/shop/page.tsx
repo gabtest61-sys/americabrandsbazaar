@@ -356,6 +356,15 @@ function ShopContent() {
     return Array.from(colorSet).sort()
   }, [products])
 
+  // Get all available brands (static + custom from products)
+  const availableBrands = useMemo(() => {
+    const brandSet = new Set<string>([...brands])
+    products.forEach(p => {
+      if (p.brand) brandSet.add(p.brand)
+    })
+    return Array.from(brandSet).sort()
+  }, [products])
+
   const activeFiltersCount =
     (selectedCategory ? 1 : 0) +
     selectedBrands.length +
@@ -435,7 +444,7 @@ function ShopContent() {
                     )}
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {brands.map(brand => (
+                    {availableBrands.map(brand => (
                       <label
                         key={brand}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
@@ -786,7 +795,7 @@ function ShopContent() {
                     )}
                   </div>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {brands.map(brand => (
+                    {availableBrands.map(brand => (
                       <label
                         key={brand}
                         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"

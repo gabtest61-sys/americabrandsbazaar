@@ -69,6 +69,13 @@ const clothesSizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']
 const shoeSizeOptions = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46']
 const accessorySizeOptions = ['One Size', 'S', 'M', 'L']
 
+// Subcategory options for each category
+const subcategoryOptions: Record<string, string[]> = {
+  clothes: ['t-shirts', 'shirts', 'polos', 'sweaters', 'hoodies', 'jackets', 'blazers', 'vests', 'pants', 'jeans', 'shorts', 'leggings', 'sportswear', 'underwear', 'dresses', 'skirts', 'coats'],
+  accessories: ['watches', 'bags', 'wallets', 'belts', 'eyewear', 'hats', 'socks', 'ties', 'scarves', 'jewelry', 'gloves'],
+  shoes: ['sneakers', 'running', 'loafers', 'oxfords', 'boots', 'sandals', 'flats', 'slip-ons', 'boat-shoes', 'heels', 'espadrilles']
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, isLoggedIn, isLoading, logout } = useAuth()
@@ -3084,11 +3091,22 @@ export default function AdminDashboard() {
                     />
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
-                  {showBrandDropdown && (
+                  {showBrandDropdown && (() => {
+                    // Combine static brands with custom brands from existing products
+                    const allAvailableBrands = [...new Set([
+                      ...brands.filter(b => b !== 'Other'),
+                      ...uniqueBrands
+                    ])].sort()
+                    const filteredBrandsList = allAvailableBrands.filter(b =>
+                      b.toLowerCase().includes((brandSearch || '').toLowerCase())
+                    )
+                    const isCustomBrand = brandSearch && !allAvailableBrands.some(b =>
+                      b.toLowerCase() === brandSearch.toLowerCase()
+                    )
+
+                    return (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                      {brands
-                        .filter(b => b !== 'Other' && b.toLowerCase().includes((brandSearch || '').toLowerCase()))
-                        .map(brand => (
+                      {filteredBrandsList.map(brand => (
                           <button
                             key={brand}
                             type="button"
@@ -3102,9 +3120,12 @@ export default function AdminDashboard() {
                             }`}
                           >
                             {brand}
+                            {!brands.includes(brand) && (
+                              <span className="ml-2 text-xs text-gray-400">(custom)</span>
+                            )}
                           </button>
                         ))}
-                      {brandSearch && !brands.includes(brandSearch) && (
+                      {isCustomBrand && (
                         <button
                           type="button"
                           onClick={() => {
@@ -3117,11 +3138,11 @@ export default function AdminDashboard() {
                           + Add &quot;{brandSearch}&quot; as custom brand
                         </button>
                       )}
-                      {!brandSearch && brands.filter(b => b !== 'Other').length === 0 && (
+                      {!brandSearch && filteredBrandsList.length === 0 && (
                         <div className="px-4 py-3 text-gray-500 text-sm">No brands available</div>
                       )}
                     </div>
-                  )}
+                  )})()}
                   {productFormData.brand && (
                     <p className="mt-1 text-xs text-gray-500">
                       Selected: <span className="font-medium text-navy">{productFormData.brand}</span>
@@ -3147,6 +3168,7 @@ export default function AdminDashboard() {
                       setProductFormData(prev => ({
                         ...prev,
                         category: newCategory,
+                        subcategory: '', // Reset subcategory when category changes
                         sizes: prev.sizes && prev.sizes.length > 0 ? prev.sizes : defaultSizes
                       }))
                     }}
@@ -3159,13 +3181,16 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
-                  <input
-                    type="text"
+                  <select
                     value={productFormData.subcategory || ''}
                     onChange={(e) => setProductFormData(prev => ({ ...prev, subcategory: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gold"
-                    placeholder="e.g. t-shirts, sneakers"
-                  />
+                  >
+                    <option value="">Select subcategory</option>
+                    {(subcategoryOptions[productFormData.category || 'clothes'] || []).map(sub => (
+                      <option key={sub} value={sub} className="capitalize">{sub}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
