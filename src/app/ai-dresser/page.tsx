@@ -15,7 +15,7 @@ import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { incrementAIDresserUsage, updateUserPreferences, checkAIDresserDailyAccess, consumeBonusAIDresserSession, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
+import { incrementAIDresserUsage, updateUserPreferences, consumeBonusAIDresserSession, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { regenerateLooks } from '@/lib/ai-dresser-engine'
 import {
@@ -187,17 +187,19 @@ export default function AIDresserPage() {
         const newSessionId = `ai_session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
         setSessionId(newSessionId)
 
-        // Check daily access from Firestore (resets at midnight)
-        try {
-          const accessResult = await checkAIDresserDailyAccess(user.id)
-          setHasAccess(accessResult.hasAccess)
-          setAccessType(accessResult.accessType)
-          setBonusSessions(accessResult.bonusSessions)
-        } catch {
-          // If Firestore check fails, allow access
-          setHasAccess(true)
-          setAccessType('daily_free')
-        }
+        // Session limit temporarily disabled for testing
+        // TODO: Re-enable session check after AI Dresser is fixed
+        setHasAccess(true)
+        setAccessType('daily_free')
+        // try {
+        //   const accessResult = await checkAIDresserDailyAccess(user.id)
+        //   setHasAccess(accessResult.hasAccess)
+        //   setAccessType(accessResult.accessType)
+        //   setBonusSessions(accessResult.bonusSessions)
+        // } catch {
+        //   setHasAccess(true)
+        //   setAccessType('daily_free')
+        // }
       }
     }
     checkAccess()
