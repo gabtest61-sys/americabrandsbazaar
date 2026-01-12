@@ -4,6 +4,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { CartProvider } from '@/context/CartContext'
 import { ToastProvider } from '@/components/Toast'
 import CartDrawer from '@/components/CartDrawer'
+import NavigationProgress from '@/components/NavigationProgress'
 import './globals.css'
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             <ToastProvider>
+              <NavigationProgress />
               {children}
               <CartDrawer />
             </ToastProvider>
