@@ -147,14 +147,14 @@ export default function Header() {
             <div className="flex items-center justify-between h-16 md:h-20">
               {/* Logo */}
               <Link href="/" className="flex items-center gap-3 group">
-                <div className={`relative rounded-full overflow-hidden border-2 border-gold/80 group-hover:border-gold transition-all duration-300 shadow-lg ${
+                <div className={`relative rounded-full overflow-hidden border-2 border-gold/80 group-hover:border-gold transition-all duration-300 shadow-lg bg-white ${
                   isScrolled ? 'w-10 h-10' : 'w-12 h-12 md:w-14 md:h-14'
                 }`}>
                   <Image
-                    src="/logo.jpg"
+                    src="/logo.png"
                     alt={BRAND.name}
                     fill
-                    className="object-cover"
+                    className="object-contain p-0.5"
                     priority
                   />
                 </div>
