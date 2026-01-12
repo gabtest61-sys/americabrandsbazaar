@@ -12,7 +12,8 @@ import {
   Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
   CheckSquare, Square, History, MessageSquare, Printer,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
-  Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle
+  Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle,
+  Grid, List, LayoutGrid, Table2
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -93,6 +94,7 @@ export default function AdminDashboard() {
   const [productFilter, setProductFilter] = useState({ category: '', brand: '' })
   const [productPage, setProductPage] = useState(1)
   const productsPerPage = 12
+  const [productViewMode, setProductViewMode] = useState<'grid' | 'table'>('grid')
   const [showProductForm, setShowProductForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<FirestoreProduct | null>(null)
   const [productFormData, setProductFormData] = useState<Partial<FirestoreProduct>>({})
@@ -2276,7 +2278,34 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-xl shadow-sm">
               <div className="p-6 border-b border-gray-100">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <h3 className="font-semibold text-navy">All Products</h3>
+                  <div className="flex items-center gap-4">
+                    <h3 className="font-semibold text-navy">All Products</h3>
+                    {/* View Toggle */}
+                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setProductViewMode('grid')}
+                        className={`p-2 transition-colors ${
+                          productViewMode === 'grid'
+                            ? 'bg-gold text-navy'
+                            : 'bg-white text-gray-500 hover:bg-gray-50'
+                        }`}
+                        title="Grid View"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setProductViewMode('table')}
+                        className={`p-2 transition-colors ${
+                          productViewMode === 'table'
+                            ? 'bg-gold text-navy'
+                            : 'bg-white text-gray-500 hover:bg-gray-50'
+                        }`}
+                        title="Table View"
+                      >
+                        <Table2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex gap-3 flex-wrap">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2412,94 +2441,255 @@ export default function AdminDashboard() {
                               </span>
                             )}
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {paginatedProducts.map(product => (
-                              <div
-                                key={product.id}
-                                className={`bg-gray-50 rounded-xl overflow-hidden border transition-colors group ${
-                                  selectedProducts.has(product.id!)
-                                    ? 'border-gold ring-2 ring-gold/30'
-                                    : 'border-gray-100 hover:border-gold/50'
-                                }`}
-                              >
-                                {/* Product Image */}
-                                <div className="relative aspect-square bg-white">
-                                  {product.images && product.images[0] ? (
-                                    <Image
-                                      src={product.images[0]}
-                                      alt={product.name}
-                                      fill
-                                      className="object-cover"
-                                      sizes="(max-width: 768px) 50vw, 25vw"
-                                    />
-                                  ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                                      <Package className="w-12 h-12" />
-                                    </div>
-                                  )}
-                                  {/* Selection checkbox */}
-                                  <button
-                                    onClick={() => toggleSelectProduct(product.id!)}
-                                    className={`absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center transition-all z-10 ${
-                                      selectedProducts.has(product.id!)
-                                        ? 'bg-gold text-navy'
-                                        : 'bg-white/90 text-gray-400 opacity-0 group-hover:opacity-100'
-                                    }`}
-                                  >
-                                    {selectedProducts.has(product.id!) ? (
-                                      <CheckSquare className="w-4 h-4" />
+                          {/* Grid View */}
+                          {productViewMode === 'grid' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                              {paginatedProducts.map(product => (
+                                <div
+                                  key={product.id}
+                                  className={`bg-gray-50 rounded-xl overflow-hidden border transition-colors group ${
+                                    selectedProducts.has(product.id!)
+                                      ? 'border-gold ring-2 ring-gold/30'
+                                      : 'border-gray-100 hover:border-gold/50'
+                                  }`}
+                                >
+                                  {/* Product Image */}
+                                  <div className="relative aspect-square bg-white">
+                                    {product.images && product.images[0] ? (
+                                      <Image
+                                        src={product.images[0]}
+                                        alt={product.name}
+                                        fill
+                                        className="object-cover"
+                                        sizes="(max-width: 768px) 50vw, 25vw"
+                                      />
                                     ) : (
-                                      <Square className="w-4 h-4" />
+                                      <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                                        <Package className="w-12 h-12" />
+                                      </div>
                                     )}
-                                  </button>
-                                  {/* Actions overlay */}
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                    {/* Selection checkbox */}
                                     <button
-                                      onClick={() => openProductForm(product as FirestoreProduct)}
-                                      className="p-2 bg-white rounded-lg hover:bg-gold transition-colors"
-                                      title="Edit"
+                                      onClick={() => toggleSelectProduct(product.id!)}
+                                      className={`absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center transition-all z-10 ${
+                                        selectedProducts.has(product.id!)
+                                          ? 'bg-gold text-navy'
+                                          : 'bg-white/90 text-gray-400 opacity-0 group-hover:opacity-100'
+                                      }`}
                                     >
-                                      <Edit2 className="w-4 h-4 text-navy" />
+                                      {selectedProducts.has(product.id!) ? (
+                                        <CheckSquare className="w-4 h-4" />
+                                      ) : (
+                                        <Square className="w-4 h-4" />
+                                      )}
                                     </button>
-                                    <button
-                                      onClick={() => setDeleteConfirm(product.id || null)}
-                                      className="p-2 bg-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {/* Actions overlay */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                      <button
+                                        onClick={() => openProductForm(product as FirestoreProduct)}
+                                        className="p-2 bg-white rounded-lg hover:bg-gold transition-colors"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="w-4 h-4 text-navy" />
+                                      </button>
+                                      <button
+                                        onClick={() => setDeleteConfirm(product.id || null)}
+                                        className="p-2 bg-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    {/* Featured badge */}
+                                    {product.featured && (
+                                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
+                                        Featured
+                                      </span>
+                                    )}
                                   </div>
-                                  {/* Featured badge */}
-                                  {product.featured && (
-                                    <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
-                                      Featured
-                                    </span>
-                                  )}
-                                </div>
 
-                                {/* Product Info */}
-                                <div className="p-3">
-                                  <p className="text-xs text-gold font-medium mb-0.5">{product.brand}</p>
-                                  <p className="text-sm font-medium text-navy truncate" title={product.name}>
-                                    {product.name}
-                                  </p>
-                                  <div className="flex items-center justify-between mt-2">
-                                    <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
-                                    <span className={`text-xs px-2 py-0.5 rounded ${
-                                      product.stockQty > 20 ? 'bg-green-100 text-green-700' :
-                                      product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-red-100 text-red-700'
-                                    }`}>
-                                      {product.stockQty} in stock
-                                    </span>
+                                  {/* Product Info */}
+                                  <div className="p-3">
+                                    <p className="text-xs text-gold font-medium mb-0.5">{product.brand}</p>
+                                    <p className="text-sm font-medium text-navy truncate" title={product.name}>
+                                      {product.name}
+                                    </p>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <p className="text-sm font-bold text-navy">₱{product.price.toLocaleString()}</p>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${
+                                        product.stockQty > 20 ? 'bg-green-100 text-green-700' :
+                                        product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700'
+                                      }`}>
+                                        {product.stockQty} in stock
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1 font-mono truncate" title={product.id}>
+                                      ID: {product.id}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-gray-400 mt-1 font-mono truncate" title={product.id}>
-                                    ID: {product.id}
-                                  </p>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Table View */}
+                          {productViewMode === 'table' && (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="w-10 px-4 py-3 text-left">
+                                      <button
+                                        onClick={() => {
+                                          if (selectedProducts.size === paginatedProducts.length) {
+                                            setSelectedProducts(new Set())
+                                          } else {
+                                            setSelectedProducts(new Set(paginatedProducts.map(p => p.id!).filter(Boolean)))
+                                          }
+                                        }}
+                                        className="text-gray-400 hover:text-navy"
+                                      >
+                                        {selectedProducts.size === paginatedProducts.length && paginatedProducts.length > 0 ? (
+                                          <CheckSquare className="w-5 h-5 text-gold" />
+                                        ) : (
+                                          <Square className="w-5 h-5" />
+                                        )}
+                                      </button>
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Product
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Brand
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Category
+                                    </th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Price
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Stock
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Status
+                                    </th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                      Actions
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {paginatedProducts.map(product => (
+                                    <tr
+                                      key={product.id}
+                                      className={`hover:bg-gray-50 transition-colors ${
+                                        selectedProducts.has(product.id!) ? 'bg-gold/5' : ''
+                                      }`}
+                                    >
+                                      <td className="px-4 py-3">
+                                        <button
+                                          onClick={() => toggleSelectProduct(product.id!)}
+                                          className="text-gray-400 hover:text-navy"
+                                        >
+                                          {selectedProducts.has(product.id!) ? (
+                                            <CheckSquare className="w-5 h-5 text-gold" />
+                                          ) : (
+                                            <Square className="w-5 h-5" />
+                                          )}
+                                        </button>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                            {product.images && product.images[0] ? (
+                                              <Image
+                                                src={product.images[0]}
+                                                alt={product.name}
+                                                fill
+                                                className="object-cover"
+                                                sizes="48px"
+                                              />
+                                            ) : (
+                                              <div className="flex items-center justify-center h-full text-gray-300">
+                                                <Package className="w-6 h-6" />
+                                              </div>
+                                            )}
+                                            {product.featured && (
+                                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full flex items-center justify-center">
+                                                <Star className="w-2.5 h-2.5 text-navy" />
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-medium text-navy truncate max-w-[200px]" title={product.name}>
+                                              {product.name}
+                                            </p>
+                                            <p className="text-xs text-gray-400 font-mono truncate" title={product.id}>
+                                              {product.id}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className="text-sm text-gold font-medium">{product.brand}</span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <span className="text-sm text-gray-600 capitalize">{product.category}</span>
+                                        {product.subcategory && (
+                                          <span className="text-xs text-gray-400 block capitalize">{product.subcategory}</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right">
+                                        <span className="text-sm font-semibold text-navy">₱{product.price.toLocaleString()}</span>
+                                      </td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className={`inline-flex items-center justify-center min-w-[40px] px-2 py-1 text-xs font-medium rounded ${
+                                          product.stockQty > 20 ? 'bg-green-100 text-green-700' :
+                                          product.stockQty > 0 ? 'bg-yellow-100 text-yellow-700' :
+                                          'bg-red-100 text-red-700'
+                                        }`}>
+                                          {product.stockQty}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-center">
+                                        {product.stockQty > 0 ? (
+                                          <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                                            <CheckCircle className="w-3.5 h-3.5" />
+                                            In Stock
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                                            <XCircle className="w-3.5 h-3.5" />
+                                            Out of Stock
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex items-center justify-end gap-1">
+                                          <button
+                                            onClick={() => openProductForm(product as FirestoreProduct)}
+                                            className="p-2 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-lg transition-colors"
+                                            title="Edit"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => setDeleteConfirm(product.id || null)}
+                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Delete"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
 
                           {/* Pagination Controls */}
                           {totalPages > 1 && (
