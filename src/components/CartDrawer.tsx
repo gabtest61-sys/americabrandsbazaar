@@ -125,8 +125,12 @@ export default function CartDrawer() {
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex gap-4">
-                    {/* Product Image */}
-                    <div className="relative w-20 h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                    {/* Product Image - Clickable */}
+                    <Link
+                      href={`/shop/${item.product.id}`}
+                      onClick={handleClose}
+                      className="relative w-20 h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 hover:ring-2 hover:ring-gold transition-all"
+                    >
                       {item.product.image ? (
                         <Image
                           src={item.product.image}
@@ -140,19 +144,23 @@ export default function CartDrawer() {
                           <Package className="w-8 h-8 text-gray-400" />
                         </div>
                       )}
-                    </div>
+                    </Link>
 
                     {/* Product Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <Link
+                          href={`/shop/${item.product.id}`}
+                          onClick={handleClose}
+                          className="hover:opacity-80 transition-opacity"
+                        >
                           <span className="text-gold text-xs font-bold tracking-wider uppercase">
                             {item.product.brand}
                           </span>
-                          <h3 className="text-navy font-semibold text-sm line-clamp-2 mt-0.5">
+                          <h3 className="text-navy font-semibold text-sm line-clamp-2 mt-0.5 hover:text-gold transition-colors">
                             {item.product.name}
                           </h3>
-                        </div>
+                        </Link>
                         <button
                           onClick={() => handleRemoveItem(item.product.id)}
                           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
