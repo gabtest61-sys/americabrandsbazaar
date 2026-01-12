@@ -22,6 +22,10 @@ export const metadata: Metadata = {
   title: 'LGM Apparel | Premium Brands EST. 2020',
   description: 'Shop authentic premium brands - Calvin Klein, Nike, GAP, Ralph Lauren, Michael Kors. Quality clothing, accessories, and shoes at great prices.',
   keywords: ['LGM Apparel', 'premium brands', 'clothing', 'accessories', 'shoes', 'Calvin Klein', 'Nike', 'GAP', 'Ralph Lauren', 'Michael Kors'],
+  icons: {
+    icon: '/icon.jpg',
+    apple: '/apple-icon.jpg',
+  },
   openGraph: {
     title: 'LGM Apparel | Premium Brands',
     description: 'Shop authentic premium brands at great prices',
