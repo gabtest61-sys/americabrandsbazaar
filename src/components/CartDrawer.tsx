@@ -127,9 +127,9 @@ export default function CartDrawer() {
                   <div className="flex gap-4">
                     {/* Product Image */}
                     <div className="relative w-20 h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                      {(item.product.image || (item.product.images && item.product.images[0])) ? (
+                      {item.product.image ? (
                         <Image
-                          src={item.product.image || item.product.images?.[0] || ''}
+                          src={item.product.image}
                           alt={item.product.name}
                           fill
                           className="object-cover"
