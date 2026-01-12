@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Minus, Plus, ShoppingBag, Trash2, ArrowRight, Sparkles } from 'lucide-react'
+import { X, Minus, Plus, ShoppingBag, Trash2, ArrowRight, Sparkles, Package } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { formatPrice } from '@/lib/constants'
 
@@ -124,13 +125,21 @@ export default function CartDrawer() {
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex gap-4">
-                    {/* Product Image Placeholder */}
-                    <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl flex items-center justify-center flex-shrink-0 shadow-inner">
-                      <div className="w-10 h-10 bg-white/80 rounded-full flex items-center justify-center">
-                        <span className="text-navy font-bold text-sm">
-                          {item.product.brand.charAt(0)}
-                        </span>
-                      </div>
+                    {/* Product Image */}
+                    <div className="relative w-20 h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                      {item.product.images && item.product.images[0] ? (
+                        <Image
+                          src={item.product.images[0]}
+                          alt={item.product.name}
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300">
+                          <Package className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Product Info */}
