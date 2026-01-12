@@ -174,7 +174,7 @@ export default function AccountPage() {
 
     order.items.forEach(item => {
       addItem({
-        id: item.productId || item.id || `reorder-${Date.now()}`,
+        id: item.productId || `reorder-${Date.now()}`,
         name: item.name,
         brand: item.brand || 'Unknown',
         price: item.price,

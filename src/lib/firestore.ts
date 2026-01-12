@@ -59,11 +59,12 @@ export const deleteProductImage = async (imageUrl: string): Promise<boolean> => 
 export interface OrderItem {
   productId: string
   name: string
-  brand: string
+  brand?: string
   price: number
   quantity: number
   size?: string
   color?: string
+  image?: string
 }
 
 export interface FirestoreOrder {
