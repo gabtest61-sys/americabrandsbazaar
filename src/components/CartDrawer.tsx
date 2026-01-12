@@ -200,17 +200,22 @@ export default function CartDrawer() {
         {items.length > 0 && (
           <div className="border-t border-gray-100 p-5 bg-gray-50">
             {/* AI Dresser Promo */}
-            <div className="bg-gradient-to-r from-navy to-navy-700 rounded-xl p-4 mb-4">
+            <Link
+              href="/ai-dresser"
+              onClick={handleClose}
+              className="block bg-gradient-to-r from-navy to-navy-700 rounded-xl p-4 mb-4 hover:from-navy-700 hover:to-navy transition-all group"
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gold/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-gold/20 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-gold/30 transition-colors">
                   <Sparkles className="w-5 h-5 text-gold" />
                 </div>
                 <div className="flex-1">
                   <p className="text-white text-sm font-semibold">Complete your look!</p>
                   <p className="text-white/60 text-xs">Try our AI Dresser for styling tips</p>
                 </div>
+                <ArrowRight className="w-5 h-5 text-gold opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </div>
-            </div>
+            </Link>
 
             {/* Subtotal */}
             <div className="flex items-center justify-between mb-1">
