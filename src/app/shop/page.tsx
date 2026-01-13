@@ -145,6 +145,9 @@ function ShopContent() {
   // Search autocomplete state
   const [showSuggestions, setShowSuggestions] = useState(false)
 
+  // Brand filter search state
+  const [brandSearch, setBrandSearch] = useState('')
+
   // Load recently viewed from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(RECENTLY_VIEWED_KEY)
