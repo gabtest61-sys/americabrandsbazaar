@@ -3,6 +3,7 @@ export const BRAND = {
   tagline: 'Premium Brands',
   established: 2020,
   facebook: 'https://www.facebook.com/profile.php?id=61585906553643',
+  logo: '/logo.jpg',
 }
 
 export const COLORS = {

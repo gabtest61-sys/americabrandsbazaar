@@ -920,16 +920,19 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-100">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-navy text-white p-6 hidden lg:block">
-        <div className="mb-8">
-          <img 
-              src="lgm-apparel-logo.jpg" 
-              alt="LGM Apparel Logo" 
-              className="w-10 h-10 object-contain"
-             />
-            <div>
+        <div className="mb-8 flex items-center gap-3">
+          <div className="relative w-10 h-10 bg-white rounded-full overflow-hidden flex-shrink-0">
+            <Image
+              src="/logo.jpg"
+              alt="LGM Apparel Logo"
+              fill
+              className="object-cover"
+            />
           </div>
-          <h1 className="text-xl font-bold text-gold">LGM Admin</h1>
-          <p className="text-white/50 text-sm">Mini CRM Dashboard</p>
+          <div>
+            <h1 className="text-xl font-bold text-gold">LGM Admin</h1>
+            <p className="text-white/50 text-sm">Mini CRM Dashboard</p>
+          </div>
         </div>
 
         <nav className="space-y-2">
@@ -986,7 +989,17 @@ export default function AdminDashboard() {
       <main className="lg:ml-64 p-6">
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-navy">LGM Admin</h1>
+          <div className="flex items-center gap-3">
+            <div className="relative w-8 h-8 bg-white rounded-full overflow-hidden flex-shrink-0">
+              <Image
+                src="/logo.jpg"
+                alt="LGM Apparel Logo"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <h1 className="text-xl font-bold text-navy">LGM Admin</h1>
+          </div>
           <button
             onClick={() => { logout(); router.push('/'); }}
             className="text-gray-500"
