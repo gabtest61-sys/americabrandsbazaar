@@ -39,7 +39,6 @@ import {
   Review
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
-import { sampleProducts } from '@/lib/sample-products'
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -516,31 +515,6 @@ export default function AdminDashboard() {
 
   // Seed sample products (52 diverse products for AI Dresser testing)
   const handleSeedSampleProducts = async () => {
-    if (!confirm(`This will add ${sampleProducts.length} sample products to Firestore. Continue?`)) return
-
-    setIsSeeding(true)
-    let successCount = 0
-    let errorCount = 0
-
-    for (const product of sampleProducts) {
-      const result = await createProduct(product)
-      if (result.success) {
-        successCount++
-      } else {
-        errorCount++
-        console.error(`Failed to create ${product.name}:`, result.error)
-      }
-    }
-
-    if (successCount > 0) {
-      alert(`Successfully added ${successCount} products${errorCount > 0 ? ` (${errorCount} failed)` : ''}`)
-      const productsData = await getFirestoreProducts()
-      setFirestoreProducts(productsData)
-    } else {
-      alert('Failed to add products')
-    }
-    setIsSeeding(false)
-  }
 
   // Quick update product fields
   const handleQuickUpdate = async (productId: string, field: string, value: unknown) => {
@@ -4255,4 +4229,5 @@ export default function AdminDashboard() {
       )}
     </div>
   )
+}
 }
