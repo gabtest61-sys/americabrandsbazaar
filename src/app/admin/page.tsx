@@ -942,6 +942,13 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-navy text-white p-6 hidden lg:block">
         <div className="mb-8">
+          <img 
+              src="lgm-apparel-logo.jpg" 
+              alt="LGM Apparel Logo" 
+              className="w-10 h-10 object-contain"
+             />
+            <div>
+          </div>
           <h1 className="text-xl font-bold text-gold">LGM Admin</h1>
           <p className="text-white/50 text-sm">Mini CRM Dashboard</p>
         </div>
