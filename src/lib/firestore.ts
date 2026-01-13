@@ -1097,30 +1097,6 @@ export const getFirestoreProductById = async (productId: string): Promise<Firest
   }
 }
 
-// Seed products from static data to Firestore (one-time migration)
-export const seedProductsToFirestore = async (
-  products: Omit<FirestoreProduct, 'createdAt' | 'updatedAt'>[]
-): Promise<{ success: boolean; count: number; error?: string }> => {
-  if (!db) return { success: false, count: 0, error: 'Database not configured' }
-
-  try {
-    let count = 0
-    for (const product of products) {
-      const productRef = doc(db, 'products', product.id || `product-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`)
-      await setDoc(productRef, {
-        ...product,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      })
-      count++
-    }
-    return { success: true, count }
-  } catch (error) {
-    console.error('Error seeding products:', error)
-    return { success: false, count: 0, error: 'Failed to seed products' }
-  }
-}
-
 // Delete user data from Firestore
 export const deleteUserData = async (userId: string): Promise<boolean> => {
   if (!db) return false

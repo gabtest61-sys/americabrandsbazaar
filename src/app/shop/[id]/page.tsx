@@ -24,7 +24,7 @@ import Footer from '@/components/Footer'
 import ReviewSection from '@/components/ReviewSection'
 import Breadcrumb from '@/components/Breadcrumb'
 import { ProductDetailSkeleton } from '@/components/ProductSkeleton'
-import { getProductById, Product } from '@/lib/products'
+import { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { getWishlist, addToWishlist, removeFromWishlist, getFirestoreProductById, getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
@@ -90,11 +90,7 @@ export default function ProductDetailPage() {
       setLoading(true)
 
       // Try Firestore first, then fallback to static products
-      let foundProduct: Product | FirestoreProduct | null = await getFirestoreProductById(productId)
-
-      if (!foundProduct) {
-        foundProduct = getProductById(productId) || null
-      }
+      const foundProduct: Product | FirestoreProduct | null = await getFirestoreProductById(productId)
 
       if (foundProduct) {
         setProduct(foundProduct)

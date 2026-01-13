@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
 import { getAuth, Auth } from 'firebase/auth'
-import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore'
+import { getFirestore, Firestore } from 'firebase/firestore'
 import { getStorage, FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -24,12 +24,7 @@ let storage: FirebaseStorage | null = null
 if (isClient && isConfigured) {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
   auth = getAuth(app)
-  // Initialize Firestore with experimentalForceLongPolling to avoid CORS/proxy issues
-  try {
-    db = initializeFirestore(app, { experimentalForceLongPolling: true })
-  } catch (e) {
-    db = getFirestore(app)
-  }
+  db = getFirestore(app)
   storage = getStorage(app)
 }
 

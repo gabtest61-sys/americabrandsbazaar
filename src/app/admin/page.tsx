@@ -28,7 +28,6 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  seedProductsToFirestore,
   FirestoreProduct,
   getShippingSettings,
   updateShippingSettings,
@@ -98,7 +97,6 @@ export default function AdminDashboard() {
   const [editingProduct, setEditingProduct] = useState<FirestoreProduct | null>(null)
   const [productFormData, setProductFormData] = useState<Partial<FirestoreProduct>>({})
   const [isSavingProduct, setIsSavingProduct] = useState(false)
-  const [isSeeding, setIsSeeding] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [customProductId, setCustomProductId] = useState('')
 
@@ -496,25 +494,6 @@ export default function AdminDashboard() {
       alert('Failed to delete product')
     }
   }
-
-  // Seed static products to Firestore
-  const handleSeedProducts = async () => {
-    if (!confirm('This will copy all static products to Firestore. Continue?')) return
-
-    setIsSeeding(true)
-    const result = await seedProductsToFirestore(staticProducts)
-    if (result.success) {
-      alert(`Successfully seeded ${result.count} products to Firestore`)
-      const productsData = await getFirestoreProducts()
-      setFirestoreProducts(productsData)
-    } else {
-      alert(result.error || 'Failed to seed products')
-    }
-    setIsSeeding(false)
-  }
-
-  // Seed sample products (52 diverse products for AI Dresser testing)
-  const handleSeedSampleProducts = async () => {
 
   // Quick update product fields
   const handleQuickUpdate = async (productId: string, field: string, value: unknown) => {
@@ -2231,25 +2210,6 @@ export default function AdminDashboard() {
                   >
                     <FileSpreadsheet className="w-4 h-4" />
                     Export CSV
-                  </button>
-                  {firestoreProducts.length === 0 && (
-                    <button
-                      onClick={handleSeedProducts}
-                      disabled={isSeeding}
-                      className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {isSeeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      {isSeeding ? 'Seeding...' : 'Seed Products'}
-                    </button>
-                  )}
-                  <button
-                    onClick={handleSeedSampleProducts}
-                    disabled={isSeeding}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                    title="Add 52 sample products for AI Dresser testing"
-                  >
-                    {isSeeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                    {isSeeding ? 'Adding...' : 'Add Sample Products (52)'}
                   </button>
                 </div>
               </div>
@@ -4236,5 +4196,4 @@ export default function AdminDashboard() {
       )}
     </div>
   )
-}
 }
