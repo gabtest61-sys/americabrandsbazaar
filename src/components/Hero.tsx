@@ -127,7 +127,7 @@ export default function Hero() {
                   src="/logo.png"
                   alt={BRAND.name}
                   fill
-                  className="object-contain p-2"
+                  className="object-contain scale-[1.75]"
                   priority
                 />
               </div>

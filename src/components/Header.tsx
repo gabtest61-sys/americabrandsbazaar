@@ -154,7 +154,7 @@ export default function Header() {
                     src="/logo.png"
                     alt={BRAND.name}
                     fill
-                    className="object-contain scale-125"
+                    className="object-contain scale-[1.75]"
                     priority
                   />
                 </div>

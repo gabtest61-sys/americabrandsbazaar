@@ -60,7 +60,7 @@ export default function Footer() {
                   src="/logo.png"
                   alt={BRAND.name}
                   fill
-                  className="object-contain p-0.5"
+                  className="object-contain scale-[1.75]"
                 />
               </div>
               <div>
