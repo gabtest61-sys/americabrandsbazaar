@@ -38,7 +38,7 @@ export default function QuizIntro({
 
       <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
         Your Personal
-        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-300 to-gold">
+        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold">
           AI Fashion Stylist
         </span>
       </h1>
@@ -80,7 +80,7 @@ export default function QuizIntro({
           </p>
           <button
             onClick={onOpenAuth}
-            className="inline-flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
+            className="inline-flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
           >
             Sign In to Continue
             <ArrowRight className="w-5 h-5" />
@@ -96,7 +96,7 @@ export default function QuizIntro({
           <div className="flex flex-col gap-3 items-center">
             <Link
               href="/shop"
-              className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
+              className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
             >
               <ShoppingBag className="w-5 h-5" />
               Browse Our Collection
@@ -123,7 +123,7 @@ export default function QuizIntro({
           )}
           <button
             onClick={onStart}
-            className="group inline-flex items-center gap-3 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
+            className="group inline-flex items-center gap-3 bg-gold hover:bg-gold-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
           >
             Start Styling Session
             {accessType === 'bonus' && <span className="text-sm opacity-75">(Using Bonus)</span>}

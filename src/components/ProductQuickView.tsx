@@ -239,7 +239,7 @@ export default function ProductQuickView({
                       ? 'bg-green-500 text-white'
                       : !product.inStock || product.stockQty === 0
                       ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-gold text-navy hover:bg-yellow-400'
+                      : 'bg-gold text-navy hover:bg-gold-400'
                   }`}
                 >
                   {isAdded ? (
@@ -269,7 +269,7 @@ export default function ProductQuickView({
               <Link
                 href={`/shop/${product.id}`}
                 onClick={onClose}
-                className="block text-center text-gold hover:text-yellow-600 font-medium text-sm py-2"
+                className="block text-center text-gold hover:text-gold-600 font-medium text-sm py-2"
               >
                 View Full Details
               </Link>

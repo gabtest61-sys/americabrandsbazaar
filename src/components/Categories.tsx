@@ -22,7 +22,7 @@ const categoryConfig = [
     icon: Watch,
     href: '/shop?category=accessories',
     image: '/categories/accessories.jpg',
-    color: 'from-gold to-amber-500',
+    color: 'from-gold to-gold-400',
   },
   {
     id: 'shoes',
@@ -58,7 +58,7 @@ export default function Categories() {
     loadCounts()
   }, [])
   return (
-    <section className="section-padding bg-gray-50">
+    <section className="section-padding bg-cream">
       <div className="container-max">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">

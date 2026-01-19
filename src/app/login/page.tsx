@@ -151,7 +151,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 disabled:bg-gold/50 text-navy font-bold py-3.5 px-6 rounded-full transition-all"
+              className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 disabled:bg-gold/50 text-navy font-bold py-3.5 px-6 rounded-full transition-all"
             >
               {isLoading ? (
                 <>

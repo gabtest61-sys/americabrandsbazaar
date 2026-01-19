@@ -328,7 +328,7 @@ export default function AccountPage() {
                   <p className="text-sm text-white/70 mb-3">Get personalized outfit recommendations</p>
                   <Link
                     href="/ai-dresser"
-                    className="block text-center bg-gold text-navy font-semibold py-2 rounded-lg hover:bg-yellow-400 transition-colors"
+                    className="block text-center bg-gold text-navy font-semibold py-2 rounded-lg hover:bg-gold-400 transition-colors"
                   >
                     Try Now
                   </Link>
@@ -415,7 +415,7 @@ export default function AccountPage() {
                                     <RotateCcw className={`w-4 h-4 ${reorderingId === (order.id || order.orderId) ? 'animate-spin' : ''}`} />
                                     {reorderingId === (order.id || order.orderId) ? 'Added!' : 'Reorder'}
                                   </button>
-                                  <button className="text-gold font-medium text-sm hover:text-yellow-600">
+                                  <button className="text-gold font-medium text-sm hover:text-gold-600">
                                     View Details
                                   </button>
                                 </div>
@@ -432,7 +432,7 @@ export default function AccountPage() {
                       <p className="text-gray-500 mb-6">Start shopping to see your orders here</p>
                       <Link
                         href="/shop"
-                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-gold-400 transition-colors"
                       >
                         <ShoppingBag className="w-5 h-5" />
                         Browse Products
@@ -483,7 +483,7 @@ export default function AccountPage() {
                               <div className="flex items-center gap-2 mt-2">
                                 <button
                                   onClick={() => handleAddToCart(product)}
-                                  className="flex-1 flex items-center justify-center gap-1 bg-gold text-navy text-sm font-medium py-2 rounded-lg hover:bg-yellow-400 transition-colors"
+                                  className="flex-1 flex items-center justify-center gap-1 bg-gold text-navy text-sm font-medium py-2 rounded-lg hover:bg-gold-400 transition-colors"
                                 >
                                   <ShoppingBag className="w-4 h-4" />
                                   Add to Cart
@@ -507,7 +507,7 @@ export default function AccountPage() {
                       <p className="text-gray-500 mb-6">Save items you love for later</p>
                       <Link
                         href="/shop"
-                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-gold-400 transition-colors"
                       >
                         <ShoppingBag className="w-5 h-5" />
                         Browse Products
@@ -587,7 +587,7 @@ export default function AccountPage() {
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => handleAddLookToCart(look)}
-                                className="flex-1 flex items-center justify-center gap-2 bg-gold text-navy font-semibold py-3 rounded-xl hover:bg-yellow-400 transition-colors"
+                                className="flex-1 flex items-center justify-center gap-2 bg-gold text-navy font-semibold py-3 rounded-xl hover:bg-gold-400 transition-colors"
                               >
                                 <ShoppingBag className="w-4 h-4" />
                                 Add All to Cart
@@ -610,7 +610,7 @@ export default function AccountPage() {
                       <p className="text-gray-500 mb-6">Save your favorite AI Dresser outfits to view them here</p>
                       <Link
                         href="/ai-dresser"
-                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+                        className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-gold-400 transition-colors"
                       >
                         <Sparkles className="w-5 h-5" />
                         Try AI Dresser
@@ -627,7 +627,7 @@ export default function AccountPage() {
                     {!isEditing ? (
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="flex items-center gap-2 text-gold hover:text-yellow-600 font-medium"
+                        className="flex items-center gap-2 text-gold hover:text-gold-600 font-medium"
                       >
                         <Edit2 className="w-4 h-4" />
                         Edit Profile
@@ -644,7 +644,7 @@ export default function AccountPage() {
                         <button
                           onClick={handleSaveProfile}
                           disabled={saving}
-                          className="flex items-center gap-1 px-4 py-1.5 bg-gold text-navy rounded-lg font-medium hover:bg-yellow-400 disabled:opacity-50"
+                          className="flex items-center gap-1 px-4 py-1.5 bg-gold text-navy rounded-lg font-medium hover:bg-gold-400 disabled:opacity-50"
                         >
                           {saving ? (
                             <Loader2 className="w-4 h-4 animate-spin" />

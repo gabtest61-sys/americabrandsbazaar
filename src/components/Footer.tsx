@@ -41,7 +41,7 @@ export default function Footer() {
                 placeholder="Your email"
                 className="flex-1 bg-white/5 border border-white/10 rounded-l-full px-5 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50"
               />
-              <button className="bg-gold hover:bg-yellow-400 text-navy font-semibold px-5 py-3 rounded-r-full transition-colors">
+              <button className="bg-gold hover:bg-gold-400 text-navy-900 font-semibold px-5 py-3 rounded-r-full transition-colors">
                 <Send className="w-4 h-4" />
               </button>
             </div>
@@ -55,12 +55,12 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-5">
-              <div className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-gold/50">
+              <div className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-gold/50 bg-white">
                 <Image
                   src="/logo.png"
                   alt={BRAND.name}
                   fill
-                  className="object-cover"
+                  className="object-contain p-0.5"
                 />
               </div>
               <div>

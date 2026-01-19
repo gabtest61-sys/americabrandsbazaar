@@ -564,7 +564,7 @@ function ShopContent() {
                   {activeFiltersCount > 0 && (
                     <button
                       onClick={clearFilters}
-                      className="text-sm text-gold hover:text-yellow-600"
+                      className="text-sm text-gold hover:text-gold-600"
                     >
                       Clear all
                     </button>
@@ -604,7 +604,7 @@ function ShopContent() {
                     {selectedBrands.length > 0 && (
                       <button
                         onClick={() => setSelectedBrands([])}
-                        className="text-xs text-gold hover:text-yellow-600"
+                        className="text-xs text-gold hover:text-gold-600"
                       >
                         Clear
                       </button>
@@ -636,7 +636,7 @@ function ShopContent() {
                       {selectedColors.length > 0 && (
                         <button
                           onClick={() => setSelectedColors([])}
-                          className="text-xs text-gold hover:text-yellow-600"
+                          className="text-xs text-gold hover:text-gold-600"
                         >
                           Clear
                         </button>
@@ -928,7 +928,7 @@ function ShopContent() {
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                               addedItems.has(productId)
                                 ? 'bg-green-500 text-white'
-                                : 'bg-gold text-navy hover:bg-yellow-400'
+                                : 'bg-gold text-navy hover:bg-gold-400'
                             }`}
                           >
                             {addedItems.has(productId) ? '✓' : <ShoppingBag className="w-4 h-4" />}
@@ -946,7 +946,7 @@ function ShopContent() {
                   <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
                   <button
                     onClick={clearFilters}
-                    className="text-gold hover:text-yellow-600 font-medium"
+                    className="text-gold hover:text-gold-600 font-medium"
                   >
                     Clear all filters
                   </button>
@@ -1044,7 +1044,7 @@ function ShopContent() {
                     {selectedBrands.length > 0 && (
                       <button
                         onClick={() => setSelectedBrands([])}
-                        className="text-xs text-gold hover:text-yellow-600"
+                        className="text-xs text-gold hover:text-gold-600"
                       >
                         Clear
                       </button>
@@ -1075,7 +1075,7 @@ function ShopContent() {
                       {selectedColors.length > 0 && (
                         <button
                           onClick={() => setSelectedColors([])}
-                          className="text-xs text-gold hover:text-yellow-600"
+                          className="text-xs text-gold hover:text-gold-600"
                         >
                           Clear
                         </button>

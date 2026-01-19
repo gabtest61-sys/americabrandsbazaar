@@ -907,7 +907,7 @@ export default function AdminDashboard() {
           </p>
           <Link
             href="/"
-            className="inline-block bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-yellow-400 transition-colors"
+            className="inline-block bg-gold text-navy-900 font-semibold px-6 py-3 rounded-full hover:bg-gold-400 transition-colors"
           >
             Go to Homepage
           </Link>
@@ -917,7 +917,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-cream">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-navy text-white p-6 hidden lg:block">
         <div className="mb-8 flex items-center gap-3">
@@ -926,7 +926,7 @@ export default function AdminDashboard() {
               src="/logo.png"
               alt="America Brands Bazaar Logo"
               fill
-              className="object-cover"
+              className="object-contain p-0.5"
             />
           </div>
           <div>
@@ -951,7 +951,7 @@ export default function AdminDashboard() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === tab.id ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-white/70'
+                activeTab === tab.id ? 'bg-gold/20 text-gold' : 'hover:bg-white/5 text-white/70'
               }`}
             >
               <tab.icon className="w-5 h-5" />
@@ -962,7 +962,7 @@ export default function AdminDashboard() {
                 </span>
               )}
               {tab.id === 'reviews' && reviews.length > 0 && (
-                <span className="ml-auto bg-gold text-navy text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                <span className="ml-auto bg-gold text-navy-900 text-xs w-5 h-5 rounded-full flex items-center justify-center">
                   {reviews.length}
                 </span>
               )}
@@ -1026,7 +1026,7 @@ export default function AdminDashboard() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabType)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                  activeTab === tab.id ? 'bg-gold text-navy' : 'bg-white text-gray-600'
+                  activeTab === tab.id ? 'bg-gold text-navy-900' : 'bg-white text-gray-600'
                 }`}
               >
                 {tab.label}
@@ -1252,7 +1252,7 @@ export default function AdminDashboard() {
                   <div className="flex gap-3 flex-wrap">
                     <button
                       onClick={exportOrdersToCSV}
-                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Export CSV
@@ -1408,7 +1408,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setSelectedOrder(order)}
-                            className="text-gold hover:text-yellow-600"
+                            className="text-gold hover:text-gold-600"
                             title="View Details"
                           >
                             <Eye className="w-5 h-5" />
@@ -1468,7 +1468,7 @@ export default function AdminDashboard() {
                   </div>
                   <button
                     onClick={exportUsersToCSV}
-                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Export CSV
@@ -1523,7 +1523,7 @@ export default function AdminDashboard() {
                         <td className="py-4 px-6">
                           <button
                             onClick={() => setSelectedCustomer(customer)}
-                            className="flex items-center gap-1.5 text-sm text-gold hover:text-yellow-600"
+                            className="flex items-center gap-1.5 text-sm text-gold hover:text-gold-600"
                           >
                             <History className="w-4 h-4" />
                             View History
@@ -1718,7 +1718,7 @@ export default function AdminDashboard() {
                     </div>
                     <button
                       onClick={exportInventoryToCSV}
-                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Export CSV
@@ -1981,7 +1981,7 @@ export default function AdminDashboard() {
                       onClick={() => setChartPeriod(period)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         chartPeriod === period
-                          ? 'bg-gold text-navy'
+                          ? 'bg-gold text-navy-900'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -2197,7 +2197,7 @@ export default function AdminDashboard() {
                 <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={() => openProductForm()}
-                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Add Product
@@ -2240,7 +2240,7 @@ export default function AdminDashboard() {
                         onClick={() => setProductViewMode('grid')}
                         className={`p-2 transition-colors ${
                           productViewMode === 'grid'
-                            ? 'bg-gold text-navy'
+                            ? 'bg-gold text-navy-900'
                             : 'bg-white text-gray-500 hover:bg-gray-50'
                         }`}
                         title="Grid View"
@@ -2251,7 +2251,7 @@ export default function AdminDashboard() {
                         onClick={() => setProductViewMode('table')}
                         className={`p-2 transition-colors ${
                           productViewMode === 'table'
-                            ? 'bg-gold text-navy'
+                            ? 'bg-gold text-navy-900'
                             : 'bg-white text-gray-500 hover:bg-gray-50'
                         }`}
                         title="Table View"
@@ -2427,7 +2427,7 @@ export default function AdminDashboard() {
                                       onClick={() => toggleSelectProduct(product.id!)}
                                       className={`absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center transition-all z-10 ${
                                         selectedProducts.has(product.id!)
-                                          ? 'bg-gold text-navy'
+                                          ? 'bg-gold text-navy-900'
                                           : 'bg-white/90 text-gray-400 opacity-0 group-hover:opacity-100'
                                       }`}
                                     >
@@ -2456,7 +2456,7 @@ export default function AdminDashboard() {
                                     </div>
                                     {/* Featured badge */}
                                     {product.featured && (
-                                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy text-xs font-bold rounded">
+                                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-gold text-navy-900 text-xs font-bold rounded">
                                         Featured
                                       </span>
                                     )}
@@ -2684,7 +2684,7 @@ export default function AdminDashboard() {
                                         onClick={() => setProductPage(pageNum)}
                                         className={`w-8 h-8 text-sm rounded-lg ${
                                           productPage === pageNum
-                                            ? 'bg-gold text-navy font-semibold'
+                                            ? 'bg-gold text-navy-900 font-semibold'
                                             : 'border border-gray-200 hover:bg-gray-50'
                                         }`}
                                       >
@@ -2732,7 +2732,7 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => openCouponForm()}
-                  className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Add Coupon
@@ -2829,7 +2829,7 @@ export default function AdminDashboard() {
                   <p className="text-gray-500">No coupons created yet</p>
                   <button
                     onClick={() => openCouponForm()}
-                    className="mt-4 text-gold hover:text-yellow-600 font-medium"
+                    className="mt-4 text-gold hover:text-gold-600 font-medium"
                   >
                     Create your first coupon
                   </button>
@@ -2916,7 +2916,7 @@ export default function AdminDashboard() {
                             {product && (
                               <Link
                                 href={`/shop/${product.id}`}
-                                className="text-sm text-gold hover:text-yellow-600 font-medium mb-1 inline-block"
+                                className="text-sm text-gold hover:text-gold-600 font-medium mb-1 inline-block"
                               >
                                 {product.name} by {product.brand}
                               </Link>
@@ -3017,7 +3017,7 @@ export default function AdminDashboard() {
                   <p className="text-gray-500">No reviews match your filters</p>
                   <button
                     onClick={() => { setReviewFilter('all'); setReviewRatingFilter(null); }}
-                    className="mt-2 text-gold hover:text-yellow-600 font-medium text-sm"
+                    className="mt-2 text-gold hover:text-gold-600 font-medium text-sm"
                   >
                     Clear Filters
                   </button>
@@ -3040,7 +3040,7 @@ export default function AdminDashboard() {
                 {!editingShipping && (
                   <button
                     onClick={() => setEditingShipping(shippingSettings ? { ...shippingSettings } : null)}
-                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                     Edit Rates
@@ -3132,7 +3132,7 @@ export default function AdminDashboard() {
                           rates: [...editingShipping.rates, newRate]
                         })
                       }}
-                      className="flex items-center gap-2 text-gold hover:text-yellow-600 font-medium"
+                      className="flex items-center gap-2 text-gold hover:text-gold-600 font-medium"
                     >
                       <Plus className="w-4 h-4" />
                       Add Region
@@ -3167,7 +3167,7 @@ export default function AdminDashboard() {
                         setIsSavingShipping(false)
                       }}
                       disabled={isSavingShipping}
-                      className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {isSavingShipping ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -3330,7 +3330,7 @@ export default function AdminDashboard() {
                       onClick={() => handleStatusChange(selectedOrder.id!, status, !selectedOrder.userId)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
                         selectedOrder.status === status
-                          ? 'bg-gold text-navy'
+                          ? 'bg-gold text-navy-900'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -3608,7 +3608,7 @@ export default function AdminDashboard() {
                           <X className="w-4 h-4" />
                         </button>
                         {index === 0 && (
-                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-gold text-navy text-[10px] rounded font-medium">
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-gold text-navy-900 text-[10px] rounded font-medium">
                             Main
                           </span>
                         )}
@@ -3810,7 +3810,7 @@ export default function AdminDashboard() {
                 <button
                   onClick={handleSaveProduct}
                   disabled={isSavingProduct}
-                  className="flex items-center gap-2 px-6 py-3 bg-gold text-navy font-semibold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-3 bg-gold text-navy-900 font-semibold rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-50"
                 >
                   {isSavingProduct ? (
                     <>
@@ -3975,7 +3975,7 @@ export default function AdminDashboard() {
                       }
                     }
                   }}
-                  className="px-4 py-2 bg-gold text-navy font-semibold rounded-lg hover:bg-yellow-400"
+                  className="px-4 py-2 bg-gold text-navy-900 font-semibold rounded-lg hover:bg-gold-400"
                 >
                   Save Note
                 </button>
@@ -3996,7 +3996,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-semibold px-4 py-2 rounded-lg"
+                    className="flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-semibold px-4 py-2 rounded-lg"
                   >
                     <Printer className="w-4 h-4" />
                     Print
@@ -4198,7 +4198,7 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   onClick={handleSaveCoupon}
-                  className="px-4 py-2 bg-gold text-navy font-semibold rounded-lg hover:bg-yellow-400"
+                  className="px-4 py-2 bg-gold text-navy-900 font-semibold rounded-lg hover:bg-gold-400"
                 >
                   {editingCoupon ? 'Update Coupon' : 'Create Coupon'}
                 </button>

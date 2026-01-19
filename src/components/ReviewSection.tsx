@@ -111,7 +111,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
                     key={star}
                     className={`w-5 h-5 ${
                       star <= averageRating
-                        ? 'text-yellow-400 fill-current'
+                        ? 'text-gold-400 fill-current'
                         : 'text-gray-300'
                     }`}
                   />
@@ -129,7 +129,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
               <span className="w-12">{stars} stars</span>
               <div className="flex-1 bg-gray-200 rounded-full h-2">
                 <div
-                  className="bg-yellow-400 h-2 rounded-full transition-all"
+                  className="bg-gold-400 h-2 rounded-full transition-all"
                   style={{ width: `${percentage}%` }}
                 />
               </div>
@@ -143,7 +143,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
           {isLoggedIn ? (
             <button
               onClick={() => setShowForm(!showForm)}
-              className="px-6 py-3 bg-gold text-navy font-semibold rounded-full hover:bg-yellow-400 transition-colors"
+              className="px-6 py-3 bg-gold text-navy font-semibold rounded-full hover:bg-gold-400 transition-colors"
             >
               Write a Review
             </button>
@@ -184,7 +184,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
                   <Star
                     className={`w-8 h-8 transition-colors ${
                       star <= (hoverRating || rating)
-                        ? 'text-yellow-400 fill-current'
+                        ? 'text-gold-400 fill-current'
                         : 'text-gray-300'
                     }`}
                   />
@@ -227,7 +227,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-gold text-navy font-semibold rounded-full hover:bg-yellow-400 transition-colors disabled:opacity-50"
+              className="px-6 py-3 bg-gold text-navy font-semibold rounded-full hover:bg-gold-400 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Review'}
             </button>
@@ -263,7 +263,7 @@ export default function ReviewSection({ productId }: ReviewSectionProps) {
                             key={star}
                             className={`w-4 h-4 ${
                               star <= review.rating
-                                ? 'text-yellow-400 fill-current'
+                                ? 'text-gold-400 fill-current'
                                 : 'text-gray-300'
                             }`}
                           />

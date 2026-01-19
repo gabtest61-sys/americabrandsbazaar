@@ -134,7 +134,7 @@ export default function LookCard({
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => onAddAllToCart(look)}
-              className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
+              className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
             >
               <ShoppingBag className="w-5 h-5" />
               Add All to Cart

@@ -182,7 +182,7 @@ export default function SearchAutocomplete({
               ))}
               <button
                 onClick={() => handleSearch()}
-                className="w-full px-3 py-2 text-sm text-gold hover:text-yellow-600 text-center font-medium"
+                className="w-full px-3 py-2 text-sm text-gold hover:text-gold-600 text-center font-medium"
               >
                 View all results for &quot;{query}&quot;
               </button>

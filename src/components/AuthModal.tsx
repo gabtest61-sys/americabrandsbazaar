@@ -228,7 +228,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 disabled:bg-gold/50 text-navy font-bold py-3 sm:py-3.5 px-6 rounded-full transition-all text-sm sm:text-base"
+                className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 disabled:bg-gold/50 text-navy font-bold py-3 sm:py-3.5 px-6 rounded-full transition-all text-sm sm:text-base"
               >
                 {isLoading ? (
                   <>
@@ -340,7 +340,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 disabled:bg-gold/50 text-navy font-bold py-3 sm:py-3.5 px-6 rounded-full transition-all mt-3 sm:mt-4 text-sm sm:text-base"
+                className="w-full flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 disabled:bg-gold/50 text-navy font-bold py-3 sm:py-3.5 px-6 rounded-full transition-all mt-3 sm:mt-4 text-sm sm:text-base"
               >
                 {isLoading ? (
                   <>
@@ -370,7 +370,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
             <button
               type="button"
               onClick={switchMode}
-              className="text-gold hover:text-yellow-400 transition-colors font-medium"
+              className="text-gold hover:text-gold-400 transition-colors font-medium"
             >
               {mode === 'login' ? 'Create Account' : 'Sign In'}
             </button>

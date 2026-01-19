@@ -26,8 +26,8 @@ export default function AIDresserBanner() {
     <section className="relative overflow-hidden bg-navy py-20 md:py-28">
       {/* Background effects */}
       <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.15),transparent_60%)]" />
-        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(212,175,55,0.1),transparent_60%)]" />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(201,162,39,0.15),transparent_60%)]" />
+        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(201,162,39,0.1),transparent_60%)]" />
       </div>
 
       <div className="container-max px-4 md:px-8 relative z-10">
@@ -43,7 +43,7 @@ export default function AIDresserBanner() {
             {/* Headline */}
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
               Your Personal
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-300 to-gold">
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold">
                 AI Fashion Stylist
               </span>
             </h2>
@@ -72,7 +72,7 @@ export default function AIDresserBanner() {
             {/* CTA */}
             <Link
               href="/ai-dresser"
-              className="group inline-flex items-center gap-3 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
+              className="group inline-flex items-center gap-3 bg-gold hover:bg-gold-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
             >
               Try AI Dresser Free
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -126,7 +126,7 @@ export default function AIDresserBanner() {
                         <p className="text-gold text-[10px]">₱2,499</p>
                       </div>
                       <div className="flex-1 bg-white/10 rounded-xl p-2">
-                        <div className="aspect-square rounded-lg bg-gradient-to-br from-amber-500/30 to-orange-600/30 mb-2" />
+                        <div className="aspect-square rounded-lg bg-gradient-to-br from-gold/30 to-gold-600/30 mb-2" />
                         <p className="text-white text-[10px] font-medium truncate">MK Clutch</p>
                         <p className="text-gold text-[10px]">₱1,899</p>
                       </div>

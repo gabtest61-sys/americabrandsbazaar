@@ -646,7 +646,7 @@ export default function AIDresserPage() {
 
       <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
         Your Personal
-        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-300 to-gold">
+        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold">
           AI Fashion Stylist
         </span>
       </h1>
@@ -688,7 +688,7 @@ export default function AIDresserPage() {
           </p>
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
+            className="inline-flex items-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
           >
             Sign In to Continue
             <ArrowRight className="w-5 h-5" />
@@ -704,7 +704,7 @@ export default function AIDresserPage() {
           <div className="flex flex-col gap-3 items-center">
             <Link
               href="/shop"
-              className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
+              className="inline-flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-3 px-6 rounded-full transition-all"
             >
               <ShoppingBag className="w-5 h-5" />
               Browse Our Collection
@@ -731,7 +731,7 @@ export default function AIDresserPage() {
           )}
           <button
             onClick={() => setCurrentStep(1)}
-            className="group inline-flex items-center gap-3 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
+            className="group inline-flex items-center gap-3 bg-gold hover:bg-gold-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40"
           >
             Start Styling Session
             {accessType === 'bonus' && <span className="text-sm opacity-75">(Using Bonus)</span>}
@@ -1166,7 +1166,7 @@ export default function AIDresserPage() {
           </div>
           <div className="h-2 bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-gold to-yellow-400 transition-all duration-500"
+              className="h-full bg-gradient-to-r from-gold to-gold-400 transition-all duration-500"
               style={{ width: `${(currentStep / totalSteps) * 100}%` }}
             />
           </div>
@@ -1189,7 +1189,7 @@ export default function AIDresserPage() {
             disabled={!canProceed()}
             className={`flex items-center gap-2 py-3 px-6 rounded-full font-semibold transition-all ${
               canProceed()
-                ? 'bg-gold hover:bg-yellow-400 text-navy'
+                ? 'bg-gold hover:bg-gold-400 text-navy'
                 : 'bg-white/10 text-white/30 cursor-not-allowed'
             }`}
           >
@@ -1505,7 +1505,7 @@ export default function AIDresserPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => addAllToCart(looks[activeLook])}
-                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-gold hover:bg-gold-400 text-navy font-bold py-4 px-6 rounded-full transition-all"
               >
                 <ShoppingBag className="w-5 h-5" />
                 Add All to Cart
@@ -1598,8 +1598,8 @@ export default function AIDresserPage() {
       <main className="min-h-screen bg-navy pt-24 pb-16">
         {/* Background effects */}
         <div className="fixed inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.1),transparent_60%)]" />
-          <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(212,175,55,0.05),transparent_60%)]" />
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(201,162,39,0.1),transparent_60%)]" />
+          <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(201,162,39,0.05),transparent_60%)]" />
         </div>
 
         <div className="container-max px-4 md:px-8 relative z-10 py-12">

@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --navy: #1a2744;
-  --gold: #d4af37;
-  --cream: #faf9f7;
+  --navy: #1e3a5f;
+  --gold: #c9a227;
+  --cream: #f5f0e1;
+  --patriot-red: #b22234;
+  --patriot-blue: #3c3b6e;
   --font-inter: 'Inter', system-ui, sans-serif;
   --font-playfair: 'Playfair Display', Georgia, serif;
 }
@@ -44,17 +46,21 @@ h1, h2 {
 }
 
 @layer components {
-  /* Modern button styles */
+  /* Modern button styles - vintage American aesthetic */
   .btn-primary {
-    @apply bg-gold hover:bg-yellow-500 text-navy font-semibold py-3 px-8 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl;
+    @apply bg-gold hover:bg-gold-400 text-navy-900 font-semibold py-3 px-8 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl;
   }
 
   .btn-secondary {
-    @apply bg-transparent border-2 border-gold text-gold hover:bg-gold hover:text-navy font-semibold py-3 px-8 rounded-full transition-all duration-300;
+    @apply bg-transparent border-2 border-gold text-gold hover:bg-gold hover:text-navy-900 font-semibold py-3 px-8 rounded-full transition-all duration-300;
   }
 
   .btn-navy {
     @apply bg-navy hover:bg-navy-700 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl;
+  }
+
+  .btn-patriot {
+    @apply bg-patriot-red hover:bg-red-700 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl;
   }
 
   .card-hover {
@@ -69,14 +75,19 @@ h1, h2 {
     @apply max-w-7xl mx-auto;
   }
 
-  /* Glass effect */
+  /* Glass effect with cream tint */
   .glass {
-    @apply bg-white/80 backdrop-blur-lg;
+    @apply bg-cream-50/90 backdrop-blur-lg;
   }
 
-  /* Modern gold accent line */
+  /* Vintage gold accent line */
   .gold-line {
-    @apply w-12 h-1 bg-gradient-to-r from-gold to-yellow-400 rounded-full;
+    @apply w-12 h-1 bg-gradient-to-r from-gold-600 to-gold-400 rounded-full;
+  }
+
+  /* Parchment background */
+  .bg-parchment {
+    @apply bg-cream-200;
   }
 }
 

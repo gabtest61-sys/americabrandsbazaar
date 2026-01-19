@@ -111,7 +111,7 @@ export default function FeaturedProducts() {
                 <Link
                   key={productId}
                   href={`/shop/${productId}`}
-                  className="group relative bg-gray-50 rounded-2xl overflow-hidden"
+                  className="group relative bg-cream rounded-2xl overflow-hidden"
                 >
                   {/* Image Container */}
                   <div className="relative aspect-[3/4] overflow-hidden">

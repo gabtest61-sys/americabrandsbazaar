@@ -352,7 +352,7 @@ export default function ProductDetailPage() {
                   <span className="text-sm font-medium text-navy">Size: {selectedSize}</span>
                   <button
                     onClick={() => setShowSizeGuide(true)}
-                    className="flex items-center gap-1 text-sm text-gold hover:text-yellow-600"
+                    className="flex items-center gap-1 text-sm text-gold hover:text-gold-600"
                   >
                     <Ruler className="w-4 h-4" />
                     Size Guide
@@ -408,7 +408,7 @@ export default function ProductDetailPage() {
                   className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-full font-semibold transition-all ${
                     isAdded
                       ? 'bg-green-500 text-white'
-                      : 'bg-gold text-navy hover:bg-yellow-400'
+                      : 'bg-gold text-navy hover:bg-gold-400'
                   }`}
                 >
                   {isAdded ? (

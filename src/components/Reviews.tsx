@@ -27,7 +27,7 @@ export default function Reviews() {
   }
 
   return (
-    <section className="section-padding bg-gray-50 overflow-hidden">
+    <section className="section-padding bg-cream overflow-hidden">
       <div className="container-max">
         {/* Section Header */}
         <div className="text-center mb-12">
@@ -63,7 +63,7 @@ export default function Reviews() {
 
               {/* Author */}
               <div className="flex items-center justify-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gold to-gold-400 flex items-center justify-center text-white font-bold text-xl shadow-lg">
                   {REVIEWS[activeIndex].name.charAt(0)}
                 </div>
                 <div className="text-left">

@@ -32,8 +32,8 @@ export default function Hero() {
       {/* Animated gradient background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-navy via-navy-800 to-navy-900" />
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,rgba(212,175,55,0.15),transparent_50%)]" />
-        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_right,rgba(212,175,55,0.1),transparent_50%)]" />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,rgba(201,162,39,0.15),transparent_50%)]" />
+        <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_right,rgba(201,162,39,0.1),transparent_50%)]" />
       </div>
 
       <div className="container-max px-4 md:px-8 relative z-10 py-12">
@@ -55,7 +55,7 @@ export default function Hero() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6">
               Premium Style,
               <span className="block mt-2">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-yellow-300 to-gold animate-pulse">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold animate-pulse">
                   Unbeatable Prices
                 </span>
               </span>
@@ -76,7 +76,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start mb-12">
               <button
                 onClick={scrollToProducts}
-                className="group w-full sm:w-auto flex items-center justify-center gap-3 bg-gold hover:bg-yellow-400 text-navy font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40 hover:shadow-xl hover:scale-105"
+                className="group w-full sm:w-auto flex items-center justify-center gap-3 bg-gold hover:bg-gold-400 text-navy-900 font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40 hover:shadow-xl hover:scale-105"
               >
                 Shop Now
                 <ChevronDown className="w-5 h-5 group-hover:translate-y-1 transition-transform" />
@@ -122,12 +122,12 @@ export default function Hero() {
               <div className="absolute inset-12 sm:inset-16 rounded-full bg-gold/20 blur-3xl" />
 
               {/* Main logo */}
-              <div className="absolute inset-12 sm:inset-16 rounded-full border-4 border-gold shadow-2xl shadow-gold/30 overflow-hidden">
+              <div className="absolute inset-12 sm:inset-16 rounded-full border-4 border-gold shadow-2xl shadow-gold/30 overflow-hidden bg-cream">
                 <Image
                   src="/logo.png"
                   alt={BRAND.name}
                   fill
-                  className="object-cover"
+                  className="object-contain p-2"
                   priority
                 />
               </div>
@@ -145,7 +145,7 @@ export default function Hero() {
       </div>
 
       {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-cream to-transparent" />
 
       {/* Scroll indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
