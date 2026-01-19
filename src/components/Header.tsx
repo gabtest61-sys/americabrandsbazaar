@@ -144,11 +144,11 @@ export default function Header() {
             : 'bg-navy'
         }`}>
           <div className="container-max px-4 md:px-8">
-            <div className="flex items-center justify-between h-24 md:h-28">
+            <div className="flex items-center justify-between h-32 md:h-36">
               {/* Logo */}
               <Link href="/" className="flex items-center gap-3 group">
                 <div className={`relative rounded-full overflow-hidden border-2 border-gold/80 group-hover:border-gold transition-all duration-300 shadow-lg bg-white ${
-                  isScrolled ? 'w-14 h-14' : 'w-20 h-20 md:w-24 md:h-24'
+                  isScrolled ? 'w-16 h-16' : 'w-28 h-28 md:w-32 md:h-32'
                 }`}>
                   <Image
                     src="/logo.png"
