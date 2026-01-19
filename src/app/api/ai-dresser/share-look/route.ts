@@ -8,11 +8,11 @@ export async function POST(request: NextRequest) {
     const { session_id, user_id, look_number, look_name, items, total_price, channel } = body
 
     // Generate share URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lgmapparel.com'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://americabrandsbazaar.com'
     const shareUrl = `${baseUrl}/shared-look/${session_id}/${look_number}`
 
     // Generate share message
-    const shareMessage = `Check out this ${look_name} from LGM Apparel! ${items?.map((i: { product_name: string, price: number }) =>
+    const shareMessage = `Check out this ${look_name} from America Brands Bazaar! ${items?.map((i: { product_name: string, price: number }) =>
       `${i.product_name} - ₱${i.price}`).join(', ')} Total: ₱${total_price} ${shareUrl}`
 
     // In production, this would:

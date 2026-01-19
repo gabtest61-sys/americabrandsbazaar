@@ -600,7 +600,7 @@ export default function AIDresserPage() {
         setShareModalOpen(true)
       } else {
         // Fallback: Generate local share URLs
-        const shareText = `Check out this ${look.look_name} from LGM Apparel! Total: ₱${look.total_price.toLocaleString()}`
+        const shareText = `Check out this ${look.look_name} from America Brands Bazaar! Total: ₱${look.total_price.toLocaleString()}`
         const shareUrl = `${window.location.origin}/ai-dresser?look=${look.look_number}`
         const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID
         setShareUrls({
@@ -614,7 +614,7 @@ export default function AIDresserPage() {
       }
     } catch {
       // Fallback share
-      const shareText = `Check out this ${look.look_name} from LGM Apparel!`
+      const shareText = `Check out this ${look.look_name} from America Brands Bazaar!`
       if (navigator.share) {
         navigator.share({ title: look.look_name, text: shareText, url: window.location.href })
       } else {

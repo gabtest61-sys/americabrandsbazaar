@@ -79,10 +79,10 @@ function LoginForm() {
           <div className="flex justify-center mb-6">
             <div className="relative w-20 h-20 rounded-full border-2 border-gold overflow-hidden">
               <Image
-                src="/logo.jpg"
-                alt="LGM Apparel"
+                src="/logo.png"
+                alt="America Brands Bazaar"
                 fill
-                className="object-cover scale-150"
+                className="object-cover"
               />
             </div>
           </div>

@@ -1,4 +1,4 @@
-// Product Database for LGM Apparel
+// Product Database for America Brands Bazaar
 // In production, this would come from a database/CMS
 
 export interface Product {

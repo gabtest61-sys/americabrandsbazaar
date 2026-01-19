@@ -1,9 +1,9 @@
 export const BRAND = {
-  name: 'LGM Apparel',
-  tagline: 'Premium Brands',
+  name: 'America Brands Bazaar',
+  tagline: 'Discover Premium Brands',
   established: 2020,
   facebook: 'https://www.facebook.com/profile.php?id=61585906553643',
-  logo: '/logo.jpg',
+  logo: '/logo.png',
 }
 
 export const COLORS = {

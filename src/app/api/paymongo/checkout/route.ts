@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       customerName: customerInfo.fullName,
       customerPhone: customerInfo.phone,
       orderId: orderResult.orderId,
-      description: `LGM Apparel Order #${orderResult.orderId}`,
+      description: `America Brands Bazaar Order #${orderResult.orderId}`,
     })
 
     if (!checkoutResult.success || !checkoutResult.checkoutUrl) {

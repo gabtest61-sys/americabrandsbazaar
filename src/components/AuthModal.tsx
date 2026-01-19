@@ -140,10 +140,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
           <div className="flex justify-center mb-4 sm:mb-6">
             <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-gold overflow-hidden">
               <Image
-                src="/logo.jpg"
-                alt="LGM Apparel"
+                src="/logo.png"
+                alt="America Brands Bazaar"
                 fill
-                className="object-cover scale-150"
+                className="object-cover"
               />
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
             <p className="text-white/50 text-xs sm:text-sm">
               {mode === 'login'
                 ? 'Sign in to access your account'
-                : 'Join LGM Apparel for exclusive benefits'}
+                : 'Join America Brands Bazaar for exclusive benefits'}
             </p>
           </div>
 

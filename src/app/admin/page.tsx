@@ -923,14 +923,14 @@ export default function AdminDashboard() {
         <div className="mb-8 flex items-center gap-3">
           <div className="relative w-10 h-10 bg-white rounded-full overflow-hidden flex-shrink-0">
             <Image
-              src="/logo.jpg"
-              alt="LGM Apparel Logo"
+              src="/logo.png"
+              alt="America Brands Bazaar Logo"
               fill
               className="object-cover"
             />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gold">LGM Admin</h1>
+            <h1 className="text-xl font-bold text-gold">ABB Admin</h1>
             <p className="text-white/50 text-sm">Mini CRM Dashboard</p>
           </div>
         </div>
@@ -992,13 +992,13 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3">
             <div className="relative w-8 h-8 bg-white rounded-full overflow-hidden flex-shrink-0">
               <Image
-                src="/logo.jpg"
-                alt="LGM Apparel Logo"
+                src="/logo.png"
+                alt="America Brands Bazaar Logo"
                 fill
                 className="object-cover"
               />
             </div>
-            <h1 className="text-xl font-bold text-navy">LGM Admin</h1>
+            <h1 className="text-xl font-bold text-navy">ABB Admin</h1>
           </div>
           <button
             onClick={() => { logout(); router.push('/'); }}
@@ -4011,7 +4011,7 @@ export default function AdminDashboard() {
             <div className="p-6 print:p-8" id="print-content">
               {/* Header */}
               <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold text-navy">LGM Apparel</h1>
+                <h1 className="text-2xl font-bold text-navy">America Brands Bazaar</h1>
                 <p className="text-gray-500">Order Receipt / Packing Slip</p>
               </div>
 
@@ -4082,8 +4082,8 @@ export default function AdminDashboard() {
 
               {/* Footer */}
               <div className="mt-8 pt-4 border-t text-center text-sm text-gray-500 print:mt-12">
-                <p>Thank you for shopping with LGM Apparel!</p>
-                <p>For questions, contact us at support@lgmapparel.com</p>
+                <p>Thank you for shopping with America Brands Bazaar!</p>
+                <p>For questions, contact us via Facebook or our website.</p>
               </div>
             </div>
           </div>
