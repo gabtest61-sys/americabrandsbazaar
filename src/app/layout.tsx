@@ -24,8 +24,8 @@ export const metadata: Metadata = {
   description: 'Shop authentic premium brands - Calvin Klein, Nike, GAP, Ralph Lauren, Michael Kors and more. Quality clothing, accessories, and shoes at great prices.',
   keywords: ['America Brands Bazaar', 'premium brands', 'clothing', 'accessories', 'shoes', 'Calvin Klein', 'Nike', 'GAP', 'Ralph Lauren', 'Michael Kors'],
   icons: {
-    icon: '/icon.jpg',
-    apple: '/apple-icon.jpg',
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
   },
   openGraph: {
     title: 'America Brands Bazaar | Discover Premium Brands',
