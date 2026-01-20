@@ -54,28 +54,28 @@ export const REVIEWS = [
     name: 'Maria Santos',
     rating: 5,
     comment: 'Amazing quality! The Calvin Klein shirt I bought looks exactly like the photos. Fast delivery too!',
-    date: '2024-12-15',
+    date: '2023-12-15',
   },
   {
     id: '2',
     name: 'Juan Dela Cruz',
     rating: 5,
     comment: 'Best place to buy authentic branded items. The AI Dresser feature helped me pick the perfect outfit!',
-    date: '2024-12-10',
+    date: '2023-12-10',
   },
   {
     id: '3',
     name: 'Anna Reyes',
     rating: 5,
     comment: 'Super satisfied with my Nike sneakers! Original and at a great price. Will definitely buy again.',
-    date: '2024-12-05',
+    date: '2023-12-05',
   },
   {
     id: '4',
     name: 'Mike Tan',
     rating: 4,
     comment: 'Great selection of premium brands. Customer service was very helpful and responsive.',
-    date: '2024-11-28',
+    date: '2023-11-28',
   },
 ]
 
