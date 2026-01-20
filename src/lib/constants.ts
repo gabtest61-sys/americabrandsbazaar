@@ -1,8 +1,8 @@
 export const BRAND = {
   name: 'America Brands Bazaar',
   tagline: 'Discover Premium Brands',
-  established: 2020,
-  facebook: 'https://www.facebook.com/profile.php?id=61585906553643',
+  established: 2023,
+  facebook: 'https://www.facebook.com/share/1CWpCZdBB6/?mibextid=wwXIfr',
   logo: '/logo.png',
 }
 
