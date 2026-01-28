@@ -45,7 +45,6 @@ export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart()
   const { user, isLoggedIn } = useAuth()
   const [step, setStep] = useState<CheckoutStep>('info')
-  const [isGuest, setIsGuest] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderId, setOrderId] = useState<string>('')
   const [shippingRegion, setShippingRegion] = useState<string>('')
@@ -326,31 +325,6 @@ export default function CheckoutPage() {
                 <div className="bg-white rounded-xl shadow-md p-6 md:p-8">
                   <h1 className="text-2xl font-bold text-navy mb-6">Checkout</h1>
 
-                  {/* Guest/Account Toggle */}
-                  <div className="flex gap-4 mb-8">
-                    <button
-                      onClick={() => setIsGuest(true)}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-colors ${
-                        isGuest
-                          ? 'border-gold bg-gold/10 text-navy'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="font-semibold">Guest Checkout</span>
-                    </button>
-                    <button
-                      onClick={() => setIsGuest(false)}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 transition-colors ${
-                        !isGuest
-                          ? 'border-gold bg-gold/10 text-navy'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="font-semibold">Create Account</span>
-                      <p className="text-xs text-gray-400 mt-1">Unlock AI Dresser</p>
-                    </button>
-                  </div>
-
                   <form onSubmit={handleSubmitInfo} className="space-y-6">
                     {/* Contact Information */}
                     <div>
@@ -500,33 +474,31 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    {/* Create Account Option */}
-                    {!isGuest && (
-                      <div className="bg-navy/5 rounded-lg p-4">
-                        <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-                          <Lock className="w-5 h-5 text-gold" />
-                          Create Account
-                        </h2>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Create an account to access the AI Dresser, track orders, and get personalized recommendations.
-                        </p>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Password *
-                          </label>
-                          <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
-                            required={!isGuest}
-                            minLength={8}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                            placeholder="Minimum 8 characters"
-                          />
-                        </div>
+                    {/* Create Account */}
+                    <div className="bg-navy/5 rounded-lg p-4">
+                      <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
+                        <Lock className="w-5 h-5 text-gold" />
+                        Create Account
+                      </h2>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Create an account to access the AI Dresser, track orders, and get personalized recommendations.
+                      </p>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Password *
+                        </label>
+                        <input
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          required
+                          minLength={8}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
+                          placeholder="Minimum 8 characters"
+                        />
                       </div>
-                    )}
+                    </div>
 
                     <button
                       type="submit"
