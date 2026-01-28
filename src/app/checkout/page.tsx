@@ -519,7 +519,7 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Order Summary */}
