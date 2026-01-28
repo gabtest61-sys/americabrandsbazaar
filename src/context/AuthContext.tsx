@@ -19,6 +19,9 @@ interface User {
   name: string
   email: string
   phone?: string
+  address?: string
+  city?: string
+  facebook?: string
 }
 
 interface AuthContextType {
@@ -27,7 +30,7 @@ interface AuthContextType {
   isLoggedIn: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>
+  register: (data: { name: string; email: string; phone: string; password: string; address?: string; city?: string; facebook?: string }) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   deleteAccount: () => Promise<{ success: boolean; error?: string }>
   updateUser: (updatedUser: User) => void
@@ -61,7 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 username: userData.username || fbUser.email?.split('@')[0] || '',
                 name: userData.name || fbUser.displayName || '',
                 email: fbUser.email || '',
-                phone: userData.phone || ''
+                phone: userData.phone || '',
+                address: userData.address || '',
+                city: userData.city || '',
+                facebook: userData.facebook || ''
               })
             } else {
               // User exists in Auth but not in Firestore
@@ -131,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const register = async (data: { name: string; email: string; phone: string; password: string }): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: { name: string; email: string; phone: string; password: string; address?: string; city?: string; facebook?: string }): Promise<{ success: boolean; error?: string }> => {
     if (!auth) {
       return { success: false, error: 'Authentication service not configured' }
     }
@@ -151,6 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: data.name,
             email: data.email,
             phone: data.phone,
+            address: data.address || '',
+            city: data.city || '',
+            facebook: data.facebook || '',
             createdAt: new Date().toISOString()
           })
         } catch (firestoreError) {

@@ -32,6 +32,7 @@ export interface CheckoutFormData {
   notes?: string
   createAccount: boolean
   password?: string
+  facebook?: string
 }
 
 export interface OrderData {
