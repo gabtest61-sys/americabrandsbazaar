@@ -165,13 +165,42 @@ export default function CheckoutPage() {
         'pending'
       )
 
+      const newOrderId = result.orderId || `ORD-${Date.now()}`
       if (result.orderId) {
         setOrderId(result.orderId)
       }
 
-      // Send order completed webhook to n8n
-      const payload = createOrderCompletedPayload(items, formData)
+      // Send order completed webhook to n8n (includes orderId and full customer data)
+      const payload = createOrderCompletedPayload(items, formData, newOrderId)
       await sendWebhook(payload)
+
+      // Send email notifications (admin + customer confirmation)
+      try {
+        await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: newOrderId,
+            customer: {
+              name: formData.fullName,
+              email: formData.email,
+              phone: formData.phone,
+              address: formData.address,
+              city: formData.city,
+              facebook: formData.facebook,
+            },
+            products: items.map(item => ({
+              name: item.product.name,
+              brand: item.product.brand,
+              price: item.product.price,
+              quantity: item.quantity,
+            })),
+            total: subtotal,
+          }),
+        })
+      } catch (emailError) {
+        console.warn('Email notification failed:', emailError)
+      }
 
       // Clear cart and show success
       clearCart()
@@ -495,6 +524,28 @@ export default function CheckoutPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Order Totals */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Subtotal</span>
+                        <span>{formatPrice(subtotal)}</span>
+                      </div>
+                      {discount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Discount</span>
+                          <span>-{formatPrice(discount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-gray-600">
+                        <span>Shipping</span>
+                        <span className="text-gray-500 text-sm">Via Facebook/Contact</span>
+                      </div>
+                      <div className="flex justify-between text-xl font-bold text-navy pt-2 border-t border-gray-200">
+                        <span>Total</span>
+                        <span>{formatPrice(total)}</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Contact Notice */}
@@ -531,7 +582,8 @@ export default function CheckoutPage() {
               ) : null}
             </div>
 
-            {/* Order Summary */}
+            {/* Order Summary - only show on info step */}
+            {step === 'info' && (
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
                 <h2 className="text-lg font-bold text-navy mb-4">Order Summary</h2>
@@ -636,6 +688,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
       </main>
