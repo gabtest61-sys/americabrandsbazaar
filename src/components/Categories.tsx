@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Shirt, Watch, Footprints, ArrowUpRight } from 'lucide-react'
-import { getFirestoreProducts } from '@/lib/firestore'
+import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 const categoryConfig = [
   {
@@ -36,26 +37,28 @@ const categoryConfig = [
 ]
 
 export default function Categories() {
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({
-    clothes: 0,
-    accessories: 0,
-    shoes: 0,
+  const [categoryData, setCategoryData] = useState<Record<string, { products: FirestoreProduct[], count: number }>>({
+    clothes: { products: [], count: 0 },
+    accessories: { products: [], count: 0 },
+    shoes: { products: [], count: 0 },
   })
 
   useEffect(() => {
-    const loadCounts = async () => {
-      // Load from Firestore only
+    const loadProducts = async () => {
       const products = await getFirestoreProducts()
 
-      const counts = {
-        clothes: products.filter(p => p.category === 'clothes').length,
-        accessories: products.filter(p => p.category === 'accessories').length,
-        shoes: products.filter(p => p.category === 'shoes').length,
-      }
-      setCategoryCounts(counts)
+      const clothesProducts = products.filter(p => p.category === 'clothes')
+      const accessoriesProducts = products.filter(p => p.category === 'accessories')
+      const shoesProducts = products.filter(p => p.category === 'shoes')
+
+      setCategoryData({
+        clothes: { products: clothesProducts.slice(0, 3), count: clothesProducts.length },
+        accessories: { products: accessoriesProducts.slice(0, 3), count: accessoriesProducts.length },
+        shoes: { products: shoesProducts.slice(0, 3), count: shoesProducts.length },
+      })
     }
 
-    loadCounts()
+    loadProducts()
   }, [])
   return (
     <section className="section-padding bg-cream">
@@ -79,7 +82,7 @@ export default function Categories() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {categoryConfig.map((category) => {
             const Icon = category.icon
-            const count = categoryCounts[category.id] || 0
+            const { products, count } = categoryData[category.id] || { products: [], count: 0 }
             return (
               <Link
                 key={category.id}
@@ -114,9 +117,27 @@ export default function Categories() {
 
                   {/* Bottom - Info */}
                   <div>
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <span className="text-white/60 text-sm">{count} {count === 1 ? 'item' : 'items'}</span>
                     </div>
+                    {products.length > 0 && (
+                      <div className="flex -space-x-2 mb-4">
+                        {products.map((product) => (
+                          <div
+                            key={product.id}
+                            className="w-10 h-10 rounded-full border-2 border-white/80 overflow-hidden shadow-md bg-white"
+                          >
+                            <Image
+                              src={product.images?.[0] || '/placeholder.jpg'}
+                              alt={product.name}
+                              width={40}
+                              height={40}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <h3 className="text-3xl md:text-4xl font-bold text-white mb-2 group-hover:translate-x-2 transition-transform duration-300">
                       {category.name}
                     </h3>

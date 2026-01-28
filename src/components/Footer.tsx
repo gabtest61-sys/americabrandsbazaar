@@ -93,14 +93,14 @@ export default function Footer() {
 
             {/* Contact */}
             <div className="space-y-2 text-sm text-white/50">
-              <a href="mailto:lgmapparel@gmail.com" className="flex items-center gap-2 hover:text-gold transition-colors">
+              <a href="mailto:sales@americabrandsbazaar.com" className="flex items-center gap-2 hover:text-gold transition-colors">
                 <Mail className="w-4 h-4" />
-                lgmapparel@gmail.com
+                sales@americabrandsbazaar.com
               </a>
-              <div className="flex items-center gap-2">
+              <a href="tel:09619371244" className="flex items-center gap-2 hover:text-gold transition-colors">
                 <Phone className="w-4 h-4" />
-                +63 XXX XXX XXXX
-              </div>
+                09619371244
+              </a>
             </div>
           </div>
 
