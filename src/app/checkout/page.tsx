@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, ShoppingBag, User, Mail, Phone, FileText, Lock, Check, Loader2, Tag, X, MessageCircle } from 'lucide-react'
@@ -471,8 +471,17 @@ export default function CheckoutPage() {
                           key={item.product.id}
                           className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
                         >
-                          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <span className="text-gray-400 text-xs">{item.product.brand}</span>
+                          <div className="relative w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
+                            {item.product.image ? (
+                              <Image
+                                src={item.product.image}
+                                alt={item.product.name}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <span className="text-gray-400 text-xs flex items-center justify-center h-full">{item.product.brand}</span>
+                            )}
                           </div>
                           <div className="flex-1">
                             <p className="font-semibold text-navy">{item.product.name}</p>
@@ -531,8 +540,17 @@ export default function CheckoutPage() {
                 <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
                   {items.map((item) => (
                     <div key={item.product.id} className="flex gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-gray-400 text-xs">{item.product.brand}</span>
+                      <div className="relative w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        {item.product.image ? (
+                          <Image
+                            src={item.product.image}
+                            alt={item.product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-xs flex items-center justify-center h-full">{item.product.brand}</span>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-navy truncate">{item.product.name}</p>
@@ -609,7 +627,7 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    <span className="text-green-600">Free</span>
+                    <span className="text-gray-500 text-sm">Via Facebook/Contact</span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-navy pt-2 border-t border-gray-200">
                     <span>Total</span>
