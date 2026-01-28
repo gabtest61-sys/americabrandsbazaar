@@ -498,9 +498,9 @@ export default function CheckoutPage() {
                       {items.map((item) => (
                         <div
                           key={item.product.id}
-                          className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                         >
-                          <div className="relative w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
+                          <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                             {item.product.image ? (
                               <Image
                                 src={item.product.image}
@@ -512,13 +512,13 @@ export default function CheckoutPage() {
                               <span className="text-gray-400 text-xs flex items-center justify-center h-full">{item.product.brand}</span>
                             )}
                           </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-navy">{item.product.name}</p>
-                            <p className="text-sm text-gray-500">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-navy text-sm sm:text-base truncate">{item.product.name}</p>
+                            <p className="text-xs sm:text-sm text-gray-500">
                               {formatPrice(item.product.price)} x {item.quantity}
                             </p>
                           </div>
-                          <p className="font-bold text-navy">
+                          <p className="font-bold text-navy text-sm sm:text-base flex-shrink-0">
                             {formatPrice(item.product.price * item.quantity)}
                           </p>
                         </div>
@@ -556,17 +556,17 @@ export default function CheckoutPage() {
                     </p>
                   </div>
 
-                  <div className="flex gap-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <button
                       onClick={() => setStep('info')}
-                      className="btn-secondary flex-1"
+                      className="btn-secondary flex-1 order-2 sm:order-1"
                     >
                       Back
                     </button>
                     <button
                       onClick={handlePlaceOrder}
                       disabled={isSubmitting}
-                      className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-primary flex-1 order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
                         <span className="flex items-center justify-center gap-2">
