@@ -87,7 +87,8 @@ export function createCheckoutPayload(
 
 export function createOrderCompletedPayload(
   items: CartItem[],
-  customer: CheckoutFormData
+  customer: CheckoutFormData,
+  orderId?: string
 ): WebhookPayload {
   const total = items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
@@ -96,10 +97,14 @@ export function createOrderCompletedPayload(
 
   return {
     event: 'order_completed',
+    orderId,
     customer: {
       name: customer.fullName,
       email: customer.email,
       phone: customer.phone,
+      address: customer.address,
+      city: customer.city,
+      facebook: customer.facebook,
     },
     products: items.map((item) => ({
       name: item.product.name,
@@ -124,12 +129,16 @@ export function formatMessengerMessage(payload: WebhookPayload): string {
     .map((p) => `• ${p.name} (${p.brand}) x${p.quantity} - ₱${p.price.toLocaleString()}`)
     .join('\n')
 
+  const orderIdLine = payload.orderId ? `\n📋 Order ID: ${payload.orderId}` : ''
+  const addressLine = payload.customer.address ? `\n📍 Address: ${payload.customer.address}, ${payload.customer.city || ''}` : ''
+  const facebookLine = payload.customer.facebook ? `\n💬 Facebook: ${payload.customer.facebook}` : ''
+
   return `
-🛒 ${eventLabels[payload.event]}
+🛒 ${eventLabels[payload.event]}${orderIdLine}
 
 👤 Customer: ${payload.customer.name}
 📧 Email: ${payload.customer.email || 'Not provided'}
-📱 Phone: ${payload.customer.phone || 'Not provided'}
+📱 Phone: ${payload.customer.phone || 'Not provided'}${facebookLine}${addressLine}
 
 📦 Products:
 ${productList}

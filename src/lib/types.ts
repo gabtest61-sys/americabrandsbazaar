@@ -46,10 +46,14 @@ export interface OrderData {
 
 export interface WebhookPayload {
   event: 'add_to_cart' | 'checkout_started' | 'order_completed'
+  orderId?: string
   customer: {
     name: string
     email: string
     phone: string
+    address?: string
+    city?: string
+    facebook?: string
   }
   products: {
     name: string
