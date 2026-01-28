@@ -223,12 +223,18 @@ export async function POST(request: NextRequest) {
     }
 
     const transporter = createTransporter()
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
+
+    // Admin emails to receive order notifications
+    const adminEmails = [
+      'sales@americabrandsbazaar.com',
+      'gmaturan60@gmail.com',
+      'nheymaturan@gmail.com'
+    ].join(', ')
 
     // Send admin notification email
     await transporter.sendMail({
       from: `"America Brands Bazaar" <${process.env.SMTP_USER}>`,
-      to: adminEmail,
+      to: adminEmails,
       subject: `New Order - ${data.orderId}`,
       html: generateAdminEmailHtml(data),
     })
