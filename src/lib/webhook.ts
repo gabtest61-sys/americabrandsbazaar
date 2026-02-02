@@ -31,6 +31,43 @@ export async function sendWebhook(payload: WebhookPayload): Promise<boolean> {
   }
 }
 
+// Admin email addresses for order notifications
+const ADMIN_EMAILS = 'flowpilot25@gmail.com, americabrandsbazaar@gmail.com'
+
+export async function sendOrderNotification(payload: WebhookPayload): Promise<boolean> {
+  if (!N8N_WEBHOOK_URL) {
+    console.warn('n8n webhook URL not configured')
+    return false
+  }
+
+  // Build the order-notification webhook URL
+  const orderWebhookUrl = N8N_WEBHOOK_URL.replace(/\/?$/, '') + '/order-notification'
+
+  try {
+    const response = await fetch(orderWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...payload,
+        notifyEmails: ADMIN_EMAILS,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('Order notification webhook failed:', response.statusText)
+      return false
+    }
+
+    console.log('Order notification sent successfully')
+    return true
+  } catch (error) {
+    console.error('Order notification webhook error:', error)
+    return false
+  }
+}
+
 export function createAddToCartPayload(
   items: CartItem[],
   customerName?: string

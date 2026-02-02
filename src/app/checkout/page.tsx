@@ -8,7 +8,7 @@ import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
 import { CheckoutFormData } from '@/lib/types'
-import { sendWebhook, createCheckoutPayload, createOrderCompletedPayload } from '@/lib/webhook'
+import { sendWebhook, sendOrderNotification, createCheckoutPayload, createOrderCompletedPayload } from '@/lib/webhook'
 import { createOrder, OrderItem } from '@/lib/firestore'
 
 type CheckoutStep = 'info' | 'confirm' | 'success'
@@ -190,7 +190,7 @@ export default function CheckoutPage() {
 
       // Send order completed webhook to n8n (includes orderId and full customer data)
       const payload = createOrderCompletedPayload(items, formData, newOrderId)
-      await sendWebhook(payload)
+      await sendOrderNotification(payload)
 
       // Send email notifications (admin + customer confirmation)
       try {

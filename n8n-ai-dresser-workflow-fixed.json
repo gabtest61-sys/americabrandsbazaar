@@ -1,0 +1,280 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Extract preferences and products from frontend\nconst body = $input.first().json.body || {};\n\nconst sessionId = body.session_id || `session_${Date.now()}`;\nconst userId = body.user_id || 'guest';\nconst preferences = body.preferences || {};\nconst products = body.products || [];\n\n// Parse budget (minimum 5000)\nlet budget = 10000;\nif (preferences.budget) {\n  budget = parseInt(String(preferences.budget).replace(/[^0-9]/g, '')) || 10000;\n  if (budget < 5000) budget = 5000;\n}\n\n// Parse sizes from user input (no bottom - ABB doesn't sell pants)\nconst sizes = preferences.sizes || { top: '', shoe: '' };\n\n// Check if user uploaded a photo for virtual try-on\nconst hasPhoto = !!preferences.photo;\nconst photoBase64 = preferences.photo || null;\n\n// Parse color preference\nconst colorPref = preferences.color || 'ai-decide';\n\n// Group products by category\nconst clothes = products.filter(p => p.category === 'clothes');\nconst accessories = products.filter(p => p.category === 'accessories');\nconst shoes = products.filter(p => p.category === 'shoes');\n\n// Filter products by user sizes if specified\nconst filterBySize = (items, sizeType, userSize) => {\n  if (!userSize) return items;\n  return items.map(p => ({\n    ...p,\n    sizeMatch: p.sizes?.includes(userSize) ? 'exact' : 'available'\n  })).sort((a, b) => {\n    if (a.sizeMatch === 'exact' && b.sizeMatch !== 'exact') return -1;\n    if (b.sizeMatch === 'exact' && a.sizeMatch !== 'exact') return 1;\n    return 0;\n  });\n};\n\nconst filteredClothes = filterBySize(clothes, 'top', sizes.top);\nconst filteredShoes = filterBySize(shoes, 'shoe', sizes.shoe);\n\nreturn {\n  json: {\n    sessionId,\n    userId,\n    preferences: {\n      purpose: preferences.purpose || 'personal',\n      gender: preferences.gender || 'unisex',\n      style: preferences.style || '',\n      occasion: preferences.occasion || '',\n      budget: budget,\n      color: colorPref,\n      sizes: {\n        top: sizes.top || '',\n        shoe: sizes.shoe || ''\n      },\n      hasPhoto: hasPhoto,\n      recipient: preferences.recipient || '',\n      relationship: preferences.relationship || ''\n    },\n    products: {\n      clothes: filteredClothes.slice(0, 30),\n      accessories: accessories.slice(0, 20),\n      shoes: filteredShoes.slice(0, 15)\n    },\n    totalProducts: products.length,\n    hasProducts: products.length > 0\n  }\n};"
+      },
+      "id": "7f109d63-551a-4bf8-bc94-0cf69ad3ae02",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18064,
+        -4864
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasProducts }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "e8499617-9b10-42e7-9fae-0b316542a5aa"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "98825fc5-31f7-4b2a-a195-81b8d7000faa",
+      "name": "Has Products?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -17840,
+        -4864
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "5e9c95c8-4038-4f58-896f-3fb0304740ce",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -17376,
+        -4592
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-dresser/get-recommendations",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "4cbc880b-961c-470d-9418-d9d153d69388",
+      "name": "Get Recommendations Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -18272,
+        -4864
+      ],
+      "webhookId": "ai-dresser-recommendations"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No products response\nreturn {\n  json: {\n    success: false,\n    error_code: 'NO_PRODUCTS',\n    message: 'No products provided for recommendations'\n  }\n};"
+      },
+      "id": "04e8cd52-ce46-4587-8593-03b6728e852f",
+      "name": "No Products Response1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17616,
+        -4592
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## USER PREFERENCES\n- Purpose: {{ $json.preferences.purpose }}{{ $json.preferences.purpose === 'gift' ? ' (Gift for ' + $json.preferences.recipient + ')' : '' }}\n- Gender: {{ $json.preferences.gender }}\n- Style: {{ $json.preferences.style }}\n- Occasion: {{ $json.preferences.occasion }}\n- Budget: ₱{{ $json.preferences.budget.toLocaleString() }} per outfit (minimum ₱5,000)\n- Color preference: {{ $json.preferences.color === 'ai-decide' ? 'Let AI decide the best color combinations' : $json.preferences.color }}\n- User sizes: Top={{ $json.preferences.sizes.top || 'not specified' }}, Shoe={{ $json.preferences.sizes.shoe || 'not specified' }}\n- Has photo for virtual try-on: {{ $json.preferences.hasPhoto ? 'Yes - consider body-flattering cuts' : 'No' }}\n\n## AVAILABLE PRODUCTS\n\n### CLOTHES ({{ $json.products.clothes.length }} items) - Shirts, Polos, Tops only (NO PANTS)\n{{ JSON.stringify($json.products.clothes.map(p => ({ id: p.id, name: p.name, brand: p.brand, price: p.price, colors: p.colors, sizes: p.sizes, style: p.style, image: p.images?.[0] || '', sizeMatch: p.sizeMatch || 'available', gender: p.gender, giftSuitable: p.giftSuitable })), null, 2) }}\n\n### ACCESSORIES ({{ $json.products.accessories.length }} items) - Bags, Wallets, etc.\n{{ JSON.stringify($json.products.accessories.map(p => ({ id: p.id, name: p.name, brand: p.brand, price: p.price, colors: p.colors, image: p.images?.[0] || '', giftSuitable: p.giftSuitable })), null, 2) }}\n\n### SHOES ({{ $json.products.shoes.length }} items)\n{{ JSON.stringify($json.products.shoes.map(p => ({ id: p.id, name: p.name, brand: p.brand, price: p.price, colors: p.colors, sizes: p.sizes, image: p.images?.[0] || '', sizeMatch: p.sizeMatch || 'available', giftSuitable: p.giftSuitable })), null, 2) }}\n\n---\nCreate 3 complete outfit sets based on the user's preferences using ONLY the products provided above.\n\nIMPORTANT:\n- ABB sells clothes (shirts/polos), accessories (bags), and shoes ONLY - NO PANTS\n- Each outfit should include: 1 clothing item (shirt/polo) + 1 accessory (bag) + 1 pair of shoes\n- If user specified sizes, STRONGLY prioritize products with sizeMatch: 'exact'\n- If color is 'ai-decide', choose harmonious color combinations\n- Each outfit total should be between ₱5,000 and ₱{{ $json.preferences.budget.toLocaleString() }}\n- For gifts, prioritize items with giftSuitable: true and premium brands",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an AI Fashion Stylist for America Brands Bazaar (ABB). ABB sells ONLY: Clothes (Shirts, Polos, Tops - NO PANTS), Accessories (Bags, Wallets), and Shoes.\n\nCREATE exactly 3 outfit recommendations. Each outfit MUST have: 1 clothing item + 1 accessory + 1 pair of shoes. NEVER repeat products across outfits. Each outfit total must be between 5000 and the user's budget.\n\nRULES:\n- Use EXACT product IDs from the provided list\n- If user specified sizes, prioritize sizeMatch: 'exact'\n- For gifts, prefer giftSuitable: true and premium brands\n- DO NOT suggest pants - customer has those already\n\nRESPOND WITH RAW JSON ONLY. NO markdown, NO code blocks, NO backticks. Start directly with the opening brace.\n\nRequired JSON structure:\n{\"looks\":[{\"look_number\":1,\"look_name\":\"string\",\"look_description\":\"string\",\"items\":[{\"product_id\":\"string\",\"product_name\":\"string\",\"brand\":\"string\",\"category\":\"string\",\"price\":0,\"image_url\":\"string\",\"product_url\":\"/shop/ID\",\"styling_note\":\"string\",\"recommended_size\":\"string\"}],\"total_price\":0,\"style_tip\":\"string\"}],\"stylist_message\":\"string\"}"
+        }
+      },
+      "id": "3b534bad-56fd-4067-ab58-e0c6bb73e863",
+      "name": "AI Outfit Builder1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -17632,
+        -4976
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format final response\nconst aiOutput = $input.first().json.output || {};\nconst inputData = $('Extract Data').first().json;\n\n// Validate and format looks\nconst looks = (aiOutput.looks || []).map((look, index) => {\n  const items = (look.items || []).map(item => ({\n    product_id: item.product_id,\n    product_name: item.product_name,\n    brand: item.brand || '',\n    category: item.category,\n    price: parseFloat(item.price) || 0,\n    image_url: item.image_url || '/placeholder.jpg',\n    product_url: item.product_url || `/shop/${item.product_id}`,\n    styling_note: item.styling_note || '',\n    recommended_size: item.recommended_size || ''\n  }));\n  \n  // Recalculate total price to ensure accuracy\n  const calculatedTotal = items.reduce((sum, item) => sum + item.price, 0);\n  \n  return {\n    look_number: look.look_number || index + 1,\n    look_name: look.look_name || `Look #${index + 1}`,\n    look_description: look.look_description || '',\n    items: items,\n    total_price: calculatedTotal,\n    style_tip: look.style_tip || ''\n  };\n});\n\n// Build response with user preferences for virtual try-on\nreturn {\n  json: {\n    success: true,\n    session_id: inputData.sessionId,\n    user_id: inputData.userId,\n    stylist_message: aiOutput.stylist_message || 'Here are your personalized recommendations!',\n    looks: looks,\n    stats: {\n      total_looks: looks.length,\n      total_items: looks.reduce((sum, l) => sum + l.items.length, 0),\n      average_look_price: Math.round(looks.reduce((sum, l) => sum + l.total_price, 0) / (looks.length || 1)),\n      products_analyzed: inputData.totalProducts\n    },\n    based_on: inputData.preferences,\n    virtual_try_on_available: inputData.preferences.hasPhoto\n  }\n};"
+      },
+      "id": "b9e326bd-05a9-48d3-9288-dd8f9b604e74",
+      "name": "Format Response1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17360,
+        -4976
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "3aeb9af3-0bee-4c5b-93f5-43756a5f4273",
+      "name": "Respond Success2",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -17136,
+        -4976
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"looks\": [\n    {\n      \"look_number\": 1,\n      \"look_name\": \"string\",\n      \"look_description\": \"string\",\n      \"items\": [\n        {\n          \"product_id\": \"string\",\n          \"product_name\": \"string\",\n          \"brand\": \"string\",\n          \"category\": \"string\",\n          \"price\": 0,\n          \"image_url\": \"string\",\n          \"product_url\": \"string\",\n          \"styling_note\": \"string\",\n          \"recommended_size\": \"string\"\n        }\n      ],\n      \"total_price\": 0,\n      \"style_tip\": \"string\"\n    }\n  ],\n  \"stylist_message\": \"string\"\n}"
+      },
+      "id": "bcca9dd4-e2e1-4d9a-bb1f-4431ff784ac1",
+      "name": "Structured Output Parser2",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -17488,
+        -4784
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -17648,
+        -4816
+      ],
+      "id": "adeef342-8296-4132-9a64-085b0f6b43b2",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "cyuQ1nX2wQQvGiAN",
+          "name": "Hillman - Gemini"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Has Products?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Products?": {
+      "main": [
+        [
+          {
+            "node": "AI Outfit Builder1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Products Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recommendations Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Products Response1": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Outfit Builder1": {
+      "main": [
+        [
+          {
+            "node": "Format Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response1": {
+      "main": [
+        [
+          {
+            "node": "Respond Success2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Outfit Builder1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Outfit Builder1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a07883a70be59257fb6bc1d02e094efb598bd4d1111cc7132a3c71f324ef93ad"
+  }
+}

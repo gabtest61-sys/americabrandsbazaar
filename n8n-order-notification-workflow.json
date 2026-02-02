@@ -1,0 +1,145 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-notification",
+        "options": {}
+      },
+      "id": "b095f82b-3f26-4bf6-9db8-2089463034bd",
+      "name": "Order Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        64
+      ],
+      "webhookId": "227241b8-aef0-42de-b353-3fc8f78dd7dd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.event }}",
+              "value2": "order_completed"
+            }
+          ]
+        }
+      },
+      "id": "21df1e6d-7982-442e-a162-fd5d3ce034bc",
+      "name": "Filter Order Events",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "message",
+              "value": "=🛒 NEW ORDER!\n\n📋 Order ID: {{ $json.orderId }}\n\n👤 Customer: {{ $json.customer.name }}\n📧 Email: {{ $json.customer.email }}\n📱 Phone: {{ $json.customer.phone }}\n💬 Facebook: {{ $json.customer.facebook || 'Not provided' }}\n📍 Address: {{ $json.customer.address || '' }}{{ $json.customer.city ? ', ' + $json.customer.city : '' }}\n\n📦 Products:\n{{ $json.products.map(p => '• ' + p.name + ' (' + p.brand + ') x' + p.quantity + ' - ₱' + p.price.toLocaleString()).join('\\n') }}\n\n💰 Total: ₱{{ $json.total.toLocaleString() }}\n\n⏰ Action: Contact customer on FB Messenger to confirm!"
+            },
+            {
+              "name": "subject",
+              "value": "=🛒 New Order #{{ $json.orderId }} - ₱{{ $json.total.toLocaleString() }}"
+            },
+            {
+              "name": "orderId",
+              "value": "={{ $json.orderId }}"
+            },
+            {
+              "name": "customerName",
+              "value": "={{ $json.customer.name }}"
+            },
+            {
+              "name": "total",
+              "value": "={{ $json.total }}"
+            },
+            {
+              "name": "recipients",
+              "value": "={{ $json.notifyEmails || 'flowpilot25@gmail.com' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "78ab7f0c-2a04-4b5c-8003-8a47e8a4989b",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{ $json.recipients }}",
+        "subject": "={{ $json.subject }}",
+        "bodyContent": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        64,
+        64
+      ],
+      "id": "918fc1e6-6a03-4020-8cd9-988c3eb7b573",
+      "name": "Send Email Notification",
+      "webhookId": "8fcaf37e-ed1c-4a54-babd-8e447cf8e78e",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "9umWuPYkzppe5pgr",
+          "name": "Microsoft Outlook account sales abb"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Order Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter Order Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Order Events": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Send Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a07883a70be59257fb6bc1d02e094efb598bd4d1111cc7132a3c71f324ef93ad"
+  }
+}

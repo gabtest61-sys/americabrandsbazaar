@@ -931,7 +931,6 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gold">ABB Admin</h1>
-            <p className="text-white/50 text-xs">Mini CRM Dashboard</p>
           </div>
         </div>
 
