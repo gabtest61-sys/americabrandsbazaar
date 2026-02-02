@@ -1040,26 +1040,6 @@ export default function AIDresserPage() {
                   </div>
                 </div>
 
-                {/* Bottom Size */}
-                <div>
-                  <label className="text-white/70 text-sm mb-2 block">Bottom Size (Pants/Shorts)</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38'].map(size => (
-                      <button
-                        key={size}
-                        onClick={() => setAnswers(prev => ({ ...prev, sizes: { ...prev.sizes, bottom: size } }))}
-                        className={`py-3 rounded-xl border-2 transition-all font-medium ${
-                          answers.sizes.bottom === size
-                            ? 'bg-gold/20 border-gold text-gold'
-                            : 'bg-white/5 border-white/10 text-white hover:border-white/30'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Shoe Size */}
                 <div>
                   <label className="text-white/70 text-sm mb-2 block">Shoe Size</label>

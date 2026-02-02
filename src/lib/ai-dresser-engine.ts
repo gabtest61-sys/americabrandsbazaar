@@ -112,16 +112,9 @@ export const scoreProduct = (
           sizeMatch = true
         }
       }
-      // Check for bottom sizes (pants, shorts, jeans, etc.)
-      if (subcategory.includes('pant') || subcategory.includes('short') || subcategory.includes('jean') || subcategory.includes('trouser') || subcategory.includes('chino')) {
-        if (answers.sizes.bottom && productSizes.includes(answers.sizes.bottom.toUpperCase())) {
-          sizeMatch = true
-        }
-      }
-      // If subcategory not clear, check both
-      if (!sizeMatch && (answers.sizes.top || answers.sizes.bottom)) {
-        if ((answers.sizes.top && productSizes.includes(answers.sizes.top.toUpperCase())) ||
-            (answers.sizes.bottom && productSizes.includes(answers.sizes.bottom.toUpperCase()))) {
+      // If subcategory not clear, check top size
+      if (!sizeMatch && answers.sizes.top) {
+        if (productSizes.includes(answers.sizes.top.toUpperCase())) {
           sizeMatch = true
         }
       }
@@ -237,8 +230,8 @@ export const generateLocalRecommendations = (
   const looks: Look[] = []
   const usedProducts = new Set<string>()
 
-  // Step 3: Generate 5 complete looks
-  for (let i = 0; i < 5; i++) {
+  // Step 3: Generate 3 complete looks
+  for (let i = 0; i < 3; i++) {
     const items: LookItem[] = []
     const usedColors = new Set<string>()
     const usedBrands = new Set<string>()
@@ -374,7 +367,7 @@ const generateFallbackLooks = (products: FirestoreProduct[], answers: QuizAnswer
   const looks: Look[] = []
   const used = new Set<string>()
 
-  for (let i = 0; i < Math.min(5, Math.ceil(clothes.length / 2)); i++) {
+  for (let i = 0; i < Math.min(3, Math.ceil(clothes.length / 2)); i++) {
     const items: LookItem[] = []
 
     // Pick clothes
