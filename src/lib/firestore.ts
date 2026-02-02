@@ -407,10 +407,10 @@ export const updateUserPreferences = async (
   }
 }
 
-// Update user profile (name, phone)
+// Update user profile (name, phone, address, city)
 export const updateUserProfile = async (
   userId: string,
-  data: { name?: string; phone?: string }
+  data: { name?: string; phone?: string; address?: string; city?: string }
 ): Promise<boolean> => {
   if (!db) return false
 
