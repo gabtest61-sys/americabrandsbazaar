@@ -7,7 +7,7 @@ import Image from 'next/image'
 import {
   User, Package, Heart, Settings, LogOut, ChevronRight,
   ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle,
-  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle, RotateCcw
+  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle, RotateCcw, MapPin
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -38,7 +38,7 @@ export default function AccountPage() {
   const { user, isLoggedIn, isLoading, logout, deleteAccount, updateUser } = useAuth()
   const { addItem } = useCart()
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
-  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'saved-looks' | 'settings'>('orders')
+  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'saved-looks' | 'address' | 'settings'>('orders')
   const [wishlistProducts, setWishlistProducts] = useState<FirestoreProduct[]>([])
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [savedLooks, setSavedLooks] = useState<SavedLook[]>([])
@@ -49,6 +49,12 @@ export default function AccountPage() {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Address editing state
+  const [isEditingAddress, setIsEditingAddress] = useState(false)
+  const [editAddress, setEditAddress] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [savingAddress, setSavingAddress] = useState(false)
 
   // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -69,6 +75,8 @@ export default function AccountPage() {
         setOrders(userOrders)
         setEditName(user.name || '')
         setEditPhone(user.phone || '')
+        setEditAddress(user.address || '')
+        setEditCity(user.city || '')
       }
     }
     loadOrders()
@@ -210,6 +218,26 @@ export default function AccountPage() {
     setIsEditing(false)
   }
 
+  const handleSaveAddress = async () => {
+    if (!user) return
+    setSavingAddress(true)
+    const success = await updateUserProfile(user.id, {
+      address: editAddress,
+      city: editCity,
+    })
+    if (success && updateUser) {
+      updateUser({ ...user, address: editAddress, city: editCity })
+    }
+    setSavingAddress(false)
+    setIsEditingAddress(false)
+  }
+
+  const cancelEditingAddress = () => {
+    setEditAddress(user?.address || '')
+    setEditCity(user?.city || '')
+    setIsEditingAddress(false)
+  }
+
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
       setDeleteError('Please type DELETE to confirm')
@@ -305,6 +333,16 @@ export default function AccountPage() {
                   >
                     <Sparkles className="w-5 h-5" />
                     <span className="font-medium">Saved Looks</span>
+                    <ChevronRight className="w-4 h-4 ml-auto" />
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('address')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                      activeTab === 'address' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    <MapPin className="w-5 h-5" />
+                    <span className="font-medium">Address</span>
                     <ChevronRight className="w-4 h-4 ml-auto" />
                   </button>
                   <button
@@ -617,6 +655,86 @@ export default function AccountPage() {
                       </Link>
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeTab === 'address' && (
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-bold text-navy">Shipping Address</h1>
+                    {!isEditingAddress ? (
+                      <button
+                        onClick={() => setIsEditingAddress(true)}
+                        className="flex items-center gap-2 text-gold hover:text-gold-600 font-medium"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit Address
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={cancelEditingAddress}
+                          className="flex items-center gap-1 px-3 py-1.5 text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="w-4 h-4" />
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveAddress}
+                          disabled={savingAddress}
+                          className="flex items-center gap-1 px-4 py-1.5 bg-gold text-navy rounded-lg font-medium hover:bg-gold-400 disabled:opacity-50"
+                        >
+                          {savingAddress ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Save
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <div className="space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                        <input
+                          type="text"
+                          value={isEditingAddress ? editAddress : (user?.address || '')}
+                          onChange={(e) => setEditAddress(e.target.value)}
+                          disabled={!isEditingAddress}
+                          placeholder={isEditingAddress ? 'Street address, barangay' : 'Not set'}
+                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
+                            isEditingAddress
+                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">City / Municipality</label>
+                        <input
+                          type="text"
+                          value={isEditingAddress ? editCity : (user?.city || '')}
+                          onChange={(e) => setEditCity(e.target.value)}
+                          disabled={!isEditingAddress}
+                          placeholder={isEditingAddress ? 'City / Municipality' : 'Not set'}
+                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
+                            isEditingAddress
+                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Info note */}
+                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <p className="text-sm text-blue-700">
+                        This address will be used as your default shipping address during checkout.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
