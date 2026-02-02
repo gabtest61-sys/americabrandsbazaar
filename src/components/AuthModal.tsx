@@ -305,7 +305,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
 
               <div>
                 <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">
-                  Shipping Address
+                  Street Address, Barangay
                 </label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-white/30" />

@@ -697,7 +697,7 @@ export default function AccountPage() {
                   <div className="bg-white rounded-2xl shadow-sm p-6">
                     <div className="space-y-6">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address, Barangay</label>
                         <input
                           type="text"
                           value={isEditingAddress ? editAddress : (user?.address || '')}
