@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, ShoppingBag, User, Mail, Phone, FileText, Lock, Check, Loader2, Tag, X, MessageCircle } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, User, Mail, Phone, FileText, Lock, Check, Loader2, Tag, X, MessageCircle, MapPin, Edit2, Plus } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
 import { formatPrice, BRAND } from '@/lib/constants'
@@ -53,6 +53,24 @@ export default function CheckoutPage() {
     password: '',
     facebook: '',
   })
+
+  // Address selection state
+  const [useSavedAddress, setUseSavedAddress] = useState(true)
+  const hasSavedAddress = isLoggedIn && user?.address && user?.city
+
+  // Pre-fill form with user data when logged in
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: user.name || prev.fullName,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+        address: user.address || prev.address,
+        city: user.city || prev.city,
+      }))
+    }
+  }, [isLoggedIn, user])
 
   // Calculate discount from coupon
   const calculateDiscount = () => {
@@ -388,39 +406,115 @@ export default function CheckoutPage() {
                     {/* Shipping Address */}
                     <div>
                       <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-gold" />
+                        <MapPin className="w-5 h-5 text-gold" />
                         Shipping Address
                       </h2>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Street Address *
+
+                      {/* Saved Address Option - only for logged in users with saved address */}
+                      {hasSavedAddress && (
+                        <div className="mb-4 space-y-3">
+                          {/* Use Saved Address */}
+                          <label
+                            className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                              useSavedAddress
+                                ? 'border-gold bg-gold/5'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="addressOption"
+                              checked={useSavedAddress}
+                              onChange={() => {
+                                setUseSavedAddress(true)
+                                setFormData(prev => ({
+                                  ...prev,
+                                  address: user?.address || '',
+                                  city: user?.city || '',
+                                }))
+                              }}
+                              className="mt-1 text-gold focus:ring-gold"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-navy">Saved Address</span>
+                                <Link
+                                  href="/account?tab=address"
+                                  className="text-xs text-gold hover:underline flex items-center gap-1"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  Edit in Account
+                                </Link>
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {user?.address}, {user?.city}
+                              </p>
+                            </div>
                           </label>
-                          <input
-                            type="text"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                            placeholder="Street address, barangay"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            City / Municipality *
+
+                          {/* Use New Address */}
+                          <label
+                            className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                              !useSavedAddress
+                                ? 'border-gold bg-gold/5'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="addressOption"
+                              checked={!useSavedAddress}
+                              onChange={() => {
+                                setUseSavedAddress(false)
+                                setFormData(prev => ({
+                                  ...prev,
+                                  address: '',
+                                  city: '',
+                                }))
+                              }}
+                              className="mt-1 text-gold focus:ring-gold"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Plus className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium text-navy">Use a different address</span>
+                            </div>
                           </label>
-                          <input
-                            type="text"
-                            name="city"
-                            value={formData.city}
-                            onChange={handleInputChange}
-                            required
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                            placeholder="City / Municipality"
-                          />
                         </div>
-                      </div>
+                      )}
+
+                      {/* Address Input Fields - show if no saved address OR using new address */}
+                      {(!hasSavedAddress || !useSavedAddress) && (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Street Address, Barangay *
+                            </label>
+                            <input
+                              type="text"
+                              name="address"
+                              value={formData.address}
+                              onChange={handleInputChange}
+                              required
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
+                              placeholder="Street address, barangay"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              City / Municipality *
+                            </label>
+                            <input
+                              type="text"
+                              name="city"
+                              value={formData.city}
+                              onChange={handleInputChange}
+                              required
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
+                              placeholder="City / Municipality"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Create Account - only show for guests */}
