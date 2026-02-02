@@ -385,77 +385,87 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    {/* Create Account */}
-                    <div className="bg-navy/5 rounded-lg p-4">
+                    {/* Shipping Address */}
+                    <div>
                       <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-gold" />
-                        Create Account
+                        <Mail className="w-5 h-5 text-gold" />
+                        Shipping Address
                       </h2>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Create an account to access the AI Dresser, track orders, and get personalized recommendations.
-                      </p>
-                      <div className="space-y-4">
-                        <div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Password *
-                          </label>
-                          <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleInputChange}
-                            required
-                            minLength={8}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                            placeholder="Minimum 8 characters"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Facebook Username/Link *
+                            Street Address *
                           </label>
                           <input
                             type="text"
-                            name="facebook"
-                            value={formData.facebook}
+                            name="address"
+                            value={formData.address}
                             onChange={handleInputChange}
                             required
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                            placeholder="facebook.com/yourname or @username"
+                            placeholder="Street address, barangay"
                           />
                         </div>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="md:col-span-2">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            City / Municipality *
+                          </label>
+                          <input
+                            type="text"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
+                            placeholder="City / Municipality"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Create Account - only show for guests */}
+                    {!isLoggedIn && (
+                      <div className="bg-navy/5 rounded-lg p-4">
+                        <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
+                          <Lock className="w-5 h-5 text-gold" />
+                          Create Account
+                        </h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Create an account to access the AI Dresser, track orders, and get personalized recommendations.
+                        </p>
+                        <div className="space-y-4">
+                          <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Shipping Address *
+                              Password *
                             </label>
                             <input
-                              type="text"
-                              name="address"
-                              value={formData.address}
+                              type="password"
+                              name="password"
+                              value={formData.password}
                               onChange={handleInputChange}
                               required
+                              minLength={8}
                               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                              placeholder="Street address, barangay"
+                              placeholder="Minimum 8 characters"
                             />
                           </div>
-                          <div className="md:col-span-2">
+                          <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              City / Municipality *
+                              Facebook Username/Link *
                             </label>
                             <input
                               type="text"
-                              name="city"
-                              value={formData.city}
+                              name="facebook"
+                              value={formData.facebook}
                               onChange={handleInputChange}
                               required
                               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gold focus:border-gold outline-none transition-colors"
-                              placeholder="City / Municipality"
+                              placeholder="facebook.com/yourname or @username"
                             />
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     <button
                       type="submit"

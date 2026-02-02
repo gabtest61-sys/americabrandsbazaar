@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { X, Eye, EyeOff, LogIn, UserPlus, Loader2, Mail, User, Phone, Sparkles } from 'lucide-react'
+import { X, Eye, EyeOff, LogIn, UserPlus, Loader2, Mail, User, Phone, Sparkles, MapPin } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
 interface AuthModalProps {
@@ -26,6 +26,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     name: '',
     email: '',
     phone: '',
+    address: '',
+    city: '',
     password: '',
     confirmPassword: ''
   })
@@ -35,7 +37,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
     if (isOpen) {
       setError('')
       setLoginData({ email: '', password: '' })
-      setRegisterData({ name: '', email: '', phone: '', password: '', confirmPassword: '' })
+      setRegisterData({ name: '', email: '', phone: '', address: '', city: '', password: '', confirmPassword: '' })
     }
   }, [isOpen])
 
@@ -93,6 +95,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
       name: registerData.name,
       email: registerData.email,
       phone: registerData.phone,
+      address: registerData.address,
+      city: registerData.city,
       password: registerData.password
     })
 
@@ -297,6 +301,37 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">
+                  Shipping Address
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-white/30" />
+                  <input
+                    type="text"
+                    value={registerData.address}
+                    onChange={(e) => setRegisterData({ ...registerData, address: e.target.value })}
+                    placeholder="Street address, barangay"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">
+                  City / Municipality
+                </label>
+                <input
+                  type="text"
+                  value={registerData.city}
+                  onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
+                  placeholder="City / Municipality"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
+                  required
+                />
               </div>
 
               <div>
