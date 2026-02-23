@@ -354,12 +354,12 @@ function ShopContent() {
       brand: product.brand,
       price: product.price,
       originalPrice: product.originalPrice || product.price,
-      image: product.images[0] || '/placeholder.jpg',
+      image: product.images?.[0] || '/placeholder.jpg',
       category: product.category as 'clothes' | 'accessories' | 'shoes',
-      sizes: product.sizes,
-      colors: product.colors,
+      sizes: product.sizes || [],
+      colors: product.colors || [],
     }
-    addItem(cartProduct, 1, product.sizes[0], product.colors[0])
+    addItem(cartProduct, 1, product.sizes?.[0] || '', product.colors?.[0] || '')
     setAddedItems(prev => new Set([...prev, product.id!]))
     setTimeout(() => {
       setAddedItems(prev => {
@@ -402,10 +402,10 @@ function ShopContent() {
       brand: product.brand,
       price: product.price,
       originalPrice: product.originalPrice || product.price,
-      image: product.images[0] || '/placeholder.jpg',
+      image: product.images?.[0] || '/placeholder.jpg',
       category: product.category as 'clothes' | 'accessories' | 'shoes',
-      sizes: product.sizes,
-      colors: product.colors,
+      sizes: product.sizes || [],
+      colors: product.colors || [],
     }
     addItem(cartProduct, quantity, size, color)
   }

@@ -144,7 +144,7 @@ export default function ProductDetailPage() {
       price: product.price,
       originalPrice: product.originalPrice || product.price,
       image: product.images?.[0] || '/placeholder.jpg',
-      category: product.category,
+      category: product.category as 'clothes' | 'accessories' | 'shoes',
       sizes: product.sizes || [],
       colors: product.colors || [],
     }
@@ -216,7 +216,7 @@ export default function ProductDetailPage() {
 
   const hasImages = product.images && product.images.length > 0 && product.images[0]
 
-  const sizeGuide = sizeGuideData[product.category] || sizeGuideData.clothes
+  const sizeGuide = sizeGuideData[product.category as keyof typeof sizeGuideData] || sizeGuideData.clothes
 
   return (
     <>
