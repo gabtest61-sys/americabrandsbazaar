@@ -19,6 +19,7 @@ export const NAV_LINKS = [
   { name: 'Accessories', href: '/shop?category=accessories' },
   { name: 'Shoes', href: '/shop?category=shoes' },
   { name: 'AI Dresser', href: '/ai-dresser' },
+  { name: 'Installations', href: '/installations' },
 ]
 
 export const CATEGORIES = [

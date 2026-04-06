@@ -35,13 +35,13 @@ export default function Footer() {
               <h3 className="text-xl font-bold mb-1">Get Exclusive Offers</h3>
               <p className="text-white/50 text-sm">Subscribe for deals and new arrivals</p>
             </div>
-            <div className="flex w-full md:w-auto max-w-sm">
+            <div className="flex w-full md:w-auto md:max-w-sm">
               <input
                 type="email"
                 placeholder="Your email"
-                className="flex-1 bg-white/5 border border-white/10 rounded-l-full px-5 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50"
+                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-l-full px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-gold/50"
               />
-              <button className="bg-gold hover:bg-gold-400 text-navy-900 font-semibold px-5 py-3 rounded-r-full transition-colors">
+              <button className="bg-gold hover:bg-gold-400 text-navy-900 font-semibold px-5 py-3 rounded-r-full transition-colors flex-shrink-0">
                 <Send className="w-4 h-4" />
               </button>
             </div>
@@ -51,7 +51,7 @@ export default function Footer() {
 
       {/* Main Footer */}
       <div className="container-max px-4 md:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 sm:gap-8">
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-5">

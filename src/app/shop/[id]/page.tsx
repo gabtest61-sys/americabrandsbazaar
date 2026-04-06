@@ -314,11 +314,11 @@ export default function ProductDetailPage() {
 
               {/* Price */}
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-navy">
+                <span className="text-2xl sm:text-3xl font-bold text-navy">
                   ₱{product.price.toLocaleString()}
                 </span>
                 {product.originalPrice && (
-                  <span className="text-xl text-gray-400 line-through">
+                  <span className="text-lg sm:text-xl text-gray-400 line-through">
                     ₱{product.originalPrice.toLocaleString()}
                   </span>
                 )}
@@ -436,7 +436,7 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Features */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t">
                 <div className="text-center">
                   <Truck className="w-6 h-6 mx-auto mb-2 text-gold" />
                   <p className="text-xs text-gray-600">Free Shipping</p>

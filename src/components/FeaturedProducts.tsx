@@ -22,9 +22,13 @@ export default function FeaturedProducts() {
     const loadFeaturedProducts = async () => {
       try {
         const firestoreProducts = await getFirestoreProducts()
-        // Filter for featured products from Firestore only
-        const featured = firestoreProducts.filter(p => p.featured === true)
-        setFeaturedProducts(featured.slice(0, 8))
+        const inStock = firestoreProducts.filter(p => p.inStock && p.images?.length > 0 && p.price > 0)
+        const featured = inStock.filter(p => p.featured === true)
+        // If fewer than 4 are marked featured, pad with other in-stock products
+        const picks = featured.length >= 4
+          ? featured.slice(0, 8)
+          : [...featured, ...inStock.filter(p => !p.featured)].slice(0, 8)
+        setFeaturedProducts(picks)
       } catch {
         setFeaturedProducts([])
       }

@@ -290,9 +290,45 @@ export default function AccountPage() {
       <Header />
       <main className="min-h-screen bg-gray-50 pt-24 pb-16">
         <div className="container-max px-4 md:px-8 py-8">
+          {/* Mobile: Profile bar + horizontal tabs */}
+          <div className="lg:hidden mb-6">
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-3 flex items-center gap-4">
+              <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="w-6 h-6 text-gold" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-bold text-navy truncate">{user?.name || user?.email}</h2>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+              <button onClick={handleLogout} className="ml-auto text-red-400 flex-shrink-0 p-2">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {[
+                { id: 'orders', icon: Package, label: 'Orders' },
+                { id: 'wishlist', icon: Heart, label: 'Wishlist' },
+                { id: 'saved-looks', icon: Sparkles, label: 'Looks' },
+                { id: 'address', icon: MapPin, label: 'Address' },
+                { id: 'settings', icon: Settings, label: 'Settings' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    activeTab === tab.id ? 'bg-gold text-navy' : 'bg-white text-gray-600 shadow-sm'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid lg:grid-cols-4 gap-8">
-            {/* Sidebar */}
-            <div className="lg:col-span-1">
+            {/* Sidebar - desktop only */}
+            <div className="hidden lg:block lg:col-span-1">
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 {/* Profile */}
                 <div className="text-center mb-6 pb-6 border-b border-gray-100">
@@ -305,56 +341,25 @@ export default function AccountPage() {
 
                 {/* Navigation */}
                 <nav className="space-y-1">
-                  <button
-                    onClick={() => setActiveTab('orders')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      activeTab === 'orders' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    <Package className="w-5 h-5" />
-                    <span className="font-medium">My Orders</span>
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('wishlist')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      activeTab === 'wishlist' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    <Heart className="w-5 h-5" />
-                    <span className="font-medium">Wishlist</span>
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('saved-looks')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      activeTab === 'saved-looks' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    <Sparkles className="w-5 h-5" />
-                    <span className="font-medium">Saved Looks</span>
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('address')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      activeTab === 'address' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    <MapPin className="w-5 h-5" />
-                    <span className="font-medium">Address</span>
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      activeTab === 'settings' ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    <Settings className="w-5 h-5" />
-                    <span className="font-medium">Settings</span>
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  </button>
+                  {[
+                    { id: 'orders', icon: Package, label: 'My Orders' },
+                    { id: 'wishlist', icon: Heart, label: 'Wishlist' },
+                    { id: 'saved-looks', icon: Sparkles, label: 'Saved Looks' },
+                    { id: 'address', icon: MapPin, label: 'Address' },
+                    { id: 'settings', icon: Settings, label: 'Settings' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                        activeTab === tab.id ? 'bg-gold/10 text-gold' : 'hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <tab.icon className="w-5 h-5" />
+                      <span className="font-medium">{tab.label}</span>
+                      <ChevronRight className="w-4 h-4 ml-auto" />
+                    </button>
+                  ))}
                 </nav>
 
                 {/* AI Dresser CTA */}
