@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { X, Send, Sparkles, Loader2, ChevronDown, Download } from 'lucide-react'
+import { X, Send, Sparkles, Loader2, ChevronDown, Download, Trash2 } from 'lucide-react'
 import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'install-card'
   content: string
 }
+
+const INSTALL_KEYWORDS = /install|add to home|download.*app|how.*install|get.*app|pwa|home screen/i
 
 // Renders assistant message content with markdown-like formatting
 function MessageContent({ text }: { text: string }) {
@@ -108,9 +110,105 @@ const QUICK_PROMPTS = [
 
 const INSTALL_STORAGE_KEY = 'abb-install-prompted'
 
+// ─── Inline install card rendered inside chat ─────────────────────────────────
+function InlineInstallCard({
+  deferredPrompt,
+  isIOS,
+  isInstalled,
+  onInstalled,
+}: {
+  deferredPrompt: BeforeInstallPromptEvent | null
+  isIOS: boolean
+  isInstalled: boolean
+  onInstalled: () => void
+}) {
+  const [installing, setInstalling] = useState(false)
+  const [done, setDone] = useState(isInstalled)
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return
+    setInstalling(true)
+    await deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') {
+      setDone(true)
+      onInstalled()
+    }
+    setInstalling(false)
+  }
+
+  if (done) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-sm text-green-700 font-medium flex items-center gap-2">
+        ✅ App installed! Open it from your home screen.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-navy/5 border border-navy/10 rounded-2xl p-4">
+      <p className="text-navy font-semibold text-sm mb-3 flex items-center gap-2">
+        <Download className="w-4 h-4 text-gold" />
+        Install ABB App
+      </p>
+
+      {isIOS ? (
+        <div className="space-y-2 mb-3">
+          {[
+            { step: '1', text: 'Open this page in Safari' },
+            { step: '2', text: 'Tap the Share button (□↑) at the bottom' },
+            { step: '3', text: 'Tap "Add to Home Screen"' },
+            { step: '4', text: 'Tap "Add" — done! ✅' },
+          ].map(({ step, text }) => (
+            <div key={step} className="flex items-center gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-navy text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                {step}
+              </span>
+              <span className="text-xs text-gray-600">{text}</span>
+            </div>
+          ))}
+        </div>
+      ) : deferredPrompt ? (
+        <button
+          onClick={handleInstall}
+          disabled={installing}
+          className="w-full flex items-center justify-center gap-2 bg-navy text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-gold hover:text-navy transition-colors disabled:opacity-60"
+        >
+          <Download className="w-4 h-4" />
+          {installing ? 'Installing…' : 'Install Now'}
+        </button>
+      ) : (
+        <div className="space-y-2">
+          {[
+            { step: '1', text: 'Open this page in Chrome' },
+            { step: '2', text: 'Tap the three-dot menu (⋮)' },
+            { step: '3', text: 'Tap "Add to Home Screen"' },
+            { step: '4', text: 'Tap "Add" — done! ✅' },
+          ].map(({ step, text }) => (
+            <div key={step} className="flex items-center gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-navy text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                {step}
+              </span>
+              <span className="text-xs text-gray-600">{text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AIChatBubble() {
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = localStorage.getItem('abb-chat-history')
+      return saved ? (JSON.parse(saved) as Message[]) : []
+    } catch {
+      return []
+    }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
@@ -172,6 +270,15 @@ export default function AIChatBubble() {
       .then((all) => setProducts(all.filter((p) => p.inStock)))
       .catch(() => {})
   }, [])
+
+  // Persist chat history to localStorage (keep last 40 messages)
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem('abb-chat-history', JSON.stringify(messages.slice(-40)))
+      } catch {}
+    }
+  }, [messages])
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -249,7 +356,13 @@ export default function AIChatBubble() {
         }),
       })
       const data = await res.json()
-      setMessages([...updated, { role: 'assistant', content: data.reply || 'Sorry, I had trouble with that.' }])
+      const reply = data.reply || 'Sorry, I had trouble with that.'
+      const newMessages: Message[] = [...updated, { role: 'assistant', content: reply }]
+      // If user asked about installing, append an install card
+      if (INSTALL_KEYWORDS.test(content)) {
+        newMessages.push({ role: 'install-card', content: '' })
+      }
+      setMessages(newMessages)
     } catch {
       setMessages([...updated, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
     }
@@ -283,12 +396,26 @@ export default function AIChatBubble() {
               <p className="text-white/50 text-[10px]">AI Fashion Designer</p>
             </div>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1.5 text-white/60 hover:text-white rounded-full hover:bg-white/10 transition-colors"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                onClick={() => {
+                  setMessages([])
+                  try { localStorage.removeItem('abb-chat-history') } catch {}
+                }}
+                className="p-1.5 text-white/50 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                title="Clear chat"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 text-white/60 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -388,24 +515,30 @@ export default function AIChatBubble() {
           )}
 
           {/* Chat messages */}
-          {messages.map((msg: Message, i: number) => (
-            <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-navy flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Sparkles className="w-3.5 h-3.5 text-gold" />
+          {messages.map((msg: Message, i: number) => {
+            // Inline install card
+            if (msg.role === 'install-card') {
+              return <InlineInstallCard key={i} deferredPrompt={deferredPrompt} isIOS={isIOS} isInstalled={isInstalled} onInstalled={() => { setIsInstalled(true); setDeferredPrompt(null) }} />
+            }
+            return (
+              <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                {msg.role === 'assistant' && (
+                  <div className="w-7 h-7 rounded-full bg-navy flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Sparkles className="w-3.5 h-3.5 text-gold" />
+                  </div>
+                )}
+                <div
+                  className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] ${
+                    msg.role === 'user'
+                      ? 'bg-navy text-white rounded-tr-sm text-sm leading-relaxed'
+                      : 'bg-gray-100 text-navy rounded-tl-sm'
+                  }`}
+                >
+                  {msg.role === 'user' ? msg.content : <MessageContent text={msg.content} />}
                 </div>
-              )}
-              <div
-                className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] ${
-                  msg.role === 'user'
-                    ? 'bg-navy text-white rounded-tr-sm text-sm leading-relaxed'
-                    : 'bg-gray-100 text-navy rounded-tl-sm'
-                }`}
-              >
-                {msg.role === 'user' ? msg.content : <MessageContent text={msg.content} />}
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {/* Loading indicator */}
           {loading && (
