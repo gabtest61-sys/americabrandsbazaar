@@ -20,14 +20,14 @@ interface OrderEmailData {
   total: number
 }
 
-// Create transporter with GoDaddy SMTP
+// Create transporter with Murphy Consulting SMTP
 const createTransporter = () => {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtpout.secureserver.net',
+    host: process.env.SMTP_HOST || 'mail.murphyconsulting.us',
     port: parseInt(process.env.SMTP_PORT || '465'),
     secure: true,
     auth: {
-      user: process.env.SMTP_USER,
+      user: process.env.SMTP_USER || 'gabriel@murphyconsulting.us',
       pass: process.env.SMTP_PASS,
     },
   })
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
 
     // Send admin notification email
     await transporter.sendMail({
-      from: `"America Brands Bazaar" <${process.env.SMTP_USER}>`,
+      from: `"ABB Bot" <${process.env.SMTP_USER || 'gabriel@murphyconsulting.us'}>`,
       to: adminEmails,
       subject: `New Order - ${data.orderId}`,
       html: generateAdminEmailHtml(data),
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
 
     // Send customer confirmation email
     await transporter.sendMail({
-      from: `"America Brands Bazaar" <${process.env.SMTP_USER}>`,
+      from: `"ABB Bot" <${process.env.SMTP_USER || 'gabriel@murphyconsulting.us'}>`,
       to: data.customer.email,
       subject: `Order Confirmed - ${data.orderId}`,
       html: generateCustomerEmailHtml(data),
