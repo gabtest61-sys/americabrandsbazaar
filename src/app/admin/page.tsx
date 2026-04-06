@@ -38,6 +38,8 @@ import {
   Review
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
+import { storage } from '@/lib/firebase'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -67,12 +69,14 @@ interface Coupon {
 const clothesSizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']
 const shoeSizeOptions = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46']
 const accessorySizeOptions = ['One Size', 'S', 'M', 'L']
+const fragranceSizeOptions = ['30ml', '50ml', '75ml', '100ml', '150ml', '200ml']
 
 // Subcategory options for each category
 const subcategoryOptions: Record<string, string[]> = {
   clothes: ['t-shirts', 'shirts', 'polos', 'sweaters', 'hoodies', 'jackets', 'blazers', 'vests', 'pants', 'jeans', 'shorts', 'leggings', 'sportswear', 'underwear', 'dresses', 'skirts', 'coats'],
   accessories: ['watches', 'bags', 'wallets', 'belts', 'eyewear', 'hats', 'socks', 'ties', 'scarves', 'jewelry', 'gloves'],
-  shoes: ['sneakers', 'running', 'loafers', 'oxfords', 'boots', 'sandals', 'flats', 'slip-ons', 'boat-shoes', 'heels', 'espadrilles']
+  shoes: ['sneakers', 'running', 'loafers', 'oxfords', 'boots', 'sandals', 'flats', 'slip-ons', 'boat-shoes', 'heels', 'espadrilles'],
+  fragrance: ['eau-de-parfum', 'eau-de-toilette', 'cologne', 'body-mist', 'perfume-oil', 'gift-set'],
 }
 
 export default function AdminDashboard() {
@@ -102,7 +106,9 @@ export default function AdminDashboard() {
 
   // Image upload state
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -505,40 +511,82 @@ export default function AdminDashboard() {
     }
   }
 
-  // Image upload handler - using Cloudinary
+  // Image upload — Cloudinary unsigned → /api/upload fallback → base64 preview
   const handleImageUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
     setUploadingImages(true)
+    setUploadError('')
     const currentImages = productFormData.images || []
     const newImages: string[] = []
 
+    const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dbbwll2i7'
+    const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'products_unsigned'
+
     for (const file of Array.from(files)) {
+      let uploaded = false
+
+      // 1️⃣ Cloudinary unsigned upload (no API key needed — requires upload preset in Cloudinary dashboard)
       try {
-        // Convert file to base64
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', UPLOAD_PRESET)
+        formData.append('folder', 'lgm-apparel/products')
+
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+        if (data.secure_url) {
+          console.log('[Upload] Cloudinary unsigned OK:', data.secure_url)
+          newImages.push(data.secure_url)
+          uploaded = true
+        } else {
+          throw new Error(data.error?.message || 'No URL returned')
+        }
+      } catch (err: any) {
+        console.warn('[Upload] Cloudinary unsigned failed:', err.message)
+      }
+
+      if (uploaded) continue
+
+      // 2️⃣ Server-side /api/upload (needs CLOUDINARY_API_KEY in .env.local)
+      try {
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = () => resolve(reader.result as string)
           reader.onerror = reject
           reader.readAsDataURL(file)
         })
-
-        // Upload to Cloudinary via API route
-        const response = await fetch('/api/upload', {
+        const res = await fetch('/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64, folder: 'products' }),
         })
-
-        const result = await response.json()
+        const result = await res.json()
         if (result.success && result.url) {
+          console.log('[Upload] /api/upload OK:', result.url)
           newImages.push(result.url)
+          uploaded = true
         } else {
-          console.error('Upload failed:', result.error)
+          throw new Error(result.error || 'Upload API failed')
         }
-      } catch (error) {
-        console.error('Error uploading image:', error)
+      } catch (err: any) {
+        console.warn('[Upload] /api/upload failed:', err.message)
       }
+
+      if (uploaded) continue
+
+      // 3️⃣ Last resort: base64 preview (shows in form but won't survive page reload)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      newImages.push(base64)
+      setUploadError('Using preview only. To save permanently, create an unsigned upload preset named "products_unsigned" in your Cloudinary dashboard (Settings → Upload → Upload Presets → Add unsigned preset).')
     }
 
     setProductFormData(prev => ({
@@ -725,7 +773,7 @@ export default function AdminDashboard() {
           const productData: Omit<FirestoreProduct, 'id' | 'createdAt' | 'updatedAt'> = {
             name: getVal('name'),
             brand: getVal('brand') || brands[0],
-            category: (getVal('category') as 'clothes' | 'accessories' | 'shoes') || 'clothes',
+            category: (getVal('category') as 'clothes' | 'accessories' | 'shoes' | 'fragrance') || 'clothes',
             subcategory: getVal('subcategory'),
             price: parseFloat(getVal('price')) || 0,
             originalPrice: getVal('original price') ? parseFloat(getVal('original price')) : undefined,
@@ -3493,13 +3541,15 @@ export default function AdminDashboard() {
                   <select
                     value={productFormData.category || 'clothes'}
                     onChange={(e) => {
-                      const newCategory = e.target.value as 'clothes' | 'accessories' | 'shoes'
+                      const newCategory = e.target.value as 'clothes' | 'accessories' | 'shoes' | 'fragrance'
                       // Set default sizes based on category
                       let defaultSizes: string[] = []
                       if (newCategory === 'shoes') {
                         defaultSizes = ['38', '39', '40', '41', '42', '43', '44', '45']
                       } else if (newCategory === 'clothes') {
                         defaultSizes = ['S', 'M', 'L', 'XL']
+                      } else if (newCategory === 'fragrance') {
+                        defaultSizes = ['50ml', '100ml']
                       }
                       setProductFormData(prev => ({
                         ...prev,
@@ -3621,29 +3671,64 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Upload Button */}
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-gold transition-colors"
-                >
-                  {uploadingImages ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-gold" />
-                      <span className="text-sm text-gray-500">Uploading...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 mb-1">Click to upload images</p>
-                      <p className="text-xs text-gray-400">PNG, JPG up to 5MB each</p>
-                    </>
-                  )}
-                </div>
+                {/* Upload error */}
+                {uploadError && (
+                  <div className="mb-3 flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {/* Upload / Camera buttons */}
+                {uploadingImages ? (
+                  <div className="border-2 border-dashed border-gold/40 rounded-xl p-6 flex items-center justify-center gap-3 bg-gold/5">
+                    <Loader2 className="w-5 h-5 animate-spin text-gold" />
+                    <span className="text-sm text-gray-600 font-medium">Uploading images…</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Upload from file */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center gap-2 hover:border-gold hover:bg-gold/5 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-7 h-7 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-600">Upload Files</span>
+                      <span className="text-xs text-gray-400">PNG, JPG, WEBP</span>
+                    </button>
+
+                    {/* Open camera */}
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center gap-2 hover:border-navy hover:bg-navy/5 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-600">Take Photo</span>
+                      <span className="text-xs text-gray-400">Use camera</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* File input — browse */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   multiple
+                  onChange={(e) => handleImageUpload(e.target.files)}
+                  className="hidden"
+                />
+                {/* Camera input — capture */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
                   onChange={(e) => handleImageUpload(e.target.files)}
                   className="hidden"
                 />
@@ -3685,6 +3770,8 @@ export default function AdminDashboard() {
                     ? shoeSizeOptions
                     : productFormData.category === 'accessories'
                     ? accessorySizeOptions
+                    : productFormData.category === 'fragrance'
+                    ? fragranceSizeOptions
                     : clothesSizeOptions
                   ).map(size => {
                     const isSelected = (productFormData.sizes || []).includes(size)

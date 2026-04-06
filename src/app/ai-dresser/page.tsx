@@ -147,13 +147,30 @@ export default function AIDresserPage() {
     if (!file.type.startsWith('image/')) { setTryOnError('Please upload an image file'); return }
     if (file.size > 10 * 1024 * 1024) { setTryOnError('Image must be under 10MB'); return }
     setTryOnError('')
+
     const reader = new FileReader()
     reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      setUploadedDataUrl(dataUrl)
-      setTryOnStatus('idle')
-      setTryOnImageUrl('')
-      setTryOnProduct(null)
+      const original = e.target?.result as string
+      // Compress to max 900px and 0.85 quality to keep upload under 1MB
+      const img = new window.Image()
+      img.onload = () => {
+        const MAX = 900
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+          else { width = Math.round(width * MAX / height); height = MAX }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+        const compressed = canvas.toDataURL('image/jpeg', 0.85)
+        setUploadedDataUrl(compressed)
+        setTryOnStatus('idle')
+        setTryOnImageUrl('')
+        setTryOnProduct(null)
+      }
+      img.src = original
     }
     reader.readAsDataURL(file)
   }, [])
@@ -232,13 +249,29 @@ export default function AIDresserPage() {
     console.log('[TryOn] Starting try-on for:', product.brand, product.name)
 
     try {
-      // Submit to NanoBanana — generates a styled fashion image using the product image
+      // Step 1: Upload user photo to Cloudinary to get a public URL
+      setTryOnStatus('uploading')
+      console.log('[TryOn] Uploading user photo to Cloudinary...')
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: uploadedDataUrl, folder: 'try-on-photos' }),
+      })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok || !uploadData.url) {
+        throw new Error(uploadData.error || 'Failed to upload your photo')
+      }
+      const personImageUrl = uploadData.url
+      console.log('[TryOn] User photo uploaded:', personImageUrl)
+
+      // Step 2: Submit to NanoBanana with both person image and product (garment) image
       setTryOnStatus('generating')
-      console.log('[TryOn] Submitting to NanoBanana...', product.images[0])
+      console.log('[TryOn] Submitting to NanoBanana...', { personImageUrl, productImage: product.images[0] })
       const res = await fetch('/api/ai-dresser/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          personImageUrl,
           productImageUrl: product.images[0],
           productName: product.name,
           productBrand: product.brand,
@@ -310,31 +343,31 @@ export default function AIDresserPage() {
       <Header />
 
       {/* Hero */}
-      <section className="bg-navy-900 pt-24 pb-12">
+      <section className="bg-navy-900 pt-24 pb-6 md:pb-12">
         <div className="container-max px-4 md:px-8">
-          <nav className="flex items-center gap-2 text-sm text-white/50 mb-6">
+          <nav className="hidden md:flex items-center gap-2 text-sm text-white/50 mb-6">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
             <ChevronRight className="w-4 h-4" />
             <span className="text-gold-400">AI Dresser</span>
           </nav>
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-gold-500/20 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-gold-400" />
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gold-500/20 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-gold-400" />
                 </div>
-                <span className="text-gold-400 text-sm font-medium uppercase tracking-widest">
+                <span className="text-gold-400 text-xs md:text-sm font-medium uppercase tracking-widest">
                   Powered by AI
                 </span>
               </div>
-              <h1 className="font-serif text-4xl md:text-5xl font-bold text-white mb-3">
+              <h1 className="font-serif text-3xl md:text-5xl font-bold text-white mb-2">
                 AI Personal Stylist
               </h1>
-              <p className="text-white/60 text-lg max-w-xl">
-                Tell us your style, get tailored picks from our full collection, then see yourself wearing them.
+              <p className="text-white/60 text-sm md:text-lg max-w-xl">
+                Tell us your style, get tailored picks, then see yourself wearing them.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="hidden md:flex flex-wrap gap-3">
               {[
                 { icon: Shirt, label: 'Style Quiz' },
                 { icon: Sparkles, label: 'Smart Picks' },
@@ -351,7 +384,7 @@ export default function AIDresserPage() {
       </section>
 
       <main className="bg-gray-50 min-h-screen">
-        <div className="container-max px-4 md:px-8 py-12">
+        <div className="container-max px-3 md:px-8 py-6 md:py-12">
 
           {/* Auth loading */}
           {authLoading && (
@@ -390,18 +423,20 @@ export default function AIDresserPage() {
 
           {/* Logged in */}
           {!authLoading && isLoggedIn && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
               {/* ── Left sidebar ─────────────────────────────────────────── */}
-              <div className="lg:col-span-1 lg:sticky lg:top-24 lg:self-start space-y-5">
+              <div className={`lg:col-span-1 lg:sticky lg:top-24 lg:self-start space-y-4 ${pageStep === 'results' ? 'hidden lg:block' : ''}`}>
 
                 {/* Photo upload card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Camera className="w-4 h-4 text-navy-600" />
-                    <h2 className="font-serif text-lg font-bold text-navy-900">Your Photo</h2>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-navy-600" />
+                      <h2 className="font-serif text-base md:text-lg font-bold text-navy-900">Your Photo</h2>
+                    </div>
+                    <span className="text-gray-400 text-[10px]">Optional · For try-on</span>
                   </div>
-                  <p className="text-gray-400 text-xs mb-4">For virtual try-on — optional</p>
 
                   {!uploadedDataUrl ? (
                     <div
@@ -409,22 +444,28 @@ export default function AIDresserPage() {
                       onDragLeave={() => setIsDragging(false)}
                       onDrop={handleDrop}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer transition-all ${isDragging ? 'border-gold-400 bg-gold-50' : 'border-gray-200 hover:border-navy-400 hover:bg-gray-50'}`}
+                      className={`mt-2 border-2 border-dashed rounded-xl flex items-center justify-center gap-3 py-4 px-4 cursor-pointer transition-all ${isDragging ? 'border-gold-400 bg-gold-50' : 'border-gray-200 hover:border-navy-400 hover:bg-gray-50'}`}
                     >
-                      <Upload className="w-7 h-7 text-navy-400 mb-2" />
-                      <p className="font-medium text-navy-800 text-sm mb-0.5">Drop photo here</p>
-                      <p className="text-gray-400 text-xs">or click to browse · Max 10MB</p>
+                      <Upload className="w-5 h-5 text-navy-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-navy-800 text-sm">Tap to upload photo</p>
+                        <p className="text-gray-400 text-xs">Max 10MB</p>
+                      </div>
                     </div>
                   ) : (
-                    <div className="relative">
-                      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-100">
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                         <img src={uploadedDataUrl} alt="Your photo" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-navy-800 text-sm font-medium">Photo ready ✓</p>
+                        <p className="text-gray-400 text-xs">Tap try-on on any product</p>
                       </div>
                       <button
                         onClick={() => { setUploadedDataUrl(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                        className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors flex-shrink-0"
                       >
-                        <X className="w-3.5 h-3.5 text-white" />
+                        <X className="w-3.5 h-3.5 text-gray-500" />
                       </button>
                     </div>
                   )}
@@ -433,19 +474,19 @@ export default function AIDresserPage() {
                 </div>
 
                 {/* Style quiz card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <div className="flex items-center gap-2 mb-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+                  <div className="flex items-center gap-2 mb-3">
                     <Palette className="w-4 h-4 text-navy-600" />
-                    <h2 className="font-serif text-lg font-bold text-navy-900">Style Quiz</h2>
+                    <h2 className="font-serif text-base md:text-lg font-bold text-navy-900">Style Quiz</h2>
                   </div>
 
                   {/* Gender */}
-                  <div className="mb-4">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Shopping for</label>
-                    <div className="flex gap-2 flex-wrap">
+                  <div className="mb-3">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Shopping for</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                       {GENDERS.map((g) => (
                         <button key={g} onClick={() => setGender(g)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${gender === g ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-gray-600 border-gray-200 hover:border-navy-400'}`}>
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap flex-shrink-0 ${gender === g ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-gray-600 border-gray-200'}`}>
                           {g}
                         </button>
                       ))}
@@ -453,12 +494,12 @@ export default function AIDresserPage() {
                   </div>
 
                   {/* Style */}
-                  <div className="mb-4">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">My style vibe</label>
-                    <div className="flex gap-2 flex-wrap">
+                  <div className="mb-3">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">My style vibe</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                       {STYLES.map((s) => (
                         <button key={s} onClick={() => setStyle(s)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${style === s ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gold-400'}`}>
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap flex-shrink-0 ${style === s ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200'}`}>
                           {s}
                         </button>
                       ))}
@@ -466,12 +507,12 @@ export default function AIDresserPage() {
                   </div>
 
                   {/* Occasion */}
-                  <div className="mb-4">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Occasion</label>
-                    <div className="flex gap-2 flex-wrap">
+                  <div className="mb-3">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Occasion</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                       {OCCASIONS.map((o) => (
                         <button key={o} onClick={() => setOccasion(o)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${occasion === o ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gold-400'}`}>
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap flex-shrink-0 ${occasion === o ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200'}`}>
                           {o}
                         </button>
                       ))}
@@ -479,31 +520,31 @@ export default function AIDresserPage() {
                   </div>
 
                   {/* Color group */}
-                  <div className="mb-5">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Favorite colors</label>
-                    <div className="flex gap-2 flex-wrap">
+                  <div className="mb-4">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Favorite colors</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                       {Object.keys(COLOR_GROUPS).map((cg) => (
                         <button key={cg} onClick={() => setColorGroup(cg)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${colorGroup === cg ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gold-400'}`}>
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap flex-shrink-0 ${colorGroup === cg ? 'bg-gold-500 text-navy-900 border-gold-500' : 'bg-white text-gray-600 border-gray-200'}`}>
                           {cg}
                         </button>
                       ))}
                       {/* AI Decide option */}
                       <button
                         onClick={() => setColorGroup(AI_DECIDE)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all flex items-center gap-1 whitespace-nowrap flex-shrink-0 ${
                           colorGroup === AI_DECIDE
                             ? 'bg-navy-900 text-gold-400 border-navy-900 shadow-md'
-                            : 'bg-white text-navy-700 border-navy-200 hover:border-navy-500 hover:bg-navy-50'
+                            : 'bg-white text-navy-700 border-navy-200'
                         }`}
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Sparkles className="w-3 h-3" />
                         Let AI Decide
                       </button>
                     </div>
                     {colorGroup === AI_DECIDE && (
                       <p className="mt-2 text-xs text-navy-500 bg-navy-50 border border-navy-100 rounded-lg px-3 py-2">
-                        DeepSeek AI will pick the best products based on your style & occasion — no color filter needed.
+                        DeepSeek AI picks the best products for your style & occasion.
                       </p>
                     )}
                   </div>
@@ -545,7 +586,20 @@ export default function AIDresserPage() {
               </div>
 
               {/* ── Right panel ───────────────────────────────────────────── */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className={`lg:col-span-2 space-y-4 lg:space-y-6 ${pageStep === 'quiz' ? 'hidden lg:block' : ''}`}>
+
+                {/* Mobile: back to quiz button */}
+                {pageStep === 'results' && (
+                  <div className="flex items-center justify-between lg:hidden">
+                    <button
+                      onClick={() => { setPageStep('quiz'); setRecommended([]); setAiStyleNote(''); setAiError(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
+                      className="flex items-center gap-2 text-sm text-navy-700 font-medium bg-white border border-gray-200 px-4 py-2 rounded-full"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Edit Style
+                    </button>
+                    <span className="text-sm text-gray-400">{recommended.length} picks</span>
+                  </div>
+                )}
 
                 {/* Permanent anchor — always in DOM so scroll always works */}
                 <div ref={tryOnSectionRef} />
@@ -622,16 +676,16 @@ export default function AIDresserPage() {
                   </div>
                 )}
 
-                {/* ── Empty state ── */}
+                {/* ── Empty state (desktop only — mobile hides this panel on quiz step) ── */}
                 {pageStep === 'quiz' && (
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-24 text-center px-8">
-                    <div className="w-16 h-16 rounded-2xl bg-gold-50 flex items-center justify-center mb-4">
-                      <Sparkles className="w-7 h-7 text-gold-500" />
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 text-center px-8">
+                    <div className="w-14 h-14 rounded-2xl bg-gold-50 flex items-center justify-center mb-4">
+                      <Sparkles className="w-6 h-6 text-gold-500" />
                     </div>
-                    <h3 className="font-serif text-2xl font-bold text-navy-900 mb-2">
+                    <h3 className="font-serif text-xl font-bold text-navy-900 mb-2">
                       Complete the style quiz
                     </h3>
-                    <p className="text-gray-500 max-w-sm">
+                    <p className="text-gray-500 text-sm max-w-sm">
                       Answer a few quick questions on the left and we&apos;ll pick the best items from our{' '}
                       {allProducts.length > 0 ? `${allProducts.length}-product` : ''} collection for you.
                     </p>
@@ -664,7 +718,7 @@ export default function AIDresserPage() {
                         No products matched. Try different preferences.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3 md:gap-4">
                         {recommended.map((product) => (
                           <ProductCard
                             key={product.id}
@@ -747,46 +801,46 @@ function ProductCard({
         )}
       </div>
 
-      <div className="p-4">
-        <p className="text-xs font-semibold text-gold-600 uppercase tracking-wider mb-1">{product.brand}</p>
-        <h3 className="font-medium text-navy-900 text-sm line-clamp-2 mb-1">{product.name}</h3>
-        <div className="flex items-baseline gap-2 mb-4">
-          <span className="text-navy-900 font-bold">${product.price}</span>
+      <div className="p-3 md:p-4">
+        <p className="text-[10px] font-semibold text-gold-600 uppercase tracking-wider mb-0.5">{product.brand}</p>
+        <h3 className="font-medium text-navy-900 text-xs md:text-sm line-clamp-2 mb-1">{product.name}</h3>
+        <div className="flex items-baseline gap-1.5 mb-3">
+          <span className="text-navy-900 font-bold text-sm">₱{product.price.toLocaleString()}</span>
           {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-gray-400 text-sm line-through">${product.originalPrice}</span>
+            <span className="text-gray-400 text-xs line-through">₱{product.originalPrice.toLocaleString()}</span>
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 md:gap-2">
           <button
             onClick={onAddToCart}
-            className="flex-1 py-2.5 rounded-xl border border-navy-200 text-navy-800 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-navy-50 transition-colors"
+            className="flex-1 py-2 md:py-2.5 rounded-xl border border-navy-200 text-navy-800 text-xs md:text-sm font-medium flex items-center justify-center gap-1 md:gap-1.5 hover:bg-navy-50 transition-colors"
           >
             {isAddedToCart ? (
-              <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Added!</>
+              <><CheckCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-500" /> Added!</>
             ) : (
-              <><ShoppingCart className="w-3.5 h-3.5" /> Add to Cart</>
+              <><ShoppingCart className="w-3 h-3 md:w-3.5 md:h-3.5" /> Cart</>
             )}
           </button>
           <button
             onClick={onTryOn}
             disabled={isDisabled}
             title={!hasPhoto ? 'Upload a photo first' : undefined}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+            className={`flex-1 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-semibold flex items-center justify-center gap-1 md:gap-1.5 transition-colors ${
               hasPhoto
                 ? 'bg-gold-500 text-navy-900 hover:bg-gold-400'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             } disabled:opacity-60`}
           >
             {isLoading ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+              <><Loader2 className="w-3 h-3 animate-spin" /> Wait…</>
             ) : (
-              <><Wand2 className="w-3.5 h-3.5" /> Try On</>
+              <><Wand2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Try On</>
             )}
           </button>
         </div>
         {!hasPhoto && (
-          <p className="text-xs text-gray-400 text-center mt-2">Upload a photo to use Try On</p>
+          <p className="text-[10px] text-gray-400 text-center mt-1.5">Upload photo to try on</p>
         )}
       </div>
     </div>

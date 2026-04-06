@@ -915,7 +915,7 @@ export interface FirestoreProduct {
   id?: string
   name: string
   brand: string
-  category: 'clothes' | 'accessories' | 'shoes'
+  category: 'clothes' | 'accessories' | 'shoes' | 'fragrance'
   subcategory: string
   price: number
   originalPrice?: number

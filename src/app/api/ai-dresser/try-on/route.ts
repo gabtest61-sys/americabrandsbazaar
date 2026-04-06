@@ -5,7 +5,7 @@ const NANO_ENDPOINT = 'https://api.nanobananaapi.ai/api/v1/nanobanana/generate'
 
 export async function POST(req: NextRequest) {
   try {
-    const { productImageUrl, productName, productBrand, productColors, productCategory } = await req.json()
+    const { personImageUrl, productImageUrl, productName, productBrand, productColors } = await req.json()
 
     if (!productImageUrl) {
       return NextResponse.json({ error: 'Product image URL is required' }, { status: 400 })
@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
     }
 
     const colorStr = productColors?.length ? productColors.join(', ') : ''
-    const prompt = `High quality fashion photography. A model wearing ${productBrand} ${productName}${colorStr ? ', ' + colorStr : ''}${productCategory ? ', ' + productCategory : ''}. Full body shot, professional studio lighting, clean background, premium fashion brand advertisement, photorealistic, 4K quality.`
+    const prompt = `Virtual try-on: dress the person in the photo with the ${productBrand} ${productName}${colorStr ? ' in ' + colorStr : ''}. Keep the person's face, body, and pose exactly as in the original photo. Only change the clothing to the product. Photorealistic, high quality, 4K.`
+
+    // imageUrls: person photo first (subject), product image second (garment)
+    const imageUrls = personImageUrl
+      ? [personImageUrl, productImageUrl]
+      : [productImageUrl]
 
     const res = await fetch(NANO_ENDPOINT, {
       method: 'POST',
@@ -29,16 +34,17 @@ export async function POST(req: NextRequest) {
         type: 'IMAGETOIAMGE',
         numImages: 1,
         image_size: '3:4',
-        imageUrls: [productImageUrl],
+        imageUrls,
         callBackUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://americabrandsbazaar.com',
       }),
     })
 
     const data = await res.json()
+    console.log('[NanoBanana] Response:', JSON.stringify(data))
 
     if (!res.ok || data.code !== 200) {
       return NextResponse.json(
-        { error: data.msg || 'NanoBanana submission failed' },
+        { error: data.msg || `NanoBanana error: ${JSON.stringify(data)}` },
         { status: 500 }
       )
     }

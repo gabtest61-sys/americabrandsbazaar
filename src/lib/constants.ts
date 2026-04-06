@@ -18,8 +18,8 @@ export const NAV_LINKS = [
   { name: 'Clothes', href: '/shop?category=clothes' },
   { name: 'Accessories', href: '/shop?category=accessories' },
   { name: 'Shoes', href: '/shop?category=shoes' },
+  { name: 'Fragrance', href: '/shop?category=fragrance' },
   { name: 'AI Dresser', href: '/ai-dresser' },
-  { name: 'Installations', href: '/installations' },
 ]
 
 export const CATEGORIES = [
@@ -43,6 +43,13 @@ export const CATEGORIES = [
     description: 'Step out in style with premium footwear',
     image: '/images/category-shoes.jpg',
     href: '/shop?category=shoes',
+  },
+  {
+    id: 'fragrance',
+    name: 'Fragrance',
+    description: 'Signature scents from premium brands',
+    image: '/images/category-fragrance.jpg',
+    href: '/shop?category=fragrance',
   },
 ]
 
