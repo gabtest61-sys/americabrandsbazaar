@@ -154,7 +154,7 @@ export default function Header() {
                     src="/abblogo.jpg"
                     alt={BRAND.name}
                     fill
-                    className="object-contain scale-[1.75]"
+                    className="object-cover"
                     priority
                   />
                 </div>

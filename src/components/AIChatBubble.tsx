@@ -135,7 +135,12 @@ export default function AIChatBubble() {
     }
 
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const android = /android/i.test(navigator.userAgent)
+    const isMobile = ios || android
     setIsIOS(ios)
+
+    // Only show install prompt on actual mobile devices
+    if (!isMobile) return
 
     // Listen for Android install prompt
     const handler = (e: Event) => {
