@@ -347,6 +347,7 @@ function ShopContent() {
 
   const handleAddToCart = (product: Product | FirestoreProduct) => {
     if (!product.id) return
+    if (!product.inStock || product.stockQty === 0) return
     // Convert to the Product type expected by CartContext
     const cartProduct = {
       id: product.id,
@@ -924,10 +925,13 @@ function ShopContent() {
                           </div>
                           <button
                             onClick={() => handleAddToCart(product)}
-                            disabled={addedItems.has(productId)}
+                            disabled={addedItems.has(productId) || !product.inStock || product.stockQty === 0}
+                            title={!product.inStock || product.stockQty === 0 ? 'Out of Stock' : 'Add to Cart'}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                               addedItems.has(productId)
                                 ? 'bg-green-500 text-white'
+                                : !product.inStock || product.stockQty === 0
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                 : 'bg-gold text-navy hover:bg-gold-400'
                             }`}
                           >

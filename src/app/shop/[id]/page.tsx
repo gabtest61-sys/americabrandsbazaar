@@ -136,6 +136,7 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product || !product.id) return
+    if (!product.inStock || product.stockQty === 0) return
 
     const cartProduct = {
       id: product.id,
@@ -404,10 +405,12 @@ export default function ProductDetailPage() {
               <div className="flex gap-3">
                 <button
                   onClick={handleAddToCart}
-                  disabled={isAdded}
+                  disabled={isAdded || !product.inStock || product.stockQty === 0}
                   className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-full font-semibold transition-all ${
                     isAdded
                       ? 'bg-green-500 text-white'
+                      : !product.inStock || product.stockQty === 0
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                       : 'bg-gold text-navy hover:bg-gold-400'
                   }`}
                 >
@@ -416,6 +419,8 @@ export default function ProductDetailPage() {
                       <Check className="w-5 h-5" />
                       Added to Cart
                     </>
+                  ) : !product.inStock || product.stockQty === 0 ? (
+                    <>Out of Stock</>
                   ) : (
                     <>
                       <ShoppingBag className="w-5 h-5" />
