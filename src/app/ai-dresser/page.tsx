@@ -7,7 +7,7 @@ import {
   Upload, Sparkles, ShoppingCart, Wand2, Lock,
   RotateCcw, AlertCircle, ChevronRight, Loader2,
   CheckCircle, X, ImageIcon, Shirt, Palette,
-  User, ArrowRight,
+  User, ArrowRight, ZoomIn,
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
@@ -125,6 +125,7 @@ export default function AIDresserPage() {
   const [tryOnProduct, setTryOnProduct] = useState<FirestoreProduct | null>(null)
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus>('idle')
   const [tryOnImageUrl, setTryOnImageUrl] = useState('')
+  const [zoomOpen, setZoomOpen] = useState(false)
   const [tryOnError, setTryOnError] = useState('')
   const [addedToCart, setAddedToCart] = useState<string[]>([])
 
@@ -650,9 +651,18 @@ export default function AIDresserPage() {
                     </div>
 
                     <div className="p-6 max-w-xs mx-auto">
-                      <div className="rounded-xl overflow-hidden bg-gray-100 aspect-[3/4]">
+                      <div
+                        className="rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] relative group cursor-zoom-in"
+                        onClick={() => setZoomOpen(true)}
+                      >
                         <img src={tryOnImageUrl} alt="AI generated style shot" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                            <ZoomIn className="w-5 h-5 text-navy" />
+                          </div>
+                        </div>
                       </div>
+                      <p className="text-center text-xs text-gray-400 mt-2">Tap to zoom</p>
                     </div>
 
                     <div className="px-6 pb-6 flex gap-3">
@@ -744,6 +754,27 @@ export default function AIDresserPage() {
       <Footer />
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialMode={authMode} />
+
+      {/* Zoom Modal */}
+      {zoomOpen && tryOnImageUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomOpen(false)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            onClick={() => setZoomOpen(false)}
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <img
+            src={tryOnImageUrl}
+            alt="AI Style Shot fullscreen"
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   )
 }

@@ -1,11 +1,97 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { X, Send, Sparkles, Loader2, ChevronDown, Download } from 'lucide-react'
+import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
+}
+
+// Renders assistant message content with markdown-like formatting
+function MessageContent({ text }: { text: string }) {
+  const lines = text.split('\n')
+
+  return (
+    <div className="space-y-1.5">
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-1" />
+
+        // Section header: **Title:**
+        const headerMatch = line.match(/^\*\*(.+?)\*\*:?$/)
+        if (headerMatch) {
+          return (
+            <p key={i} className="font-semibold text-navy text-[13px] mt-2 first:mt-0">
+              {headerMatch[1]}
+            </p>
+          )
+        }
+
+        // Bullet line: starts with - or •
+        if (line.match(/^[-•]\s/)) {
+          const content = line.replace(/^[-•]\s/, '')
+          return (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="text-gold mt-0.5 flex-shrink-0 text-[10px]">●</span>
+              <span className="text-[13px] leading-relaxed">{renderInline(content)}</span>
+            </div>
+          )
+        }
+
+        // Normal paragraph
+        return (
+          <p key={i} className="text-[13px] leading-relaxed">
+            {renderInline(line)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
+// Renders inline bold, italic, and internal links within a line
+function renderInline(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  // Combined regex: **bold**, *italic*, /shop/... or /ai-dresser links
+  const regex = /\*\*(.+?)\*\*|\*(.+?)\*|(\/shop(?:\/[^\s,!?.()\[\]"']*)?(?=[\s,!?.()\[\]"']|$))|(\/ai-dresser(?:[^\s,!?.()\[\]"']*)?)/g
+  let last = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push(text.slice(last, match.index))
+    }
+    if (match[1]) {
+      // **bold**
+      parts.push(<strong key={match.index} className="font-semibold text-navy">{match[1]}</strong>)
+    } else if (match[2]) {
+      // *italic*
+      parts.push(<em key={match.index} className="italic">{match[2]}</em>)
+    } else if (match[3]) {
+      // /shop link
+      parts.push(
+        <Link key={match.index} href={match[3]} className="text-gold font-semibold underline underline-offset-2 hover:text-navy transition-colors">
+          {match[3]}
+        </Link>
+      )
+    } else if (match[4]) {
+      // /ai-dresser link
+      parts.push(
+        <Link key={match.index} href={match[4]} className="text-gold font-semibold underline underline-offset-2 hover:text-navy transition-colors">
+          {match[4]}
+        </Link>
+      )
+    }
+    last = match.index + match[0].length
+  }
+
+  if (last < text.length) {
+    parts.push(text.slice(last))
+  }
+
+  return parts
 }
 
 interface BeforeInstallPromptEvent extends Event {
@@ -32,6 +118,7 @@ export default function AIChatBubble() {
   const [isInstalled, setIsInstalled] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const [showInstallCard, setShowInstallCard] = useState(false)
+  const [products, setProducts] = useState<FirestoreProduct[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -72,6 +159,13 @@ export default function AIChatBubble() {
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  // Load product catalog once on mount
+  useEffect(() => {
+    getFirestoreProducts()
+      .then((all) => setProducts(all.filter((p) => p.inStock)))
+      .catch(() => {})
   }, [])
 
   // Scroll to bottom on new messages
@@ -137,6 +231,16 @@ export default function AIChatBubble() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: updated.map((m) => ({ role: m.role, content: m.content })),
+          products: products.map((p) => ({
+            id: p.id,
+            name: p.name,
+            brand: p.brand,
+            category: p.category,
+            price: p.price,
+            colors: p.colors,
+            tags: p.tags,
+            inStock: p.inStock,
+          })),
         }),
       })
       const data = await res.json()
@@ -287,13 +391,13 @@ export default function AIChatBubble() {
                 </div>
               )}
               <div
-                className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap ${
+                className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] ${
                   msg.role === 'user'
-                    ? 'bg-navy text-white rounded-tr-sm'
+                    ? 'bg-navy text-white rounded-tr-sm text-sm leading-relaxed'
                     : 'bg-gray-100 text-navy rounded-tl-sm'
                 }`}
               >
-                {msg.content}
+                {msg.role === 'user' ? msg.content : <MessageContent text={msg.content} />}
               </div>
             </div>
           ))}

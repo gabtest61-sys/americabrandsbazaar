@@ -1,12 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+interface ProductSummary {
+  id: string
+  name: string
+  brand: string
+  category: string
+  price: number
+  colors?: string[]
+  tags?: string[]
+  inStock: boolean
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json()
+    const { messages, products } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Invalid messages' }, { status: 400 })
     }
+
+    // Build product catalog section for system prompt
+    let catalogSection = ''
+    if (products && Array.isArray(products) && products.length > 0) {
+      const inStock = (products as ProductSummary[]).filter((p) => p.inStock)
+      const lines = inStock.map((p) => {
+        const colors = p.colors?.length ? ` | Colors: ${p.colors.slice(0, 3).join(', ')}` : ''
+        const tags = p.tags?.length ? ` | Tags: ${p.tags.slice(0, 4).join(', ')}` : ''
+        return `- [${p.name}] by ${p.brand} | Category: ${p.category} | Price: ₱${p.price.toLocaleString()} | Link: /shop/${p.id}${colors}${tags}`
+      })
+      catalogSection = `\n\nCURRENT PRODUCT CATALOG (${inStock.length} items in stock):\n${lines.join('\n')}`
+    }
+
+    const systemPrompt = `You are ABB Style Assistant, the AI fashion designer for America Brands Bazaar — a premium clothing store in the Philippines.
+
+Your job is to help customers find outfits and specific products from our actual catalog below.
+
+When recommending products:
+- Always mention the exact product name and brand
+- Always include the product link formatted as /shop/PRODUCT_ID (e.g. /shop/abc123)
+- Mention the price in Philippine Peso (₱)
+- Group suggestions by category (Top, Bottom, Footwear, Accessories)
+- Keep it friendly, concise, and fashion-forward ✨
+- Use occasional style emojis
+
+For styling tips, consider Filipino climate (hot & humid), local culture, and occasions.
+Never recommend products not in the catalog below.${catalogSection}`
 
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
@@ -17,25 +55,11 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
-          {
-            role: 'system',
-            content: `You are ABB Style Assistant, the AI fashion designer for America Brands Bazaar — a premium clothing store in the Philippines.
-You help customers with:
-- Outfit ideas and style advice
-- Brand recommendations (we carry Nike, Calvin Klein, GAP, Ralph Lauren, Michael Kors, and more)
-- Size and fit guidance
-- Occasion-based outfit suggestions (casual, formal, date night, office, etc.)
-- Product category suggestions (clothes, shoes, accessories, fragrance)
-- Styling tips for Filipino climate and culture
-
-Keep replies concise, friendly, and fashion-forward. Use occasional style-relevant emojis.
-If asked to shop specific items, suggest they use the /shop page or the AI Dresser feature.
-Never make up specific product stock or prices — direct them to browse the shop.`,
-          },
+          { role: 'system', content: systemPrompt },
           ...messages,
         ],
-        max_tokens: 500,
-        temperature: 0.8,
+        max_tokens: 700,
+        temperature: 0.75,
       }),
     })
 
