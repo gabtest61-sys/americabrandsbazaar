@@ -9,7 +9,7 @@ import { formatPrice } from '@/lib/constants'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { state, dispatch } = useCart()
+  const { items, clearCart } = useCart()
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -42,7 +42,7 @@ export default function CheckoutPage() {
     }
   }, [user])
 
-  const subtotal = state.items.reduce((sum, i) => sum + i.product.price * i.quantity, 0)
+  const subtotal = items.reduce((sum: number, i) => sum + i.product.price * i.quantity, 0)
   const shippingFee = subtotal >= 2000 ? 0 : 100
   const total = subtotal + shippingFee
 
@@ -52,13 +52,13 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (state.items.length === 0) return
+    if (items.length === 0) return
     setLoading(true)
     setError('')
 
     try {
       // 1. Save order to Firestore
-      const items = state.items.map((i) => ({
+      const orderItems = items.map((i) => ({
         productId: i.product.id,
         name: i.product.name,
         brand: i.product.brand,
@@ -79,7 +79,7 @@ export default function CheckoutPage() {
       }
 
       const result = await createOrder(
-        items,
+        orderItems,
         customerInfo,
         user?.id,
         form.notes,
@@ -95,7 +95,7 @@ export default function CheckoutPage() {
       const emailPayload = {
         orderId: result.orderId,
         customer: customerInfo,
-        products: state.items.map((i) => ({
+        products: items.map((i) => ({
           name: i.product.name,
           brand: i.product.brand,
           price: i.product.price,
@@ -115,7 +115,7 @@ export default function CheckoutPage() {
       }
 
       // 3. Clear cart and show success
-      dispatch({ type: 'CLEAR_CART' })
+      clearCart()
       setOrderId(result.orderId)
       setSuccess(true)
     } catch (err: any) {
@@ -125,7 +125,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (state.items.length === 0 && !success) {
+  if (items.length === 0 && !success) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
         <h2 className="text-2xl font-bold text-navy mb-2">Your cart is empty</h2>
@@ -287,7 +287,7 @@ export default function CheckoutPage() {
             <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-6">
               <h2 className="text-lg font-semibold text-navy mb-4">Order Summary</h2>
               <div className="space-y-3 mb-4">
-                {state.items.map((item, i) => (
+                {items.map((item, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <img
                       src={item.product.image}
