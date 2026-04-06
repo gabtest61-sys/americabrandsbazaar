@@ -138,14 +138,14 @@ export const createOrder = async (
 
     const orderData: Omit<FirestoreOrder, 'id'> = {
       orderId,
-      userId: userId || undefined,
+      ...(userId ? { userId } : {}),
       items,
       subtotal,
       shippingFee,
       total,
       status: 'pending',
       customerInfo,
-      notes: notes || undefined,
+      ...(notes ? { notes } : {}),
       paymentMethod: paymentMethod || 'cod',
       paymentStatus: paymentStatus || 'pending',
       createdAt: serverTimestamp() as Timestamp,
@@ -163,9 +163,9 @@ export const createOrder = async (
     }
 
     return { success: true, orderId }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating order:', error)
-    return { success: false, error: 'Failed to create order' }
+    return { success: false, error: error?.message || 'Failed to create order' }
   }
 }
 

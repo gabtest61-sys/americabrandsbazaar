@@ -144,11 +144,11 @@ export default function Header() {
             : 'bg-navy'
         }`}>
           <div className="container-max px-4 md:px-8">
-            <div className="flex items-center justify-between h-20 md:h-22">
+            <div className="flex items-center justify-between h-16 md:h-18">
               {/* Logo */}
               <Link href="/" className="flex items-center gap-3 group">
                 <div className={`relative rounded-full overflow-hidden border-2 border-gold/80 group-hover:border-gold transition-all duration-300 shadow-lg bg-white ${
-                  isScrolled ? 'w-12 h-12' : 'w-16 h-16 md:w-18 md:h-18'
+                  isScrolled ? 'w-10 h-10' : 'w-12 h-12'
                 }`}>
                   <Image
                     src="/abblogo.jpg"
@@ -158,7 +158,7 @@ export default function Header() {
                     priority
                   />
                 </div>
-                <div className="hidden sm:block">
+                <div className="hidden xl:block">
                   <h1 className={`text-white font-bold tracking-wide transition-all duration-300 ${
                     isScrolled ? 'text-lg' : 'text-xl'
                   }`}>
@@ -176,7 +176,7 @@ export default function Header() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className="relative px-5 py-2 text-white/90 hover:text-white text-sm font-medium tracking-wide transition-colors group"
+                    className="relative px-3 py-2 text-white/90 hover:text-white text-sm font-medium tracking-wide transition-colors group whitespace-nowrap"
                   >
                     {link.name}
                     <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-gold group-hover:w-8 transition-all duration-300 rounded-full" />

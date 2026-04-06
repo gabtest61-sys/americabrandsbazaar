@@ -133,6 +133,11 @@ export default function AIDresserPage() {
   const [tryOnError, setTryOnError] = useState('')
   const [addedToCart, setAddedToCart] = useState<string[]>([])
 
+  // Marketing consent state
+  const [marketingConsent, setMarketingConsent] = useState(false)
+  const [showConsentModal, setShowConsentModal] = useState(false)
+  const [pendingTryOnProduct, setPendingTryOnProduct] = useState<FirestoreProduct | null>(null)
+
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const tryOnSectionRef = useRef<HTMLDivElement>(null)
 
@@ -246,6 +251,25 @@ export default function AIDresserPage() {
       const results = filterProducts(allProducts, gender, style, occasion, colorGroup)
       setRecommended(results.length > 0 ? results : allProducts.filter((p) => p.inStock).slice(0, 8))
       setPageStep('results')
+    }
+  }
+
+  const handleTryOnClick = (product: FirestoreProduct) => {
+    if (!uploadedDataUrl) { setTryOnError('Upload a photo first to try on this item'); return }
+    if (marketingConsent) {
+      startTryOn(product)
+    } else {
+      setPendingTryOnProduct(product)
+      setShowConsentModal(true)
+    }
+  }
+
+  const handleConsentAccept = () => {
+    setMarketingConsent(true)
+    setShowConsentModal(false)
+    if (pendingTryOnProduct) {
+      startTryOn(pendingTryOnProduct)
+      setPendingTryOnProduct(null)
     }
   }
 
@@ -752,7 +776,7 @@ export default function AIDresserPage() {
                             tryOnStatus={tryOnStatus}
                             hasPhoto={!!uploadedDataUrl}
                             onAddToCart={() => handleAddToCart(product)}
-                            onTryOn={() => startTryOn(product)}
+                            onTryOn={() => handleTryOnClick(product)}
                           />
                         ))}
                       </div>
@@ -768,6 +792,50 @@ export default function AIDresserPage() {
       <Footer />
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialMode={authMode} />
+
+      {/* Marketing Consent Modal */}
+      {showConsentModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center">
+            {/* Icon */}
+            <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-5">
+              <span className="text-3xl">📸</span>
+            </div>
+
+            <h2 className="text-xl font-bold text-navy mb-2">Photo Usage Consent</h2>
+            <p className="text-gray-500 text-sm leading-relaxed mb-6">
+              By using the AI Try-On feature, you agree that <strong className="text-navy">America Brands Bazaar</strong> may use the AI-generated image of you wearing our product for <strong className="text-navy">marketing purposes</strong> — including our website and Facebook page.
+            </p>
+
+            <div className="bg-gold/5 border border-gold/20 rounded-2xl p-4 mb-6 text-left space-y-2">
+              <p className="text-xs text-gray-600 flex items-start gap-2">
+                <span className="text-gold mt-0.5">✓</span>
+                Your AI-generated image may appear on our website or social media
+              </p>
+              <p className="text-xs text-gray-600 flex items-start gap-2">
+                <span className="text-gold mt-0.5">✓</span>
+                Your real photo is never stored or shared — only the AI output
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleConsentAccept}
+                className="w-full bg-gold text-navy font-bold py-3.5 rounded-xl hover:bg-yellow-500 transition-all shadow-lg shadow-gold/20"
+              >
+                I Agree — Start Try-On
+              </button>
+              <button
+                onClick={() => setShowConsentModal(false)}
+                className="w-full py-3 rounded-xl border border-gray-200 text-gray-500 text-sm hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zoom Modal */}
       {zoomOpen && tryOnImageUrl && (
@@ -871,14 +939,19 @@ function ProductCard({
             onClick={onTryOn}
             disabled={isDisabled}
             title={!hasPhoto ? 'Upload a photo first' : undefined}
-            className={`flex-1 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-semibold flex items-center justify-center gap-1 md:gap-1.5 transition-colors ${
-              hasPhoto
+            className={`flex-1 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-semibold flex items-center justify-center gap-1 md:gap-1.5 transition-all relative overflow-hidden ${
+              isLoading
+                ? 'bg-gold-500 text-navy-900 animate-gold-glow'
+                : hasPhoto
                 ? 'bg-gold-500 text-navy-900 hover:bg-gold-400'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             } disabled:opacity-60`}
           >
+            {isLoading && (
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_1.2s_infinite]" style={{ backgroundSize: '200% 100%' }} />
+            )}
             {isLoading ? (
-              <><Loader2 className="w-3 h-3 animate-spin" /> Wait…</>
+              <><Loader2 className="w-3 h-3 animate-spin relative z-10" /><span className="relative z-10">Wait…</span></>
             ) : (
               <><Wand2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Try On</>
             )}

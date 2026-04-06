@@ -558,130 +558,206 @@ function ShopContent() {
 
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar Filters - Desktop */}
-            <aside className="hidden lg:block w-64 flex-shrink-0">
-              <div className="bg-white rounded-2xl p-6 shadow-sm sticky top-28">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-semibold text-navy">Filters</h2>
+            <aside className="hidden lg:block w-60 flex-shrink-0">
+              <div className="bg-white rounded-2xl shadow-sm sticky top-28 overflow-hidden">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-navy" />
+                    <h2 className="font-bold text-navy text-sm">Filters</h2>
+                    {activeFiltersCount > 0 && (
+                      <span className="bg-navy text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </div>
                   {activeFiltersCount > 0 && (
-                    <button
-                      onClick={clearFilters}
-                      className="text-sm text-gold hover:text-gold-600"
-                    >
+                    <button onClick={clearFilters} className="text-xs text-gold hover:text-navy transition-colors font-medium">
                       Clear all
                     </button>
                   )}
                 </div>
 
-                {/* Category Filter */}
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium text-navy mb-3">Category</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setSelectedCategory('')}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        !selectedCategory ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      All Categories
-                    </button>
-                    {categories.map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm capitalize transition-colors ${
-                          selectedCategory === cat ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <div className="p-5 space-y-6 max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide">
 
-                {/* Brand Filter */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-navy">Brand</h3>
-                    {selectedBrands.length > 0 && (
-                      <button
-                        onClick={() => setSelectedBrands([])}
-                        className="text-xs text-gold hover:text-gold-600"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {availableBrands.map(brand => (
-                      <label
-                        key={brand}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-100 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedBrands.includes(brand)}
-                          onChange={() => toggleBrand(brand)}
-                          className="w-4 h-4 accent-gold rounded"
-                        />
-                        {brand}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Color Filter */}
-                {availableColors.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-navy">Color</h3>
-                      {selectedColors.length > 0 && (
-                        <button
-                          onClick={() => setSelectedColors([])}
-                          className="text-xs text-gold hover:text-gold-600"
-                        >
-                          Clear
-                        </button>
+                  {/* Active filter chips */}
+                  {activeFiltersCount > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedCategory && (
+                        <span className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full capitalize">
+                          {selectedCategory}
+                          <button onClick={() => setSelectedCategory('')}><X className="w-3 h-3" /></button>
+                        </span>
+                      )}
+                      {selectedBrands.map(b => (
+                        <span key={b} className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
+                          {b}
+                          <button onClick={() => toggleBrand(b)}><X className="w-3 h-3" /></button>
+                        </span>
+                      ))}
+                      {selectedColors.map(c => (
+                        <span key={c} className="inline-flex items-center gap-1.5 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
+                          <span className="w-2.5 h-2.5 rounded-full border border-gray-300" style={{ backgroundColor: getColorHex(c) }} />
+                          {c}
+                          <button onClick={() => toggleColor(c)}><X className="w-3 h-3" /></button>
+                        </span>
+                      ))}
+                      {(selectedPriceRange.min > 0 || selectedPriceRange.max < Infinity) && (
+                        <span className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
+                          {selectedPriceRange.label}
+                          <button onClick={() => setSelectedPriceRange(priceRanges[0])}><X className="w-3 h-3" /></button>
+                        </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
-                      {availableColors.map(color => (
-                        <label
-                          key={color}
-                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs cursor-pointer hover:bg-gray-100 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedColors.includes(color)}
-                            onChange={() => toggleColor(color)}
-                            className="w-3.5 h-3.5 accent-gold rounded"
-                          />
-                          <span
-                            className="w-3.5 h-3.5 rounded-full border border-gray-300 flex-shrink-0"
-                            style={{ backgroundColor: getColorHex(color) }}
-                          />
-                          <span className="truncate">{color}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Price Filter */}
-                <div>
-                  <h3 className="text-sm font-medium text-navy mb-3">Price Range</h3>
-                  <div className="space-y-2">
-                    {priceRanges.map((range, i) => (
+                  {/* Category */}
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">Category</p>
+                    <div className="space-y-0.5">
                       <button
-                        key={i}
-                        onClick={() => setSelectedPriceRange(range)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedPriceRange === range ? 'bg-gold/10 text-gold' : 'hover:bg-gray-100'
+                        onClick={() => setSelectedCategory('')}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all ${
+                          !selectedCategory ? 'bg-navy text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'
                         }`}
                       >
-                        {range.label}
+                        <span>All Categories</span>
+                        {!selectedCategory && <span className="text-[10px] text-white/60">{products.length}</span>}
                       </button>
-                    ))}
+                      {categories.map(cat => {
+                        const count = products.filter(p => p.category === cat).length
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm capitalize transition-all ${
+                              selectedCategory === cat ? 'bg-navy text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            <span>{cat}</span>
+                            <span className={`text-[10px] ${selectedCategory === cat ? 'text-white/60' : 'text-gray-400'}`}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Brand */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Brand</p>
+                      {selectedBrands.length > 0 && (
+                        <button onClick={() => setSelectedBrands([])} className="text-[10px] text-gold font-medium">Clear</button>
+                      )}
+                    </div>
+                    {/* Brand search */}
+                    <div className="relative mb-2">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search brands…"
+                        value={brandSearch}
+                        onChange={e => setBrandSearch(e.target.value)}
+                        className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-gold bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-0.5 max-h-44 overflow-y-auto scrollbar-hide">
+                      {availableBrands
+                        .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
+                        .map(brand => {
+                          const checked = selectedBrands.includes(brand)
+                          return (
+                            <button
+                              key={brand}
+                              onClick={() => toggleBrand(brand)}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
+                                checked ? 'bg-gold/10 text-navy font-medium' : 'text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all ${
+                                checked ? 'bg-navy border-navy' : 'border-gray-300'
+                              }`}>
+                                {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5"/></svg>}
+                              </span>
+                              <span className="truncate">{brand}</span>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Color */}
+                  {availableColors.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Color</p>
+                        {selectedColors.length > 0 && (
+                          <button onClick={() => setSelectedColors([])} className="text-[10px] text-gold font-medium">Clear</button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {availableColors.map(color => {
+                          const hex = getColorHex(color)
+                          const isSelected = selectedColors.includes(color)
+                          const isLight = ['white', 'ivory', 'cream', 'beige', 'nude', 'peach', 'lavender', 'mint', 'aqua', 'cyan'].includes(color.toLowerCase())
+                          return (
+                            <button
+                              key={color}
+                              onClick={() => toggleColor(color)}
+                              title={color}
+                              className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
+                                isSelected ? 'border-navy scale-110 shadow-md' : isLight ? 'border-gray-300' : 'border-transparent hover:border-gray-300'
+                              }`}
+                              style={{ backgroundColor: hex }}
+                            >
+                              {isSelected && (
+                                <svg className={`w-3 h-3 mx-auto ${isLight ? 'text-navy' : 'text-white'}`} fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5"/>
+                                </svg>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {selectedColors.length > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-2">{selectedColors.join(', ')}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Price */}
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">Price Range</p>
+                    <div className="space-y-0.5">
+                      {priceRanges.map((range, i) => {
+                        const isActive = selectedPriceRange === range
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedPriceRange(range)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
+                              isActive ? 'bg-gold/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              isActive ? 'border-navy' : 'border-gray-300'
+                            }`}>
+                              {isActive && <span className="w-2 h-2 rounded-full bg-navy" />}
+                            </span>
+                            {range.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </aside>
