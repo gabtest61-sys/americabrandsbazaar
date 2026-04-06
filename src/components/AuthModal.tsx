@@ -144,7 +144,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
           <div className="flex justify-center mb-4 sm:mb-6">
             <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-gold overflow-hidden">
               <Image
-                src="/logo.png"
+                src="/abblogo.jpg"
                 alt="America Brands Bazaar"
                 fill
                 className="object-cover"

@@ -3,7 +3,7 @@ export const BRAND = {
   tagline: 'Discover Premium Brands',
   established: 2023,
   facebook: 'https://www.facebook.com/share/1CWpCZdBB6/?mibextid=wwXIfr',
-  logo: '/logo.png',
+  logo: '/abblogo.jpg',
 }
 
 export const COLORS = {

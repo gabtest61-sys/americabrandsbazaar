@@ -151,7 +151,7 @@ export default function Header() {
                   isScrolled ? 'w-12 h-12' : 'w-16 h-16 md:w-18 md:h-18'
                 }`}>
                   <Image
-                    src="/logo.png"
+                    src="/abblogo.jpg"
                     alt={BRAND.name}
                     fill
                     className="object-contain scale-[1.75]"

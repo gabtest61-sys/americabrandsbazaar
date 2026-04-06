@@ -5,7 +5,6 @@ import { CartProvider } from '@/context/CartContext'
 import { ToastProvider } from '@/components/Toast'
 import CartDrawer from '@/components/CartDrawer'
 import NavigationProgress from '@/components/NavigationProgress'
-import InstallPrompt from '@/components/InstallPrompt'
 import AIChatBubble from '@/components/AIChatBubble'
 import './globals.css'
 
@@ -40,8 +39,8 @@ export const metadata: Metadata = {
     title: 'ABB',
   },
   icons: {
-    icon: '/icon.png',
-    apple: '/apple-icon.png',
+    icon: '/abblogo.jpg',
+    apple: '/abblogo.jpg',
   },
   openGraph: {
     title: 'America Brands Bazaar | Discover Premium Brands',
@@ -63,7 +62,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ABB" />
-        <link rel="apple-touch-icon" href="/apple-icon.png" />
+        <link rel="apple-touch-icon" href="/abblogo.jpg" />
       </head>
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>
         <AuthProvider>
@@ -72,7 +71,6 @@ export default function RootLayout({
               <NavigationProgress />
               {children}
               <CartDrawer />
-              <InstallPrompt />
               <AIChatBubble />
             </ToastProvider>
           </CartProvider>

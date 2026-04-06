@@ -971,7 +971,7 @@ export default function AdminDashboard() {
         <div className="mb-6 flex items-center gap-2">
           <div className="relative w-8 h-8 bg-white rounded-full overflow-hidden flex-shrink-0">
             <Image
-              src="/logo.png"
+              src="/abblogo.jpg"
               alt="America Brands Bazaar Logo"
               fill
               className="object-contain scale-[1.75]"
@@ -1044,7 +1044,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2">
             <div className="relative w-7 h-7 bg-white rounded-full overflow-hidden flex-shrink-0">
               <Image
-                src="/logo.png"
+                src="/abblogo.jpg"
                 alt="America Brands Bazaar Logo"
                 fill
                 className="object-contain scale-[1.75]"
@@ -3698,10 +3698,9 @@ export default function AdminDashboard() {
                       <span className="text-xs text-gray-400">PNG, JPG, WEBP</span>
                     </button>
 
-                    {/* Open camera */}
-                    <button
-                      type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                    {/* Open camera — label directly linked to input for max mobile compatibility */}
+                    <label
+                      htmlFor="admin-camera-input"
                       className="border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center gap-2 hover:border-navy hover:bg-navy/5 transition-colors cursor-pointer"
                     >
                       <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -3710,7 +3709,7 @@ export default function AdminDashboard() {
                       </svg>
                       <span className="text-sm font-medium text-gray-600">Take Photo</span>
                       <span className="text-xs text-gray-400">Use camera</span>
-                    </button>
+                    </label>
                   </div>
                 )}
 
@@ -3723,14 +3722,15 @@ export default function AdminDashboard() {
                   onChange={(e) => handleImageUpload(e.target.files)}
                   className="hidden"
                 />
-                {/* Camera input — capture */}
+                {/* Camera input — opacity-0 (NOT display:none) so iOS Safari allows label trigger */}
                 <input
+                  id="admin-camera-input"
                   ref={cameraInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={(e) => handleImageUpload(e.target.files)}
-                  className="hidden"
+                  style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden' }}
                 />
               </div>
 

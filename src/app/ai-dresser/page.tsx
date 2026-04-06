@@ -46,17 +46,22 @@ function filterProducts(
   const selectedColors = COLOR_GROUPS[colorGroup] || []
 
   const scored = products
-    .filter((p) => p.inStock)
-    .map((p) => {
-      let score = 0
+    .filter((p) => {
+      if (!p.inStock) return false
 
-      // Gender match
+      // Hard gender filter — products with no gender field pass through for all selections
       if (gender !== 'Both' && p.gender) {
-        if (p.gender.toLowerCase().includes(gender.toLowerCase())) score += 3
-        else if (p.gender.toLowerCase() === 'unisex') score += 1
-      } else {
-        score += 1
+        const g = p.gender.toLowerCase()
+        const isUnisex = g === 'unisex' || g === 'both' || g === 'all'
+        const matchesMen = gender === 'Men' && (g.includes('men') || g.includes('male') || g.includes('man'))
+        const matchesWomen = gender === 'Women' && (g.includes('women') || g.includes('female') || g.includes('woman') || g.includes('girl'))
+        if (!isUnisex && !matchesMen && !matchesWomen) return false
       }
+
+      return true
+    })
+    .map((p) => {
+      let score = 1 // base score — gender already hard-filtered above
 
       // Style / tag match
       const allText = [
@@ -89,8 +94,7 @@ function filterProducts(
     })
     .sort((a, b) => b.score - a.score)
 
-  // Return top 8, minimum score of 1
-  return scored.filter((s) => s.score > 0).slice(0, 8).map((s) => s.product)
+  return scored.slice(0, 8).map((s) => s.product)
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -219,7 +223,17 @@ export default function AIDresserPage() {
         const picks = allProducts.filter((p) =>
           (data.recommendedProductIds as string[]).includes(p.id as string)
         )
-        setRecommended(picks.length > 0 ? picks : allProducts.filter((p) => p.inStock).slice(0, 8))
+        // Fallback also respects gender filter
+        const genderFallback = allProducts.filter((p) => {
+          if (!p.inStock) return false
+          if (gender === 'Both' || !p.gender) return true
+          const g = p.gender.toLowerCase()
+          if (g === 'unisex' || g === 'both' || g === 'all') return true
+          if (gender === 'Men') return g.includes('men') || g.includes('male') || g.includes('man')
+          if (gender === 'Women') return g.includes('women') || g.includes('female') || g.includes('woman')
+          return true
+        })
+        setRecommended(picks.length > 0 ? picks : genderFallback.slice(0, 8))
         setAiStyleNote(data.styleNote || '')
         setPageStep('results')
       } catch (err: any) {
@@ -673,7 +687,7 @@ export default function AIDresserPage() {
                         {addedToCart.includes(tryOnProduct.id as string) ? (
                           <><CheckCircle className="w-4 h-4 text-green-400" /> Added!</>
                         ) : (
-                          <><ShoppingCart className="w-4 h-4" /> Add to Cart — ${tryOnProduct.price}</>
+                          <><ShoppingCart className="w-4 h-4" /> Add to Cart — ₱{tryOnProduct.price.toLocaleString()}</>
                         )}
                       </button>
                       <button

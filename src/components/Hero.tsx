@@ -124,7 +124,7 @@ export default function Hero() {
               {/* Main logo */}
               <div className="absolute inset-12 sm:inset-16 rounded-full border-4 border-gold shadow-2xl shadow-gold/30 overflow-hidden bg-cream">
                 <Image
-                  src="/logo.png"
+                  src="/abblogo.jpg"
                   alt={BRAND.name}
                   fill
                   className="object-contain scale-[1.75]"

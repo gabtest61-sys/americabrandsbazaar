@@ -57,7 +57,7 @@ export default function Footer() {
             <Link href="/" className="flex items-center gap-3 mb-5">
               <div className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-gold/50 bg-white">
                 <Image
-                  src="/logo.png"
+                  src="/abblogo.jpg"
                   alt={BRAND.name}
                   fill
                   className="object-contain scale-[1.75]"

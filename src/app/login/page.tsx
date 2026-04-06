@@ -79,7 +79,7 @@ function LoginForm() {
           <div className="flex justify-center mb-6">
             <div className="relative w-20 h-20 rounded-full border-2 border-gold overflow-hidden">
               <Image
-                src="/logo.png"
+                src="/abblogo.jpg"
                 alt="America Brands Bazaar"
                 fill
                 className="object-cover"
