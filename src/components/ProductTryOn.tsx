@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { Wand2, X, Upload, Camera, Loader2, RotateCcw, Sparkles, AlertCircle, CheckCircle, Zap, LogIn, ShieldCheck, UserPlus } from 'lucide-react'
-import { FirestoreProduct, saveTryOnResult, getTryOnCredits, consumeTryOnCredit } from '@/lib/firestore'
+import { Wand2, X, Upload, Camera, Loader2, RotateCcw, Sparkles, AlertCircle, CheckCircle, Zap, LogIn, ShieldCheck, UserPlus, Bookmark } from 'lucide-react'
+import { FirestoreProduct, saveTryOnResult, getTryOnCredits, consumeTryOnCredit, saveTryOnLook } from '@/lib/firestore'
 import { useAuth } from '@/context/AuthContext'
 import AuthModal from '@/components/AuthModal'
 
@@ -25,6 +25,8 @@ export default function ProductTryOn({ product }: Props) {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [credits, setCredits] = useState<number | null>(null)
+  const [savedLookId, setSavedLookId] = useState<string | null>(null)
+  const [savingLook, setSavingLook] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
   const [showAuth, setShowAuth] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
@@ -46,6 +48,7 @@ export default function ProductTryOn({ product }: Props) {
     setPersonUrl(null)
     setResultUrl(null)
     setError('')
+    setSavedLookId(null)
   }
 
   const retryWithSamePhoto = () => {
@@ -459,6 +462,29 @@ export default function ProductTryOn({ product }: Props) {
                       Change Photo
                     </button>
                   </div>
+                  <button
+                    disabled={savingLook || !!savedLookId}
+                    onClick={async () => {
+                      if (!user?.id || savingLook || savedLookId) return
+                      setSavingLook(true)
+                      const id = await saveTryOnLook(user.id, product, resultUrl!)
+                      setSavedLookId(id)
+                      setSavingLook(false)
+                    }}
+                    className={`w-full py-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-semibold transition-colors ${
+                      savedLookId
+                        ? 'border-green-200 bg-green-50 text-green-600'
+                        : 'border-gold/40 bg-gold/5 text-navy hover:bg-gold/15'
+                    } disabled:opacity-60`}
+                  >
+                    {savingLook ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : savedLookId ? (
+                      <><CheckCircle className="w-4 h-4" /> Saved to Looks</>
+                    ) : (
+                      <><Bookmark className="w-4 h-4 text-gold" /> Save Look</>
+                    )}
+                  </button>
                 </div>
               )}
             </div>

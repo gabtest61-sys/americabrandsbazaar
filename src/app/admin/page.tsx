@@ -10,10 +10,10 @@ import {
   ChevronRight, Search, Filter, MoreVertical, LogOut, Download, Loader2,
   AlertTriangle, BarChart3, Plus, Edit2, Trash2, Save, X,
   Upload, ImageIcon, Calendar, ChevronLeft, ArrowUpDown,
-  CheckSquare, Square, History, MessageSquare, Printer,
+  CheckSquare, Square, History,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
   Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle,
-  Grid, List, LayoutGrid, Table2, Wand2
+  Grid, List, LayoutGrid, Table2, Wand2, RefreshCw
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -33,11 +33,16 @@ import {
   updateShippingSettings,
   ShippingSettings,
   ShippingRate,
+  getPaymentSettings,
+  updatePaymentSettings,
+  PaymentSettings,
   getAllReviews,
   deleteReview,
   Review,
   getAllTryOns,
-  TryOnResult
+  TryOnResult,
+  createOrderNotification,
+  deleteOrder
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 import { storage } from '@/lib/firebase'
@@ -92,6 +97,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [ordersRefreshing, setOrdersRefreshing] = useState(false)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
 
   // Product management state
   const [firestoreProducts, setFirestoreProducts] = useState<FirestoreProduct[]>([])
@@ -156,6 +163,10 @@ export default function AdminDashboard() {
   // Order print modal
   const [printOrder, setPrintOrder] = useState<FirestoreOrder | null>(null)
 
+  // Delete order confirmation
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null)
+  const [deletingOrder, setDeletingOrder] = useState(false)
+
   // Product import
   const productImportRef = useRef<HTMLInputElement>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -171,6 +182,11 @@ export default function AdminDashboard() {
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null)
   const [editingShipping, setEditingShipping] = useState<ShippingSettings | null>(null)
   const [isSavingShipping, setIsSavingShipping] = useState(false)
+
+  // Payment settings state
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
+  const [editingPayment, setEditingPayment] = useState<PaymentSettings | null>(null)
+  const [isSavingPayment, setIsSavingPayment] = useState(false)
 
   // Reviews management state
   const [reviews, setReviews] = useState<Review[]>([])
@@ -214,13 +230,14 @@ export default function AdminDashboard() {
       setIsAdmin(adminStatus)
 
       if (adminStatus) {
-        const [ordersData, usersData, productsData, shippingData, reviewsData, tryOnsData] = await Promise.all([
+        const [ordersData, usersData, productsData, shippingData, reviewsData, tryOnsData, paymentData] = await Promise.all([
           getAllOrders(),
           getAllUsers(),
           getFirestoreProducts(),
           getShippingSettings(),
           getAllReviews(),
-          getAllTryOns()
+          getAllTryOns(),
+          getPaymentSettings()
         ])
         setOrders(ordersData)
         setUsers(usersData)
@@ -228,6 +245,7 @@ export default function AdminDashboard() {
         setShippingSettings(shippingData)
         setReviews(reviewsData)
         setTryOns(tryOnsData)
+        setPaymentSettings(paymentData)
       }
       setIsLoadingData(false)
     }
@@ -236,6 +254,26 @@ export default function AdminDashboard() {
       fetchData()
     }
   }, [isLoggedIn, user])
+
+  const refreshOrders = useCallback(async () => {
+    if (ordersRefreshing) return
+    setOrdersRefreshing(true)
+    try {
+      const ordersData = await getAllOrders()
+      setOrders(ordersData)
+      setLastRefreshed(new Date())
+    } catch (e) {
+      console.error('Failed to refresh orders', e)
+    }
+    setOrdersRefreshing(false)
+  }, [ordersRefreshing])
+
+  // Auto-refresh orders every 2 minutes
+  useEffect(() => {
+    if (!isAdmin) return
+    const interval = setInterval(refreshOrders, 2 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [isAdmin, refreshOrders])
 
   // Combined products - Firestore takes priority, fallback to static
   const allProducts = firestoreProducts.length > 0 ? firestoreProducts : staticProducts
@@ -276,16 +314,26 @@ export default function AdminDashboard() {
     totalCustomers: users.length,
   }
 
-  // Payment stats
+  // Payment stats — gcash + bank = online; no more COD
+  const gcashOrders = orders.filter(o => o.paymentMethod === 'gcash')
+  const bankOrders = orders.filter(o => o.paymentMethod === 'bank')
+  const confirmedOrders = orders.filter(o => o.status === 'confirmed' || o.status === 'processing' || o.status === 'shipped' || o.status === 'delivered')
   const paymentStats = {
-    paidOrders: orders.filter(o => o.paymentStatus === 'paid').length,
-    pendingPayments: orders.filter(o => o.paymentStatus === 'pending').length,
-    failedPayments: orders.filter(o => o.paymentStatus === 'failed').length,
-    paidRevenue: orders.filter(o => o.paymentStatus === 'paid').reduce((sum, o) => sum + o.total, 0),
-    codOrders: orders.filter(o => o.paymentMethod === 'cod').length,
-    onlineOrders: orders.filter(o => o.paymentMethod === 'online').length,
-    codRevenue: orders.filter(o => o.paymentMethod === 'cod').reduce((sum, o) => sum + o.total, 0),
-    onlineRevenue: orders.filter(o => o.paymentMethod === 'online').reduce((sum, o) => sum + o.total, 0),
+    confirmedOrders: confirmedOrders.length,
+    confirmedRevenue: confirmedOrders.reduce((sum, o) => sum + o.total, 0),
+    pendingPayments: orders.filter(o => o.status === 'pending').length,
+    pendingRevenue: orders.filter(o => o.status === 'pending').reduce((sum, o) => sum + o.total, 0),
+    gcashOrders: gcashOrders.length,
+    gcashRevenue: gcashOrders.reduce((sum, o) => sum + o.total, 0),
+    bankOrders: bankOrders.length,
+    bankRevenue: bankOrders.reduce((sum, o) => sum + o.total, 0),
+    // kept for backward compat in other parts
+    paidOrders: confirmedOrders.length,
+    paidRevenue: confirmedOrders.reduce((sum, o) => sum + o.total, 0),
+    onlineOrders: gcashOrders.length + bankOrders.length,
+    onlineRevenue: [...gcashOrders, ...bankOrders].reduce((sum, o) => sum + o.total, 0),
+    codOrders: 0,
+    codRevenue: 0,
   }
 
   // Inventory stats - Low stock threshold
@@ -359,6 +407,15 @@ export default function AdminDashboard() {
     currentPage * itemsPerPage
   )
 
+  const STATUS_MESSAGES: Record<string, string> = {
+    confirmed: 'Your order has been confirmed! Please complete your payment.',
+    processing: 'Your order is being processed and packed.',
+    shipped: '🚚 Your order is on its way!',
+    delivered: '📦 Your order has been delivered. Thank you!',
+    cancelled: 'Your order has been cancelled. Contact us for assistance.',
+    pending: 'Your order is pending confirmation.',
+  }
+
   const handleStatusChange = async (docId: string, newStatus: FirestoreOrder['status'], isGuestOrder: boolean = false) => {
     const success = await updateOrderStatus(docId, newStatus, isGuestOrder)
     if (success) {
@@ -367,7 +424,111 @@ export default function AdminDashboard() {
       if (selectedOrder?.id === docId) {
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null)
       }
+
+      const order = ordersData.find(o => o.id === docId) || orders.find(o => o.id === docId)
+      if (!order) return
+
+      if (order.customerInfo.email) {
+        const isPaymentMethod = order.paymentMethod === 'gcash' || order.paymentMethod === 'bank'
+
+        if (newStatus === 'confirmed' && isPaymentMethod) {
+          // Confirmed + gcash/bank → send payment instructions email
+          fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'payment_instructions',
+              orderId: order.orderId,
+              customer: {
+                name: order.customerInfo.name,
+                email: order.customerInfo.email,
+                phone: order.customerInfo.phone,
+                address: order.customerInfo.address,
+                city: order.customerInfo.city,
+                houseNo: order.customerInfo.houseNo,
+                street: order.customerInfo.street,
+                barangay: order.customerInfo.barangay,
+                province: order.customerInfo.province,
+                zip: order.customerInfo.zip,
+              },
+              products: order.items.map(i => ({
+                name: i.name,
+                brand: i.brand,
+                price: i.price,
+                quantity: i.quantity,
+                size: i.size,
+                color: i.color,
+              })),
+              total: order.total,
+              paymentMethod: order.paymentMethod,
+              paymentSettings: paymentSettings ? {
+                gcashNumber: paymentSettings.gcashNumber,
+                gcashName: paymentSettings.gcashName,
+                bankName: paymentSettings.bankName,
+                bankAccount: paymentSettings.bankAccount,
+                bankAccountName: paymentSettings.bankAccountName,
+              } : undefined,
+            }),
+          }).catch(() => {})
+        } else if (newStatus !== 'confirmed') {
+          // All other statuses (processing, shipped, delivered, cancelled) → status update email
+          fetch('/api/email/status-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: order.orderId,
+              customerName: order.customerInfo.name,
+              customerEmail: order.customerInfo.email,
+              status: newStatus,
+              items: order.items.map(i => ({
+                name: i.name,
+                brand: i.brand,
+                price: i.price,
+                quantity: i.quantity,
+              })),
+              total: order.total,
+            }),
+          }).catch(() => {})
+        }
+      }
+
+      // Create in-app notification + push for registered users
+      // Fall back to looking up userId by email if order.userId is missing
+      const resolvedUserId = order.userId || users.find(u => u.email === order.customerInfo.email)?.id
+      if (resolvedUserId) {
+        const notifMessage = STATUS_MESSAGES[newStatus] || `Your order status has been updated to ${newStatus}.`
+        createOrderNotification(resolvedUserId, order.orderId, newStatus, notifMessage).catch(() => {})
+        fetch('/api/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: resolvedUserId,
+            title: `Order ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)} — ${order.orderId}`,
+            body: notifMessage,
+            orderId: order.orderId,
+            status: newStatus,
+          }),
+        }).catch(() => {})
+      }
     }
+  }
+
+  const handleDeleteOrder = async (docId: string, isGuest: boolean) => {
+    setDeletingOrder(true)
+    try {
+      const success = await deleteOrder(docId, isGuest)
+      if (success) {
+        setOrders(prev => prev.filter(o => o.id !== docId))
+        if (selectedOrder?.id === docId) setSelectedOrder(null)
+      } else {
+        alert('Failed to delete order. Please try again.')
+      }
+    } catch (e) {
+      console.error('Delete order error:', e)
+      alert('Error deleting order.')
+    }
+    setDeleteOrderId(null)
+    setDeletingOrder(false)
   }
 
   // Export users to CSV
@@ -1182,42 +1343,42 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-green-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Paid</p>
-                    <p className="text-xl font-bold text-navy">{paymentStats.paidOrders}</p>
+                    <p className="text-sm text-gray-500">Confirmed</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.confirmedOrders}</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-green-500" />
                 </div>
-                <p className="text-xs text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()}</p>
+                <p className="text-xs text-green-600 mt-1">₱{paymentStats.confirmedRevenue.toLocaleString()}</p>
               </div>
               <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-yellow-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Pending Payment</p>
+                    <p className="text-sm text-gray-500">Pending</p>
                     <p className="text-xl font-bold text-navy">{paymentStats.pendingPayments}</p>
                   </div>
                   <Clock className="w-8 h-8 text-yellow-500" />
                 </div>
-                <p className="text-xs text-yellow-600 mt-1">Awaiting payment</p>
+                <p className="text-xs text-yellow-600 mt-1">₱{paymentStats.pendingRevenue.toLocaleString()} awaiting</p>
               </div>
               <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Online Payments</p>
-                    <p className="text-xl font-bold text-navy">{paymentStats.onlineOrders}</p>
+                    <p className="text-sm text-gray-500">GCash</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.gcashOrders}</p>
                   </div>
-                  <CreditCard className="w-8 h-8 text-blue-500" />
+                  <span className="text-2xl">📱</span>
                 </div>
-                <p className="text-xs text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+                <p className="text-xs text-blue-600 mt-1">₱{paymentStats.gcashRevenue.toLocaleString()}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-amber-500">
+              <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">COD Orders</p>
-                    <p className="text-xl font-bold text-navy">{paymentStats.codOrders}</p>
+                    <p className="text-sm text-gray-500">Bank Transfer</p>
+                    <p className="text-xl font-bold text-navy">{paymentStats.bankOrders}</p>
                   </div>
-                  <Wallet className="w-8 h-8 text-amber-500" />
+                  <span className="text-2xl">🏦</span>
                 </div>
-                <p className="text-xs text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
+                <p className="text-xs text-purple-600 mt-1">₱{paymentStats.bankRevenue.toLocaleString()}</p>
               </div>
             </div>
 
@@ -1386,7 +1547,18 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            <p className="text-xs text-gray-400 px-1">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found</p>
+            <div className="flex items-center gap-3 px-1">
+              <p className="text-xs text-gray-400">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found</p>
+              <button
+                onClick={refreshOrders}
+                disabled={ordersRefreshing}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-navy transition-colors disabled:opacity-50"
+                title="Refresh orders"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${ordersRefreshing ? 'animate-spin' : ''}`} />
+                {lastRefreshed ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Refresh'}
+              </button>
+            </div>
 
             {/* Mobile: card list */}
             <div className="lg:hidden space-y-2">
@@ -1418,13 +1590,10 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : order.paymentStatus === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                          {order.paymentMethod === 'cod' ? 'COD' : 'Online'} · {order.paymentStatus}
+                          {order.paymentMethod === 'gcash' ? '📱 GCash' : order.paymentMethod === 'bank' ? '🏦 Bank' : order.paymentMethod?.toUpperCase() || '—'} · {order.status}
                         </span>
-                        <button onClick={(e) => { e.stopPropagation(); setOrderNotesModal({ order, note: order.notes || '' }) }} className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
-                          <MessageSquare className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setPrintOrder(order) }} className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
-                          <Printer className="w-3.5 h-3.5" />
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteOrderId(order.id!) }} className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1457,8 +1626,8 @@ export default function AdminDashboard() {
                 </select>
                 <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gold">
                   <option value="">All Methods</option>
-                  <option value="online">Online</option>
-                  <option value="cod">COD</option>
+                  <option value="gcash">📱 GCash</option>
+                  <option value="bank">🏦 Bank Transfer</option>
                 </select>
               </div>
               <div className="overflow-x-auto">
@@ -1476,11 +1645,11 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 font-semibold text-navy">₱{order.total.toLocaleString()}</td>
                         <td className="py-4 px-4">
                           <div className="flex flex-col gap-1">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${order.paymentMethod === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {order.paymentMethod === 'online' ? <><CreditCard className="w-3 h-3" /> Online</> : <><Wallet className="w-3 h-3" /> COD</>}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${order.paymentMethod === 'gcash' ? 'bg-blue-100 text-blue-700' : order.paymentMethod === 'bank' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {order.paymentMethod === 'gcash' ? <>📱 GCash</> : order.paymentMethod === 'bank' ? <>🏦 Bank</> : order.paymentMethod?.toUpperCase() || '—'}
                             </span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : order.paymentStatus === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                              {order.paymentStatus}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${order.status === 'confirmed' || order.status === 'delivered' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {order.status}
                             </span>
                           </div>
                         </td>
@@ -1492,9 +1661,8 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4 text-sm text-gray-500">{order.createdAt?.toDate().toLocaleDateString() || 'N/A'}</td>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => setSelectedOrder(order)} className="text-gold hover:text-gold-600"><Eye className="w-5 h-5" /></button>
-                            <button onClick={() => setOrderNotesModal({ order, note: order.notes || '' })} className="text-gray-400 hover:text-blue-600"><MessageSquare className="w-5 h-5" /></button>
-                            <button onClick={() => setPrintOrder(order)} className="text-gray-400 hover:text-green-600"><Printer className="w-5 h-5" /></button>
+                            <button onClick={() => setSelectedOrder(order)} className="text-gold hover:text-gold-600" title="View"><Eye className="w-5 h-5" /></button>
+                            <button onClick={() => setDeleteOrderId(order.id!)} className="text-gray-300 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-5 h-5" /></button>
                           </div>
                         </td>
                       </tr>
@@ -1965,40 +2133,40 @@ export default function AdminDashboard() {
                   <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                   </div>
-                  <p className="text-sm text-gray-500">Paid Orders</p>
+                  <p className="text-sm text-gray-500">Confirmed Orders</p>
                 </div>
-                <p className="text-2xl font-bold text-navy">{paymentStats.paidOrders}</p>
-                <p className="text-sm text-green-600 mt-1">₱{paymentStats.paidRevenue.toLocaleString()} confirmed</p>
+                <p className="text-2xl font-bold text-navy">{paymentStats.confirmedOrders}</p>
+                <p className="text-sm text-green-600 mt-1">₱{paymentStats.confirmedRevenue.toLocaleString()}</p>
               </div>
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
                     <Clock className="w-4 h-4 text-yellow-600" />
                   </div>
-                  <p className="text-sm text-gray-500">Pending Payments</p>
+                  <p className="text-sm text-gray-500">Pending Orders</p>
                 </div>
                 <p className="text-2xl font-bold text-navy">{paymentStats.pendingPayments}</p>
-                <p className="text-sm text-yellow-600 mt-1">Awaiting payment</p>
+                <p className="text-sm text-yellow-600 mt-1">₱{paymentStats.pendingRevenue.toLocaleString()} awaiting</p>
               </div>
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">📱</span>
                   </div>
-                  <p className="text-sm text-gray-500">Online Payments</p>
+                  <p className="text-sm text-gray-500">GCash Orders</p>
                 </div>
-                <p className="text-2xl font-bold text-navy">{paymentStats.onlineOrders}</p>
-                <p className="text-sm text-blue-600 mt-1">₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-navy">{paymentStats.gcashOrders}</p>
+                <p className="text-sm text-blue-600 mt-1">₱{paymentStats.gcashRevenue.toLocaleString()}</p>
               </div>
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <Wallet className="w-4 h-4 text-amber-600" />
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <span className="text-sm">🏦</span>
                   </div>
-                  <p className="text-sm text-gray-500">COD Orders</p>
+                  <p className="text-sm text-gray-500">Bank Transfer Orders</p>
                 </div>
-                <p className="text-2xl font-bold text-navy">{paymentStats.codOrders}</p>
-                <p className="text-sm text-amber-600 mt-1">₱{paymentStats.codRevenue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-navy">{paymentStats.bankOrders}</p>
+                <p className="text-sm text-purple-600 mt-1">₱{paymentStats.bankRevenue.toLocaleString()}</p>
               </div>
             </div>
 
@@ -2008,33 +2176,33 @@ export default function AdminDashboard() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-600">Online Payments</span>
+                    <span className="text-gray-600">📱 GCash</span>
                     <span className="font-semibold text-navy">
-                      {stats.totalOrders > 0 ? Math.round((paymentStats.onlineOrders / stats.totalOrders) * 100) : 0}%
+                      {stats.totalOrders > 0 ? Math.round((paymentStats.gcashOrders / stats.totalOrders) * 100) : 0}%
                     </span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-blue-500 rounded-full transition-all"
-                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.onlineOrders / stats.totalOrders) * 100 : 0}%` }}
+                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.gcashOrders / stats.totalOrders) * 100 : 0}%` }}
                     />
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">{paymentStats.onlineOrders} orders • ₱{paymentStats.onlineRevenue.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 mt-1">{paymentStats.gcashOrders} orders • ₱{paymentStats.gcashRevenue.toLocaleString()}</p>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-600">Cash on Delivery</span>
+                    <span className="text-gray-600">🏦 Bank Transfer</span>
                     <span className="font-semibold text-navy">
-                      {stats.totalOrders > 0 ? Math.round((paymentStats.codOrders / stats.totalOrders) * 100) : 0}%
+                      {stats.totalOrders > 0 ? Math.round((paymentStats.bankOrders / stats.totalOrders) * 100) : 0}%
                     </span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-amber-500 rounded-full transition-all"
-                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.codOrders / stats.totalOrders) * 100 : 0}%` }}
+                      className="h-full bg-purple-500 rounded-full transition-all"
+                      style={{ width: `${stats.totalOrders > 0 ? (paymentStats.bankOrders / stats.totalOrders) * 100 : 0}%` }}
                     />
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">{paymentStats.codOrders} orders • ₱{paymentStats.codRevenue.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 mt-1">{paymentStats.bankOrders} orders • ₱{paymentStats.bankRevenue.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -3076,6 +3244,177 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+
+            {/* Payment Settings */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-navy">Payment Settings</h2>
+                  <p className="text-sm text-gray-500">GCash and bank transfer details shown in order confirmation emails</p>
+                </div>
+                {!editingPayment && (
+                  <button
+                    onClick={() => setEditingPayment(paymentSettings ? { ...paymentSettings } : { gcashNumber: '', gcashName: '', bankName: '', bankAccount: '', bankAccountName: '' })}
+                    className="flex items-center gap-2 bg-gold hover:bg-yellow-500 text-navy font-semibold px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {/* View mode */}
+              {!editingPayment && paymentSettings && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xl">📱</span>
+                      <h3 className="font-semibold text-navy">GCash</h3>
+                    </div>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Number:</span>
+                        <span className="font-medium text-navy">{paymentSettings.gcashNumber || <span className="text-gray-300 italic">Not set</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Account Name:</span>
+                        <span className="font-medium text-navy">{paymentSettings.gcashName || <span className="text-gray-300 italic">Not set</span>}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xl">🏦</span>
+                      <h3 className="font-semibold text-navy">Bank Transfer</h3>
+                    </div>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Bank:</span>
+                        <span className="font-medium text-navy">{paymentSettings.bankName || <span className="text-gray-300 italic">Not set</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Account No.:</span>
+                        <span className="font-medium text-navy">{paymentSettings.bankAccount || <span className="text-gray-300 italic">Not set</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Account Name:</span>
+                        <span className="font-medium text-navy">{paymentSettings.bankAccountName || <span className="text-gray-300 italic">Not set</span>}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit mode */}
+              {editingPayment && (
+                <div className="space-y-6">
+                  {/* GCash */}
+                  <div className="bg-blue-50 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xl">📱</span>
+                      <h3 className="font-semibold text-navy">GCash</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">GCash Number</label>
+                        <input
+                          type="text"
+                          value={editingPayment.gcashNumber}
+                          onChange={(e) => setEditingPayment({ ...editingPayment, gcashNumber: e.target.value })}
+                          placeholder="09XX-XXX-XXXX"
+                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Account Name</label>
+                        <input
+                          type="text"
+                          value={editingPayment.gcashName}
+                          onChange={(e) => setEditingPayment({ ...editingPayment, gcashName: e.target.value })}
+                          placeholder="Juan Dela Cruz"
+                          className="w-full px-3 py-2.5 border border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 bg-white text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bank Transfer */}
+                  <div className="bg-green-50 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xl">🏦</span>
+                      <h3 className="font-semibold text-navy">Bank Transfer</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Bank Name</label>
+                        <input
+                          type="text"
+                          value={editingPayment.bankName}
+                          onChange={(e) => setEditingPayment({ ...editingPayment, bankName: e.target.value })}
+                          placeholder="BDO / BPI / UnionBank"
+                          className="w-full px-3 py-2.5 border border-green-200 rounded-lg focus:outline-none focus:border-green-400 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Account Number</label>
+                        <input
+                          type="text"
+                          value={editingPayment.bankAccount}
+                          onChange={(e) => setEditingPayment({ ...editingPayment, bankAccount: e.target.value })}
+                          placeholder="1234-5678-9012"
+                          className="w-full px-3 py-2.5 border border-green-200 rounded-lg focus:outline-none focus:border-green-400 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Account Name</label>
+                        <input
+                          type="text"
+                          value={editingPayment.bankAccountName}
+                          onChange={(e) => setEditingPayment({ ...editingPayment, bankAccountName: e.target.value })}
+                          placeholder="Juan Dela Cruz"
+                          className="w-full px-3 py-2.5 border border-green-200 rounded-lg focus:outline-none focus:border-green-400 bg-white text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2 border-t border-gray-200">
+                    <button
+                      onClick={async () => {
+                        setIsSavingPayment(true)
+                        const success = await updatePaymentSettings(editingPayment)
+                        if (success) {
+                          setPaymentSettings(editingPayment)
+                          setEditingPayment(null)
+                        } else {
+                          alert('Failed to save payment settings')
+                        }
+                        setIsSavingPayment(false)
+                      }}
+                      disabled={isSavingPayment}
+                      className="flex items-center gap-2 bg-gold hover:bg-yellow-500 text-navy font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSavingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setEditingPayment(null)}
+                      className="px-6 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!paymentSettings && !editingPayment && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-gray-300 mx-auto mb-2 animate-spin" />
+                  <p className="text-gray-500">Loading payment settings...</p>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </main>
@@ -3159,13 +3498,13 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500">Payment Method</span>
                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
-                      selectedOrder.paymentMethod === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                      selectedOrder.paymentMethod === 'gcash' ? 'bg-blue-100 text-blue-700' :
+                      selectedOrder.paymentMethod === 'bank' ? 'bg-purple-100 text-purple-700' :
+                      'bg-gray-100 text-gray-700'
                     }`}>
-                      {selectedOrder.paymentMethod === 'online' ? (
-                        <><CreditCard className="w-4 h-4" /> Online Payment</>
-                      ) : (
-                        <><Wallet className="w-4 h-4" /> Cash on Delivery</>
-                      )}
+                      {selectedOrder.paymentMethod === 'gcash' ? <>📱 GCash</> :
+                       selectedOrder.paymentMethod === 'bank' ? <>🏦 Bank Transfer</> :
+                       selectedOrder.paymentMethod?.toUpperCase() || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -3454,24 +3793,6 @@ export default function AdminDashboard() {
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Leave empty if no sale</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Total Stock</label>
-                    <div className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-semibold text-navy">
-                      {Object.values(productFormData.stockBySize || {}).reduce((sum, qty) => sum + qty, 0) || productFormData.stockQty || 0}
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Auto from sizes</p>
-                  </div>
-                  <div className="flex items-center">
-                    <label className="flex items-center gap-2 cursor-pointer mt-4">
-                      <input
-                        type="checkbox"
-                        checked={productFormData.inStock !== false}
-                        onChange={(e) => setProductFormData(prev => ({ ...prev, inStock: e.target.checked }))}
-                        className="w-4 h-4 accent-gold"
-                      />
-                      <span className="text-sm font-medium">In Stock</span>
-                    </label>
-                  </div>
                 </div>
               </div>
 
@@ -3699,33 +4020,31 @@ export default function AdminDashboard() {
                     )
                   })}
                 </div>
+
+                {/* Total Stock Summary */}
+                {(() => {
+                  const total = Object.values(productFormData.stockBySize || {}).reduce((sum, qty) => sum + qty, 0) || productFormData.stockQty || 0
+                  return (
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Stock</span>
+                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
+                        total > 20 ? 'bg-green-100 text-green-700' :
+                        total > 0 ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-600'
+                      }`}>
+                        {total > 0 && (
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 12 12">
+                            <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                          </svg>
+                        )}
+                        {total} {total === 0 ? '— Out of Stock' : total === 1 ? 'unit' : 'units'}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
 
 
-              {/* Flags */}
-              <div className="bg-gold/10 rounded-2xl p-3 sm:p-4">
-                <h4 className="font-semibold text-navy text-sm mb-3">Display Options</h4>
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productFormData.featured || false}
-                      onChange={(e) => setProductFormData(prev => ({ ...prev, featured: e.target.checked }))}
-                      className="w-4 h-4 accent-gold"
-                    />
-                    <span className="text-sm font-medium">Featured Product</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productFormData.giftSuitable !== false}
-                      onChange={(e) => setProductFormData(prev => ({ ...prev, giftSuitable: e.target.checked }))}
-                      className="w-4 h-4 accent-gold"
-                    />
-                    <span className="text-sm font-medium">Gift Suitable</span>
-                  </label>
-                </div>
-              </div>
             </div>
             </div>{/* end flex-1 overflow-y-auto */}
 
@@ -3911,6 +4230,39 @@ export default function AdminDashboard() {
                   Save Note
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Order Confirmation Modal */}
+      {deleteOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteOrderId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-7 h-7 text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-navy mb-2">Delete Order?</h3>
+            <p className="text-sm text-gray-500 mb-6">This will permanently remove the order from your records. This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteOrderId(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const order = orders.find(o => o.id === deleteOrderId)
+                  if (order) handleDeleteOrder(deleteOrderId, !order.userId)
+                }}
+                disabled={deletingOrder}
+                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {deletingOrder ? 'Deleting…' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>

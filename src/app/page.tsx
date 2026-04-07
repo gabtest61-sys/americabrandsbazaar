@@ -5,6 +5,7 @@ import Categories from '@/components/Categories'
 import FeaturedProducts from '@/components/FeaturedProducts'
 import AIDresserBanner from '@/components/AIDresserBanner'
 import Reviews from '@/components/Reviews'
+import AppInstallSection from '@/components/AppInstallSection'
 import Footer from '@/components/Footer'
 
 export default function Home() {
@@ -16,6 +17,7 @@ export default function Home() {
       <FeaturedProducts />
       <AIDresserBanner />
       <Reviews />
+      <AppInstallSection />
       <Footer />
       <AIChatBubble />
     </main>

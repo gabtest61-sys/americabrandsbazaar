@@ -7,14 +7,14 @@ import {
   Upload, Sparkles, ShoppingCart, Wand2, Lock,
   RotateCcw, AlertCircle, ChevronRight, Loader2,
   CheckCircle, X, ImageIcon, Shirt, Palette,
-  User, ArrowRight, ZoomIn, Zap,
+  User, ArrowRight, ZoomIn, Zap, Bookmark,
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { getFirestoreProducts, FirestoreProduct, getTryOnCredits, consumeTryOnCredit, saveTryOnResult } from '@/lib/firestore'
+import { getFirestoreProducts, FirestoreProduct, getTryOnCredits, consumeTryOnCredit, saveTryOnResult, saveTryOnLook } from '@/lib/firestore'
 
 // ─── Style quiz options ───────────────────────────────────────────────────────
 const GENDERS = ['Men', 'Women', 'Both']
@@ -132,6 +132,8 @@ export default function AIDresserPage() {
   const [zoomOpen, setZoomOpen] = useState(false)
   const [tryOnError, setTryOnError] = useState('')
   const [addedToCart, setAddedToCart] = useState<string[]>([])
+  const [savedTryOnLookId, setSavedTryOnLookId] = useState<string | null>(null)
+  const [savingLook, setSavingLook] = useState(false)
 
   // Marketing consent state — synced with localStorage so it persists across pages
   const CONSENT_KEY = 'tryon_consent_v1'
@@ -812,22 +814,47 @@ export default function AIDresserPage() {
                       <p className="text-center text-xs text-gray-400 mt-2">Tap to zoom</p>
                     </div>
 
-                    <div className="px-4 md:px-6 pb-4 md:pb-6 flex gap-3">
+                    <div className="px-4 md:px-6 pb-4 md:pb-6 space-y-2">
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleAddToCart(tryOnProduct)}
+                          className="flex-1 py-3 rounded-xl bg-navy-900 text-white font-semibold flex items-center justify-center gap-2 hover:bg-navy-800 transition-colors text-sm"
+                        >
+                          {addedToCart.includes(tryOnProduct.id as string) ? (
+                            <><CheckCircle className="w-4 h-4 text-green-400" /> Added!</>
+                          ) : (
+                            <><ShoppingCart className="w-4 h-4" /> Add to Cart — ₱{tryOnProduct.price.toLocaleString()}</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => { setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null); setSavedTryOnLookId(null) }}
+                          className="px-4 py-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
+                        >
+                          Try Another
+                        </button>
+                      </div>
                       <button
-                        onClick={() => handleAddToCart(tryOnProduct)}
-                        className="flex-1 py-3 rounded-xl bg-navy-900 text-white font-semibold flex items-center justify-center gap-2 hover:bg-navy-800 transition-colors text-sm"
+                        disabled={savingLook || !!savedTryOnLookId}
+                        onClick={async () => {
+                          if (!user?.id || savingLook || savedTryOnLookId) return
+                          setSavingLook(true)
+                          const id = await saveTryOnLook(user.id, tryOnProduct, tryOnImageUrl)
+                          setSavedTryOnLookId(id)
+                          setSavingLook(false)
+                        }}
+                        className={`w-full py-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-semibold transition-colors ${
+                          savedTryOnLookId
+                            ? 'border-green-200 bg-green-50 text-green-600'
+                            : 'border-gold/40 bg-gold/5 text-navy hover:bg-gold/15'
+                        } disabled:opacity-60`}
                       >
-                        {addedToCart.includes(tryOnProduct.id as string) ? (
-                          <><CheckCircle className="w-4 h-4 text-green-400" /> Added!</>
+                        {savingLook ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : savedTryOnLookId ? (
+                          <><CheckCircle className="w-4 h-4" /> Saved to Looks</>
                         ) : (
-                          <><ShoppingCart className="w-4 h-4" /> Add to Cart — ₱{tryOnProduct.price.toLocaleString()}</>
+                          <><Bookmark className="w-4 h-4 text-gold" /> Save Look</>
                         )}
-                      </button>
-                      <button
-                        onClick={() => { setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
-                        className="px-4 py-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
-                      >
-                        Try Another
                       </button>
                     </div>
                   </div>

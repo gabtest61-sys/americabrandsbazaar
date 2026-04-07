@@ -7,13 +7,14 @@ import Image from 'next/image'
 import {
   User, Package, Heart, Settings, LogOut, ChevronRight,
   ShoppingBag, Sparkles, Clock, CheckCircle, Truck, XCircle,
-  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle, RotateCcw, MapPin
+  Shirt, Trash2, Edit2, Save, X, Loader2, AlertTriangle, RotateCcw, MapPin, LayoutDashboard,
+  Upload, CreditCard, Copy, CheckSquare
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { getOrdersByUser, getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct, FirestoreOrder, getSavedLooks, deleteSavedLook, SavedLook } from '@/lib/firestore'
+import { getOrdersByUser, getWishlist, removeFromWishlist, updateUserProfile, getFirestoreProductById, FirestoreProduct, FirestoreOrder, getSavedLooks, deleteSavedLook, SavedLook, checkIsAdmin, getPaymentSettings, PaymentSettings, submitPaymentProof } from '@/lib/firestore'
 
 const statusIcons = {
   pending: Clock,
@@ -52,9 +53,23 @@ export default function AccountPage() {
 
   // Address editing state
   const [isEditingAddress, setIsEditingAddress] = useState(false)
-  const [editAddress, setEditAddress] = useState('')
+  const [editHouseNo, setEditHouseNo] = useState('')
+  const [editStreet, setEditStreet] = useState('')
+  const [editBarangay, setEditBarangay] = useState('')
   const [editCity, setEditCity] = useState('')
+  const [editProvince, setEditProvince] = useState('')
+  const [editZip, setEditZip] = useState('')
+  const [editAddress, setEditAddress] = useState('') // legacy combined field
   const [savingAddress, setSavingAddress] = useState(false)
+
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Payment settings + proof submission
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null)
+  const [proofUploading, setProofUploading] = useState(false)
+  const [proofSubmitted, setProofSubmitted] = useState<Record<string, boolean>>({})
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -71,15 +86,27 @@ export default function AccountPage() {
   useEffect(() => {
     const loadOrders = async () => {
       if (user) {
-        const userOrders = await getOrdersByUser(user.id)
+        const userOrders = await getOrdersByUser(user.id, user.email)
         setOrders(userOrders)
         setEditName(user.name || '')
         setEditPhone(user.phone || '')
-        setEditAddress(user.address || '')
+        setEditHouseNo(user.houseNo || '')
+        setEditStreet(user.street || '')
+        setEditBarangay(user.barangay || '')
         setEditCity(user.city || '')
+        setEditProvince(user.province || '')
+        setEditZip(user.zip || '')
+        setEditAddress(user.address || '')
+        const adminStatus = await checkIsAdmin(user.id)
+        setIsAdmin(adminStatus)
+        // Pre-mark already submitted proofs
+        const submitted: Record<string, boolean> = {}
+        userOrders.forEach(o => { if (o.paymentProofUrl) submitted[o.orderId] = true })
+        setProofSubmitted(submitted)
       }
     }
     loadOrders()
+    getPaymentSettings().then(setPaymentSettings).catch(() => {})
   }, [user])
 
   // Load wishlist when tab is active
@@ -176,6 +203,39 @@ export default function AccountPage() {
   // Reorder - add all items from an order to cart
   const [reorderingId, setReorderingId] = useState<string | null>(null)
 
+  const handleProofUpload = async (order: FirestoreOrder, file: File) => {
+    if (!order.id) return
+    setProofUploading(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, folder: 'payment-proofs' }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error || 'Upload failed')
+      await submitPaymentProof(order.id, data.url)
+      setProofSubmitted(prev => ({ ...prev, [order.orderId]: true }))
+      setPaymentOrderId(null)
+    } catch (e) {
+      console.error('Proof upload error:', e)
+    }
+    setProofUploading(false)
+  }
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    })
+  }
+
   const handleReorder = (order: FirestoreOrder) => {
     const orderId = order.id || order.orderId
     setReorderingId(orderId)
@@ -221,20 +281,31 @@ export default function AccountPage() {
   const handleSaveAddress = async () => {
     if (!user) return
     setSavingAddress(true)
+    const combined = [editHouseNo, editStreet, editBarangay].filter(Boolean).join(', ')
     const success = await updateUserProfile(user.id, {
-      address: editAddress,
+      houseNo: editHouseNo,
+      street: editStreet,
+      barangay: editBarangay,
       city: editCity,
+      province: editProvince,
+      zip: editZip,
+      address: combined || editAddress,
     })
     if (success && updateUser) {
-      updateUser({ ...user, address: editAddress, city: editCity })
+      updateUser({ ...user, houseNo: editHouseNo, street: editStreet, barangay: editBarangay, city: editCity, province: editProvince, zip: editZip, address: combined || editAddress })
     }
     setSavingAddress(false)
     setIsEditingAddress(false)
   }
 
   const cancelEditingAddress = () => {
-    setEditAddress(user?.address || '')
+    setEditHouseNo(user?.houseNo || '')
+    setEditStreet(user?.street || '')
+    setEditBarangay(user?.barangay || '')
     setEditCity(user?.city || '')
+    setEditProvince(user?.province || '')
+    setEditZip(user?.zip || '')
+    setEditAddress(user?.address || '')
     setIsEditingAddress(false)
   }
 
@@ -323,6 +394,15 @@ export default function AccountPage() {
                   {tab.label}
                 </button>
               ))}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-navy text-gold shadow-sm hover:bg-navy/90 transition-colors"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
 
@@ -360,6 +440,16 @@ export default function AccountPage() {
                       <ChevronRight className="w-4 h-4 ml-auto" />
                     </button>
                   ))}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-navy text-gold hover:bg-navy/90 transition-colors mt-2"
+                    >
+                      <LayoutDashboard className="w-5 h-5" />
+                      <span className="font-medium">Admin Dashboard</span>
+                      <ChevronRight className="w-4 h-4 ml-auto opacity-60" />
+                    </Link>
+                  )}
                 </nav>
 
                 {/* AI Dresser CTA */}
@@ -421,31 +511,55 @@ export default function AccountPage() {
 
                             {/* Order Items */}
                             <div className="p-3 md:p-4">
-                              <div className="flex flex-col gap-2 mb-3 md:flex-wrap md:flex-row md:gap-4 md:mb-4">
+                              <div className="space-y-2 mb-3">
                                 {order.items.slice(0, 3).map((item, i) => (
-                                  <div key={i} className="flex items-center gap-2">
-                                    <div className="w-10 h-10 md:w-16 md:h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                      <ShoppingBag className="w-4 h-4 md:w-6 md:h-6 text-gray-300" />
+                                  <div key={i} className="flex items-center gap-3">
+                                    <div className="w-12 h-12 md:w-14 md:h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                                      {item.image ? (
+                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <ShoppingBag className="w-5 h-5 text-gray-300" />
+                                        </div>
+                                      )}
                                     </div>
-                                    <div>
-                                      <p className="font-medium text-navy text-xs md:text-sm">{item.name}</p>
-                                      <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-navy text-sm truncate">{item.name}</p>
+                                      <p className="text-xs text-gray-400">{item.brand && <span className="text-gold">{item.brand} · </span>}Qty: {item.quantity}{item.size ? ` · Size: ${item.size}` : ''}</p>
                                     </div>
+                                    <p className="text-sm font-semibold text-navy whitespace-nowrap">₱{(item.price * item.quantity).toLocaleString()}</p>
                                   </div>
                                 ))}
                                 {order.items.length > 3 && (
-                                  <div className="flex items-center">
-                                    <span className="text-sm text-gray-500">+{order.items.length - 3} more</span>
-                                  </div>
+                                  <p className="text-xs text-gray-400 pl-1">+{order.items.length - 3} more item{order.items.length - 3 > 1 ? 's' : ''}</p>
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                <div>
-                                  <span className="text-gray-500 text-sm">Total: </span>
-                                  <span className="font-bold text-navy">₱{order.total.toLocaleString()}</span>
-                                </div>
+                              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <div className="flex items-center gap-3">
+                                  <span className="font-bold text-navy text-base">₱{order.total.toLocaleString()}</span>
+                                  {order.paymentMethod && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                                      {order.paymentMethod === 'gcash' ? '📱 GCash' : order.paymentMethod === 'bank' ? '🏦 Bank' : order.paymentMethod.toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {/* Make Payment button for confirmed gcash/bank orders */}
+                                  {order.status === 'confirmed' && (order.paymentMethod === 'gcash' || order.paymentMethod === 'bank') && !proofSubmitted[order.orderId] && (
+                                    <button
+                                      onClick={() => setPaymentOrderId(paymentOrderId === order.orderId ? null : order.orderId)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-sm bg-gold text-navy hover:bg-yellow-400 transition-all"
+                                    >
+                                      <CreditCard className="w-3.5 h-3.5" />
+                                      Make Payment
+                                    </button>
+                                  )}
+                                  {proofSubmitted[order.orderId] && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-green-50 text-green-600 font-medium">
+                                      <CheckCircle className="w-3.5 h-3.5" /> Payment Sent
+                                    </span>
+                                  )}
                                   <button
                                     onClick={() => handleReorder(order)}
                                     disabled={reorderingId === (order.id || order.orderId)}
@@ -455,14 +569,96 @@ export default function AccountPage() {
                                         : 'bg-gold/10 text-gold hover:bg-gold hover:text-navy'
                                     }`}
                                   >
-                                    <RotateCcw className={`w-4 h-4 ${reorderingId === (order.id || order.orderId) ? 'animate-spin' : ''}`} />
+                                    <RotateCcw className={`w-3.5 h-3.5 ${reorderingId === (order.id || order.orderId) ? 'animate-spin' : ''}`} />
                                     {reorderingId === (order.id || order.orderId) ? 'Added!' : 'Reorder'}
-                                  </button>
-                                  <button className="text-gold font-medium text-sm hover:text-gold-600">
-                                    View Details
                                   </button>
                                 </div>
                               </div>
+
+                              {/* Payment details panel */}
+                              {paymentOrderId === order.orderId && order.status === 'confirmed' && paymentSettings && (
+                                <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/5 overflow-hidden">
+                                  <div className="px-4 py-3 bg-gold/10 border-b border-gold/20 flex items-center gap-2">
+                                    <CreditCard className="w-4 h-4 text-gold" />
+                                    <p className="font-semibold text-navy text-sm">
+                                      {order.paymentMethod === 'gcash' ? '📱 GCash Payment' : '🏦 Bank Transfer'}
+                                    </p>
+                                  </div>
+
+                                  <div className="p-4 space-y-3">
+                                    {order.paymentMethod === 'gcash' && (
+                                      <>
+                                        <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-gold/20">
+                                          <div>
+                                            <p className="text-[11px] text-gray-400 uppercase tracking-wide">GCash Number</p>
+                                            <p className="font-bold text-navy text-lg tracking-widest">{paymentSettings.gcashNumber || '—'}</p>
+                                          </div>
+                                          <button onClick={() => copyToClipboard(paymentSettings.gcashNumber, 'gcash')} className="p-2 hover:bg-gold/10 rounded-lg transition-colors">
+                                            {copiedField === 'gcash' ? <CheckSquare className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                                          </button>
+                                        </div>
+                                        <div className="bg-white rounded-xl px-4 py-3 border border-gold/20">
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Account Name</p>
+                                          <p className="font-semibold text-navy">{paymentSettings.gcashName || '—'}</p>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {order.paymentMethod === 'bank' && (
+                                      <>
+                                        <div className="bg-white rounded-xl px-4 py-3 border border-gold/20">
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Bank</p>
+                                          <p className="font-semibold text-navy">{paymentSettings.bankName || '—'}</p>
+                                        </div>
+                                        <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-gold/20">
+                                          <div>
+                                            <p className="text-[11px] text-gray-400 uppercase tracking-wide">Account Number</p>
+                                            <p className="font-bold text-navy text-lg tracking-widest">{paymentSettings.bankAccount || '—'}</p>
+                                          </div>
+                                          <button onClick={() => copyToClipboard(paymentSettings.bankAccount, 'bank')} className="p-2 hover:bg-gold/10 rounded-lg transition-colors">
+                                            {copiedField === 'bank' ? <CheckSquare className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                                          </button>
+                                        </div>
+                                        <div className="bg-white rounded-xl px-4 py-3 border border-gold/20">
+                                          <p className="text-[11px] text-gray-400 uppercase tracking-wide">Account Name</p>
+                                          <p className="font-semibold text-navy">{paymentSettings.bankAccountName || '—'}</p>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    <div className="bg-navy/5 rounded-xl p-3 text-xs text-gray-500 leading-relaxed">
+                                      Send exactly <span className="font-bold text-navy">₱{order.total.toLocaleString()}</span> and upload your screenshot below.
+                                    </div>
+
+                                    {/* Upload screenshot */}
+                                    <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-5 cursor-pointer transition-all ${proofUploading ? 'border-gold/40 bg-gold/5' : 'border-gray-200 hover:border-gold hover:bg-gold/5'}`}>
+                                      {proofUploading ? (
+                                        <>
+                                          <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                                          <p className="text-sm text-gray-400">Uploading…</p>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Upload className="w-6 h-6 text-gray-400" />
+                                          <p className="text-sm font-medium text-gray-600">Upload Payment Screenshot</p>
+                                          <p className="text-xs text-gray-400">JPG, PNG accepted</p>
+                                        </>
+                                      )}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={proofUploading}
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0]
+                                          if (file) handleProofUpload(order, file)
+                                          e.target.value = ''
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )
@@ -585,38 +781,77 @@ export default function AccountPage() {
                             </div>
                           </div>
 
-                          {/* Look Items */}
+                          {/* Look Body */}
                           <div className="p-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                              {look.items.map((item, index) => (
-                                <Link
-                                  key={index}
-                                  href={item.productUrl || `/shop/${item.productId}`}
-                                  className="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-                                >
-                                  <div className="aspect-square relative bg-gray-100">
-                                    {item.imageUrl ? (
-                                      <Image
-                                        src={item.imageUrl}
-                                        alt={item.productName}
-                                        fill
-                                        className="object-cover"
-                                        sizes="150px"
-                                      />
-                                    ) : (
-                                      <div className="absolute inset-0 flex items-center justify-center">
-                                        <Shirt className="w-8 h-8 text-gray-300" />
+                            {/* Try-on image (when saved from AI Try-On) */}
+                            {look.tryOnImageUrl ? (
+                              <div className="flex gap-4 mb-4">
+                                <div className="relative w-32 flex-shrink-0 aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 shadow-sm">
+                                  <Image
+                                    src={look.tryOnImageUrl}
+                                    alt="AI Try-On"
+                                    fill
+                                    className="object-cover"
+                                    sizes="128px"
+                                  />
+                                  <div className="absolute top-1.5 left-1.5 bg-gold text-navy text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    AI
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {look.items.map((item, index) => (
+                                    <Link
+                                      key={index}
+                                      href={item.productUrl || `/shop/${item.productId}`}
+                                      className="flex items-center gap-3 bg-gray-50 rounded-xl p-2 mb-2 hover:shadow-sm transition-shadow"
+                                    >
+                                      {item.imageUrl && (
+                                        <div className="relative w-10 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                          <Image src={item.imageUrl} alt={item.productName} fill className="object-cover" sizes="40px" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] text-gold font-medium">{item.brand}</p>
+                                        <p className="text-xs font-semibold text-navy truncate">{item.productName}</p>
+                                        <p className="text-xs text-gray-500">₱{item.price.toLocaleString()}</p>
                                       </div>
-                                    )}
-                                  </div>
-                                  <div className="p-2">
-                                    <p className="text-xs text-gold font-medium">{item.brand}</p>
-                                    <p className="text-sm font-medium text-navy truncate">{item.productName}</p>
-                                    <p className="text-sm font-bold text-navy">₱{item.price.toLocaleString()}</p>
-                                  </div>
-                                </Link>
-                              ))}
-                            </div>
+                                    </Link>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                {look.items.map((item, index) => (
+                                  <Link
+                                    key={index}
+                                    href={item.productUrl || `/shop/${item.productId}`}
+                                    className="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                                  >
+                                    <div className="aspect-square relative bg-gray-100">
+                                      {item.imageUrl ? (
+                                        <Image
+                                          src={item.imageUrl}
+                                          alt={item.productName}
+                                          fill
+                                          className="object-cover"
+                                          sizes="150px"
+                                        />
+                                      ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <Shirt className="w-8 h-8 text-gray-300" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="p-2">
+                                      <p className="text-xs text-gold font-medium">{item.brand}</p>
+                                      <p className="text-sm font-medium text-navy truncate">{item.productName}</p>
+                                      <p className="text-sm font-bold text-navy">₱{item.price.toLocaleString()}</p>
+                                    </div>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
 
                             {/* Style Tip */}
                             {look.styleTip && (
@@ -700,38 +935,112 @@ export default function AccountPage() {
                     )}
                   </div>
                   <div className="bg-white rounded-2xl shadow-sm p-6">
-                    <div className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address, Barangay</label>
-                        <input
-                          type="text"
-                          value={isEditingAddress ? editAddress : (user?.address || '')}
-                          onChange={(e) => setEditAddress(e.target.value)}
-                          disabled={!isEditingAddress}
-                          placeholder={isEditingAddress ? 'Street address, barangay' : 'Not set'}
-                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
-                            isEditingAddress
-                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
-                              : 'border-gray-200 bg-gray-50'
-                          }`}
-                        />
+                    {/* View mode */}
+                    {!isEditingAddress ? (
+                      <div className="space-y-4">
+                        {[
+                          { label: 'House / Unit No.', value: user?.houseNo },
+                          { label: 'Street', value: user?.street },
+                          { label: 'Barangay', value: user?.barangay },
+                          { label: 'City / Municipality', value: user?.city },
+                          { label: 'Province', value: user?.province },
+                          { label: 'ZIP Code', value: user?.zip },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex flex-col gap-1">
+                            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+                            <p className={`text-sm font-medium px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 ${value ? 'text-navy' : 'text-gray-300'}`}>
+                              {value || 'Not set'}
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">City / Municipality</label>
-                        <input
-                          type="text"
-                          value={isEditingAddress ? editCity : (user?.city || '')}
-                          onChange={(e) => setEditCity(e.target.value)}
-                          disabled={!isEditingAddress}
-                          placeholder={isEditingAddress ? 'City / Municipality' : 'Not set'}
-                          className={`w-full px-4 py-3 border rounded-xl transition-colors ${
-                            isEditingAddress
-                              ? 'border-gold bg-white focus:outline-none focus:ring-2 focus:ring-gold/20'
-                              : 'border-gray-200 bg-gray-50'
-                          }`}
-                        />
+                    ) : (
+                      /* Edit mode */
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">House / Unit No.</label>
+                            <input
+                              type="text"
+                              value={editHouseNo}
+                              onChange={(e) => setEditHouseNo(e.target.value)}
+                              placeholder="e.g. 123, Blk 4 Lot 5"
+                              className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Street</label>
+                            <input
+                              type="text"
+                              value={editStreet}
+                              onChange={(e) => setEditStreet(e.target.value)}
+                              placeholder="e.g. Rizal Street"
+                              className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Barangay</label>
+                          <input
+                            type="text"
+                            value={editBarangay}
+                            onChange={(e) => setEditBarangay(e.target.value)}
+                            placeholder="e.g. Brgy. San Antonio"
+                            className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">City / Municipality</label>
+                            <input
+                              type="text"
+                              value={editCity}
+                              onChange={(e) => setEditCity(e.target.value)}
+                              placeholder="e.g. Quezon City"
+                              className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Province</label>
+                            <input
+                              type="text"
+                              value={editProvince}
+                              onChange={(e) => setEditProvince(e.target.value)}
+                              placeholder="e.g. Metro Manila"
+                              className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="sm:w-1/2">
+                          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">ZIP Code</label>
+                          <input
+                            type="text"
+                            value={editZip}
+                            onChange={(e) => setEditZip(e.target.value)}
+                            placeholder="e.g. 1100"
+                            className="w-full px-4 py-3 border border-gold rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gold/20 text-sm"
+                          />
+                        </div>
+
+                        {/* Save button inside form */}
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            onClick={handleSaveAddress}
+                            disabled={savingAddress}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gold text-navy font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                          >
+                            {savingAddress ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {savingAddress ? 'Saving…' : 'Save Address'}
+                          </button>
+                          <button
+                            onClick={cancelEditingAddress}
+                            className="px-5 py-3 border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Info note */}
                     <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">

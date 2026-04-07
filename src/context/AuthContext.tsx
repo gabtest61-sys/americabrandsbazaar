@@ -21,6 +21,11 @@ interface User {
   phone?: string
   address?: string
   city?: string
+  houseNo?: string
+  street?: string
+  barangay?: string
+  province?: string
+  zip?: string
   facebook?: string
 }
 
@@ -67,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 phone: userData.phone || '',
                 address: userData.address || '',
                 city: userData.city || '',
+                houseNo: userData.houseNo || '',
+                street: userData.street || '',
+                barangay: userData.barangay || '',
+                province: userData.province || '',
+                zip: userData.zip || '',
                 facebook: userData.facebook || ''
               })
             } else {

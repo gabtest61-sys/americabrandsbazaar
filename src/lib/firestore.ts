@@ -11,6 +11,7 @@ import {
   where,
   orderBy,
   limit,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
   arrayUnion,
@@ -82,12 +83,20 @@ export interface FirestoreOrder {
     phone: string
     address?: string
     city?: string
+    houseNo?: string
+    street?: string
+    barangay?: string
+    province?: string
+    zip?: string
+    facebook?: string
   }
   notes?: string
   // Payment fields
   paymentMethod?: 'cod' | 'online' | 'gcash' | 'bank'
   paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded'
   paymentId?: string
+  paymentProofUrl?: string
+  paymentProofSubmittedAt?: Timestamp | null
   checkoutSessionId?: string
   paidAt?: Timestamp | null
   paymentError?: string
@@ -99,6 +108,14 @@ export interface UserProfile {
   name: string
   email: string
   phone?: string
+  address?: string
+  city?: string
+  houseNo?: string
+  street?: string
+  barangay?: string
+  province?: string
+  zip?: string
+  facebook?: string
   preferences?: {
     colors?: string[]
     sizes?: string[]
@@ -169,27 +186,54 @@ export const createOrder = async (
   }
 }
 
-// Get orders by user ID
-export const getOrdersByUser = async (userId: string): Promise<FirestoreOrder[]> => {
+// Get orders by user ID or email (covers guest orders and pre-login orders)
+export const getOrdersByUser = async (userId: string, email?: string): Promise<FirestoreOrder[]> => {
   if (!db) return []
 
-  try {
-    const ordersRef = collection(db, 'orders')
-    const q = query(
-      ordersRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    )
-    const snapshot = await getDocs(q)
+  const seen = new Set<string>()
+  const allResults: FirestoreOrder[] = []
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as FirestoreOrder[]
-  } catch (error) {
-    console.error('Error fetching orders:', error)
-    return []
+  const addResults = (docs: any[]) => {
+    for (const d of docs) {
+      if (!seen.has(d.id)) {
+        seen.add(d.id)
+        allResults.push({ id: d.id, ...d.data() } as FirestoreOrder)
+      }
+    }
   }
+
+  // 1. orders by userId — primary source
+  try {
+    const snap = await getDocs(query(collection(db, 'orders'), where('userId', '==', userId)))
+    addResults(snap.docs)
+  } catch (e) {
+    console.warn('getOrdersByUser userId query failed:', e)
+  }
+
+  // 2. orders by email — catches orders placed before login or email mismatch
+  if (email) {
+    try {
+      const snap = await getDocs(query(collection(db, 'orders'), where('customerInfo.email', '==', email)))
+      addResults(snap.docs)
+    } catch (e) {
+      console.warn('getOrdersByUser email query failed:', e)
+    }
+
+    // 3. guestOrders by email
+    try {
+      const snap = await getDocs(query(collection(db, 'guestOrders'), where('customerInfo.email', '==', email)))
+      addResults(snap.docs)
+    } catch (e) {
+      console.warn('getOrdersByUser guestOrders query failed:', e)
+    }
+  }
+
+  // Sort by date descending
+  return allResults.sort((a, b) => {
+    const dateA = a.createdAt?.toMillis?.() || 0
+    const dateB = b.createdAt?.toMillis?.() || 0
+    return dateB - dateA
+  })
 }
 
 // Get all orders (admin)
@@ -258,6 +302,36 @@ export const getOrderById = async (orderId: string): Promise<FirestoreOrder | nu
   } catch (error) {
     console.error('Error fetching order by ID:', error)
     return null
+  }
+}
+
+// Submit payment proof screenshot
+export const submitPaymentProof = async (orderId: string, proofUrl: string): Promise<boolean> => {
+  if (!db) return false
+  try {
+    await updateDoc(doc(db, 'orders', orderId), {
+      paymentProofUrl: proofUrl,
+      paymentProofSubmittedAt: serverTimestamp(),
+      paymentStatus: 'paid',
+      updatedAt: serverTimestamp(),
+    })
+    return true
+  } catch (error) {
+    console.error('Error submitting payment proof:', error)
+    return false
+  }
+}
+
+// Delete order (admin)
+export const deleteOrder = async (orderId: string, isGuestOrder: boolean = false): Promise<boolean> => {
+  if (!db) return false
+  try {
+    const collectionName = isGuestOrder ? 'guestOrders' : 'orders'
+    await deleteDoc(doc(db, collectionName, orderId))
+    return true
+  } catch (error) {
+    console.error('Error deleting order:', error)
+    return false
   }
 }
 
@@ -410,7 +484,7 @@ export const updateUserPreferences = async (
 // Update user profile (name, phone, address, city)
 export const updateUserProfile = async (
   userId: string,
-  data: { name?: string; phone?: string; address?: string; city?: string }
+  data: { name?: string; phone?: string; address?: string; city?: string; houseNo?: string; street?: string; barangay?: string; province?: string; zip?: string; facebook?: string }
 ): Promise<boolean> => {
   if (!db) return false
 
@@ -624,6 +698,7 @@ export interface SavedLook {
   lookNumber: number
   lookName: string
   lookDescription: string
+  tryOnImageUrl?: string
   items: {
     productId: string
     productName: string
@@ -656,6 +731,44 @@ export const saveAIDresserLook = async (
     return docRef.id
   } catch (error) {
     console.error('Error saving AI Dresser look:', error)
+    return null
+  }
+}
+
+// Save a single try-on result as a SavedLook
+export const saveTryOnLook = async (
+  userId: string,
+  product: { id?: string; name: string; brand: string; category?: string; price: number; images?: string[] },
+  tryOnImageUrl: string
+): Promise<string | null> => {
+  if (!db) return null
+
+  try {
+    const savedLooksRef = collection(db, 'savedLooks')
+    const docRef = await addDoc(savedLooksRef, {
+      userId,
+      sessionId: `tryon-${Date.now()}`,
+      lookNumber: 1,
+      lookName: `${product.brand} Try-On`,
+      lookDescription: product.name,
+      tryOnImageUrl,
+      items: [{
+        productId: product.id || '',
+        productName: product.name,
+        brand: product.brand,
+        category: product.category || '',
+        price: product.price,
+        imageUrl: product.images?.[0] || '',
+        productUrl: `/shop/${product.id}`,
+        stylingNote: '',
+      }],
+      totalPrice: product.price,
+      styleTip: '',
+      savedAt: serverTimestamp(),
+    })
+    return docRef.id
+  } catch (error) {
+    console.error('Error saving try-on look:', error)
     return null
   }
 }
@@ -1293,5 +1406,209 @@ export const updateShippingSettings = async (settings: ShippingSettings): Promis
   } catch (error) {
     console.error('Error updating shipping settings:', error)
     return false
+  }
+}
+
+export interface PaymentSettings {
+  gcashNumber: string
+  gcashName: string
+  bankName: string
+  bankAccount: string
+  bankAccountName: string
+  updatedAt?: string
+}
+
+const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
+  gcashNumber: '',
+  gcashName: '',
+  bankName: '',
+  bankAccount: '',
+  bankAccountName: '',
+}
+
+export const getPaymentSettings = async (): Promise<PaymentSettings> => {
+  if (!db) return DEFAULT_PAYMENT_SETTINGS
+  try {
+    const docRef = doc(db, 'settings', 'payment')
+    const docSnap = await getDoc(docRef)
+    if (docSnap.exists()) {
+      return docSnap.data() as PaymentSettings
+    }
+    return DEFAULT_PAYMENT_SETTINGS
+  } catch (error) {
+    console.error('Error getting payment settings:', error)
+    return DEFAULT_PAYMENT_SETTINGS
+  }
+}
+
+export const updatePaymentSettings = async (settings: PaymentSettings): Promise<boolean> => {
+  if (!db) return false
+  try {
+    const docRef = doc(db, 'settings', 'payment')
+    await setDoc(docRef, {
+      ...settings,
+      updatedAt: new Date().toISOString()
+    })
+    return true
+  } catch (error) {
+    console.error('Error updating payment settings:', error)
+    return false
+  }
+}
+
+// ==================== ORDER NOTIFICATIONS ====================
+
+export interface OrderNotification {
+  id?: string
+  userId: string
+  orderId: string
+  message: string
+  status: string
+  read: boolean
+  createdAt: Timestamp | null
+}
+
+export const createOrderNotification = async (
+  userId: string,
+  orderId: string,
+  status: string,
+  message: string
+): Promise<boolean> => {
+  if (!db || !userId) return false
+  try {
+    await addDoc(collection(db, 'notifications'), {
+      userId,
+      orderId,
+      message,
+      status,
+      read: false,
+      createdAt: serverTimestamp(),
+    })
+    return true
+  } catch (error) {
+    console.error('Error creating notification:', error)
+    return false
+  }
+}
+
+export const getUnreadNotifications = async (userId: string): Promise<OrderNotification[]> => {
+  if (!db || !userId) return []
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false),
+      limit(20)
+    )
+    const snap = await getDocs(q)
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as OrderNotification[]
+  } catch (error) {
+    console.error('Error fetching notifications:', error)
+    return []
+  }
+}
+
+export const getAllNotifications = async (userId: string): Promise<OrderNotification[]> => {
+  if (!db || !userId) return []
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      limit(30)
+    )
+    const snap = await getDocs(q)
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() })) as OrderNotification[]
+  } catch (error) {
+    console.error('Error fetching all notifications:', error)
+    return []
+  }
+}
+
+export const markNotificationRead = async (notificationId: string): Promise<void> => {
+  if (!db) return
+  try {
+    await updateDoc(doc(db, 'notifications', notificationId), { read: true })
+  } catch (error) {
+    console.error('Error marking notification read:', error)
+  }
+}
+
+// Real-time listener — returns unsubscribe fn
+// NOTE: no orderBy to avoid requiring a composite Firestore index — sort client-side
+export const subscribeToNotifications = (
+  userId: string,
+  callback: (notifications: OrderNotification[]) => void
+): (() => void) => {
+  if (!db || !userId) return () => {}
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    limit(30)
+  )
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as OrderNotification[]
+      // Sort newest first client-side
+      items.sort((a, b) => {
+        const aMs = (a.createdAt as any)?.toMillis?.() ?? 0
+        const bMs = (b.createdAt as any)?.toMillis?.() ?? 0
+        return bMs - aMs
+      })
+      callback(items)
+    },
+    (err) => {
+      console.error('Notification listener error:', err)
+    }
+  )
+}
+
+export const markAllNotificationsRead = async (userId: string): Promise<void> => {
+  if (!db || !userId) return
+  try {
+    const notifications = await getUnreadNotifications(userId)
+    await Promise.all(notifications.map(n => n.id ? markNotificationRead(n.id) : Promise.resolve()))
+  } catch (error) {
+    console.error('Error marking all notifications read:', error)
+  }
+}
+
+// ==================== PUSH SUBSCRIPTIONS ====================
+
+export const savePushSubscription = async (userId: string, subscription: PushSubscriptionJSON): Promise<void> => {
+  if (!db || !userId) return
+  try {
+    const endpoint = subscription.endpoint!
+    const subRef = doc(db, 'pushSubscriptions', `${userId}_${btoa(endpoint).slice(0, 40)}`)
+    await setDoc(subRef, {
+      userId,
+      subscription,
+      updatedAt: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error('Error saving push subscription:', error)
+  }
+}
+
+export const deletePushSubscription = async (userId: string, endpoint: string): Promise<void> => {
+  if (!db || !userId) return
+  try {
+    const subRef = doc(db, 'pushSubscriptions', `${userId}_${btoa(endpoint).slice(0, 40)}`)
+    await deleteDoc(subRef)
+  } catch (error) {
+    console.error('Error deleting push subscription:', error)
+  }
+}
+
+export const getPushSubscriptions = async (userId: string): Promise<PushSubscriptionJSON[]> => {
+  if (!db || !userId) return []
+  try {
+    const q = query(collection(db, 'pushSubscriptions'), where('userId', '==', userId))
+    const snap = await getDocs(q)
+    return snap.docs.map(d => d.data().subscription as PushSubscriptionJSON)
+  } catch (error) {
+    console.error('Error fetching push subscriptions:', error)
+    return []
   }
 }

@@ -4,11 +4,11 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, ShoppingCart, User, Search, ChevronRight, Loader2 } from 'lucide-react'
+import { Menu, X, ShoppingCart, User, Search, ChevronRight, Loader2, Bell } from 'lucide-react'
 import { NAV_LINKS, BRAND } from '@/lib/constants'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
+import { getFirestoreProducts, FirestoreProduct, subscribeToNotifications, markAllNotificationsRead, markNotificationRead, OrderNotification } from '@/lib/firestore'
 import AuthModal from '@/components/AuthModal'
 
 export default function Header() {
@@ -26,6 +26,64 @@ export default function Header() {
   const [allProducts, setAllProducts] = useState<FirestoreProduct[]>([])
   const searchInputRef = useRef<HTMLInputElement>(null)
   const { itemCount, toggleCart } = useCart()
+
+  // Notifications
+  const [notifications, setNotifications] = useState<OrderNotification[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
+  const unreadCount = notifications.filter(n => !n.read).length
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | null>(null)
+  const [enablingPush, setEnablingPush] = useState(false)
+
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) { setNotifications([]); return }
+    const unsub = subscribeToNotifications(user.id, setNotifications)
+    return () => unsub()
+  }, [isLoggedIn, user?.id])
+
+  // Check current push permission state
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermission(Notification.permission)
+    }
+  }, [isLoggedIn])
+
+  const enablePushNotifications = async () => {
+    if (!user?.id || enablingPush) return
+    setEnablingPush(true)
+    try {
+      const permission = await Notification.requestPermission()
+      setPushPermission(permission)
+      if (permission !== 'granted') { setEnablingPush(false); return }
+
+      const reg = await navigator.serviceWorker.ready
+      const existing = await reg.pushManager.getSubscription()
+      const sub = existing || await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      })
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, subscription: sub.toJSON() }),
+      })
+    } catch (e) {
+      console.error('Push enable error:', e)
+    }
+    setEnablingPush(false)
+  }
+
+  // Close notification panel on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   useEffect(() => {
     getFirestoreProducts().then(setAllProducts).catch(() => setAllProducts([]))
@@ -160,6 +218,118 @@ export default function Header() {
                 >
                   <User className="w-[18px] h-[18px]" />
                 </button>
+              )}
+
+              {/* Notification bell — only for logged-in users */}
+              {isLoggedIn && (
+                <div ref={notifRef} className="relative">
+                  <button
+                    onClick={() => {
+                      setShowNotifications(v => !v)
+                      if (!showNotifications && unreadCount > 0 && user?.id) {
+                        markAllNotificationsRead(user.id).then(() =>
+                          setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+                        )
+                      }
+                    }}
+                    className="relative w-9 h-9 flex items-center justify-center text-white/70 hover:text-gold hover:bg-white/10 rounded-full transition-all"
+                    title="Notifications"
+                  >
+                    <Bell className="w-[18px] h-[18px]" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-black min-w-[17px] h-[17px] rounded-full flex items-center justify-center leading-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Dropdown panel */}
+                  {showNotifications && (
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-navy text-sm">Notifications</h3>
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={() => {
+                              if (user?.id) {
+                                markAllNotificationsRead(user.id)
+                                setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+                              }
+                            }}
+                            className="text-xs text-gold hover:underline"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Allow push notifications banner */}
+                      {pushPermission !== 'granted' && pushPermission !== null && 'serviceWorker' in navigator && (
+                        <div className="px-4 py-3 bg-navy/5 border-b border-gray-100 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gold/15 flex items-center justify-center flex-shrink-0">
+                            <Bell className="w-4 h-4 text-gold" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-navy">Get order alerts</p>
+                            <p className="text-[11px] text-gray-400 leading-tight">Allow notifications to be notified when your order status changes.</p>
+                          </div>
+                          <button
+                            onClick={enablePushNotifications}
+                            disabled={enablingPush || pushPermission === 'denied'}
+                            className={`flex-shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full transition-colors ${
+                              pushPermission === 'denied'
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-gold text-navy hover:bg-yellow-400'
+                            }`}
+                          >
+                            {enablingPush ? '…' : pushPermission === 'denied' ? 'Blocked' : 'Allow'}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+                        {notifications.length === 0 ? (
+                          <div className="py-10 text-center">
+                            <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                            <p className="text-gray-400 text-sm">No notifications yet</p>
+                          </div>
+                        ) : (
+                          notifications.map(n => {
+                            const statusEmoji: Record<string, string> = {
+                              confirmed: '✅', processing: '⚙️', shipped: '🚚',
+                              delivered: '📦', cancelled: '❌', pending: '🕐',
+                            }
+                            return (
+                              <button
+                                key={n.id}
+                                onClick={() => {
+                                  if (n.id) markNotificationRead(n.id)
+                                  setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
+                                  setShowNotifications(false)
+                                  router.push('/account')
+                                }}
+                                className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-start gap-3 ${!n.read ? 'bg-gold/5' : ''}`}
+                              >
+                                <span className="text-lg flex-shrink-0 mt-0.5">{statusEmoji[n.status] || '📋'}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold text-navy capitalize">{n.status} — Order #{n.orderId}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">{n.message}</p>
+                                </div>
+                                {!n.read && <span className="w-2 h-2 bg-gold rounded-full flex-shrink-0 mt-1" />}
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+
+                      <div className="px-4 py-2.5 border-t border-gray-100 text-center">
+                        <Link href="/account" onClick={() => setShowNotifications(false)} className="text-xs text-gold font-semibold hover:underline">
+                          View all orders →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Cart */}

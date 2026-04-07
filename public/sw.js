@@ -22,6 +22,43 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// ── Push notifications ────────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  if (!event.data) return
+  let data = {}
+  try { data = event.data.json() } catch { data = { title: 'Notification', body: event.data.text() } }
+
+  const { title = 'America Brands Bazaar', body = '', icon = '/icon.png', badge = '/icon.png', tag = 'abb-notif', data: extra = {} } = data
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge,
+      tag,
+      renotify: true,
+      data: extra,
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data?.url || '/account'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus()
+          client.navigate(url)
+          return
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url)
+    })
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return

@@ -4,17 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { createOrder, addTryOnCreditsForPurchase } from '@/lib/firestore'
+import { createOrder, addTryOnCreditsForPurchase, updateUserProfile } from '@/lib/firestore'
 import { formatPrice } from '@/lib/constants'
-import { ChevronLeft, ShoppingBag, CheckCircle, Package, Truck, Tag } from 'lucide-react'
+import { ChevronLeft, ShoppingBag, CheckCircle, Package, Truck, Tag, MapPin, BookmarkCheck, Plus } from 'lucide-react'
 
 const paymentOptions = [
-  {
-    value: 'cod',
-    label: 'Cash on Delivery',
-    desc: 'Pay when your order arrives',
-    icon: '💵',
-  },
   {
     value: 'gcash',
     label: 'GCash',
@@ -32,36 +26,49 @@ const paymentOptions = [
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, clearCart } = useCart()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [orderId, setOrderId] = useState('')
   const [error, setError] = useState('')
 
+  const [saveAddress, setSaveAddress] = useState(false)
+  const [hasSavedAddress, setHasSavedAddress] = useState(false)
+
   const [form, setForm] = useState({
     fullName: '',
     email: '',
     phone: '',
-    address: '',
+    houseNo: '',
+    street: '',
+    barangay: '',
     city: '',
+    province: '',
+    zip: '',
     facebook: '',
     notes: '',
-    paymentMethod: 'cod' as 'cod' | 'gcash' | 'bank',
+    paymentMethod: 'gcash' as 'gcash' | 'bank',
   })
 
+  // Populate form once auth has finished loading and user is available
   useEffect(() => {
-    if (user) {
-      setForm((f) => ({
-        ...f,
-        fullName: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        address: user.address || '',
-        city: user.city || '',
-        facebook: user.facebook || '',
-      }))
-    }
-  }, [user])
+    if (authLoading || !user) return
+    const hasAddr = !!(user.houseNo || user.street || user.barangay || user.city || user.province || user.zip)
+    setHasSavedAddress(hasAddr)
+    setForm((f) => ({
+      ...f,
+      fullName: user.name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      houseNo: user.houseNo || '',
+      street: user.street || '',
+      barangay: user.barangay || '',
+      city: user.city || '',
+      province: user.province || '',
+      zip: user.zip || '',
+      facebook: user.facebook || '',
+    }))
+  }, [user, authLoading])
 
   const subtotal = items.reduce((sum: number, i) => sum + i.product.price * i.quantity, 0)
   const shippingFee = subtotal >= 2000 ? 0 : 100
@@ -89,12 +96,19 @@ export default function CheckoutPage() {
         image: i.product.image,
       }))
 
+      const fullAddress = [form.houseNo, form.street, form.barangay].filter(Boolean).join(', ')
+
       const customerInfo = {
         name: form.fullName,
         email: form.email,
         phone: form.phone,
-        address: form.address,
+        address: fullAddress,
         city: form.city,
+        houseNo: form.houseNo,
+        street: form.street,
+        barangay: form.barangay,
+        province: form.province,
+        zip: form.zip,
         facebook: form.facebook,
       }
 
@@ -113,14 +127,25 @@ export default function CheckoutPage() {
 
       const emailPayload = {
         orderId: result.orderId,
-        customer: customerInfo,
+        customer: {
+          ...customerInfo,
+          houseNo: form.houseNo,
+          street: form.street,
+          barangay: form.barangay,
+          province: form.province,
+          zip: form.zip,
+        },
         products: items.map((i) => ({
           name: i.product.name,
           brand: i.product.brand,
           price: i.product.price,
           quantity: i.quantity,
+          size: i.size,
+          color: i.color,
         })),
         total,
+        paymentMethod: form.paymentMethod,
+        notes: form.notes,
       }
 
       await fetch('/api/email/send', {
@@ -128,6 +153,18 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailPayload),
       }).catch(() => {})
+
+      // Save address to profile if requested
+      if (saveAddress && user?.id) {
+        updateUserProfile(user.id, {
+          houseNo: form.houseNo,
+          street: form.street,
+          barangay: form.barangay,
+          city: form.city,
+          province: form.province,
+          zip: form.zip,
+        }).catch(() => {})
+      }
 
       // Add 10 try-on credits per item purchased
       if (user?.id) {
@@ -251,34 +288,134 @@ export default function CheckoutPage() {
 
             {/* Delivery */}
             <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-5">
-                <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">2</span>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-xs font-bold">2</span>
+                  </div>
+                  <h2 className="font-semibold text-navy">Delivery Address</h2>
                 </div>
-                <h2 className="font-semibold text-navy">Delivery Address</h2>
+                {hasSavedAddress && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!user) return
+                      setForm((f) => ({
+                        ...f,
+                        houseNo: user.houseNo || '',
+                        street: user.street || '',
+                        barangay: user.barangay || '',
+                        city: user.city || '',
+                        province: user.province || '',
+                        zip: user.zip || '',
+                      }))
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-gold hover:text-yellow-600 transition"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Use saved address
+                  </button>
+                )}
               </div>
-              <div className="space-y-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* House / Unit No */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Street Address</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">House / Unit No.</label>
                   <input
-                    name="address"
-                    value={form.address}
+                    name="houseNo"
+                    value={form.houseNo}
                     onChange={handleChange}
-                    placeholder="House no., Street, Barangay"
+                    placeholder="123 / Unit 4B"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
                   />
                 </div>
-                <div className="w-full sm:w-1/2">
+
+                {/* Street */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Street</label>
+                  <input
+                    name="street"
+                    value={form.street}
+                    onChange={handleChange}
+                    placeholder="Rizal Ave."
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
+                  />
+                </div>
+
+                {/* Barangay */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Barangay</label>
+                  <input
+                    name="barangay"
+                    value={form.barangay}
+                    onChange={handleChange}
+                    placeholder="Brgy. San Antonio"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
+                  />
+                </div>
+
+                {/* City / Municipality */}
+                <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">City / Municipality</label>
                   <input
                     name="city"
                     value={form.city}
                     onChange={handleChange}
-                    placeholder="Manila"
+                    placeholder="Makati"
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
+                  />
+                </div>
+
+                {/* Province */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Province</label>
+                  <input
+                    name="province"
+                    value={form.province}
+                    onChange={handleChange}
+                    placeholder="Metro Manila"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
+                  />
+                </div>
+
+                {/* ZIP Code */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">ZIP Code</label>
+                  <input
+                    name="zip"
+                    value={form.zip}
+                    onChange={handleChange}
+                    placeholder="1200"
+                    maxLength={10}
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy placeholder-gray-300 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition"
                   />
                 </div>
               </div>
+
+              {/* Save address toggle */}
+              {user && (
+                <label className="flex items-center gap-2.5 mt-5 cursor-pointer group w-fit">
+                  <div
+                    onClick={() => setSaveAddress((v) => !v)}
+                    className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all flex-shrink-0 ${
+                      saveAddress ? 'bg-gold border-gold' : 'border-gray-300 group-hover:border-gold'
+                    }`}
+                  >
+                    {saveAddress && (
+                      <svg className="w-3 h-3 text-navy" fill="none" viewBox="0 0 12 12">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-600 select-none">
+                    <BookmarkCheck className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                    Save this address to my account
+                  </span>
+                </label>
+              )}
             </div>
 
             {/* Payment */}

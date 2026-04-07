@@ -23,12 +23,9 @@ export default function FeaturedProducts() {
       try {
         const firestoreProducts = await getFirestoreProducts()
         const inStock = firestoreProducts.filter(p => p.inStock && p.images?.length > 0 && p.price > 0)
-        const featured = inStock.filter(p => p.featured === true)
-        // If fewer than 4 are marked featured, pad with other in-stock products
-        const picks = featured.length >= 4
-          ? featured.slice(0, 8)
-          : [...featured, ...inStock.filter(p => !p.featured)].slice(0, 8)
-        setFeaturedProducts(picks)
+        // Shuffle randomly and pick up to 8
+        const shuffled = [...inStock].sort(() => Math.random() - 0.5)
+        setFeaturedProducts(shuffled.slice(0, 8))
       } catch {
         setFeaturedProducts([])
       }
