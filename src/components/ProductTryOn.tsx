@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { Wand2, X, Upload, Camera, Loader2, Download, RotateCcw, Sparkles, AlertCircle, CheckCircle, Zap, LogIn, ShieldCheck } from 'lucide-react'
+import { Wand2, X, Upload, Camera, Loader2, RotateCcw, Sparkles, AlertCircle, CheckCircle, Zap, LogIn, ShieldCheck, UserPlus } from 'lucide-react'
 import { FirestoreProduct, saveTryOnResult, getTryOnCredits, consumeTryOnCredit } from '@/lib/firestore'
 import { useAuth } from '@/context/AuthContext'
-import Link from 'next/link'
+import AuthModal from '@/components/AuthModal'
 
 const CONSENT_KEY = 'tryon_consent_v1'
 
@@ -26,6 +26,8 @@ export default function ProductTryOn({ product }: Props) {
   const [uploading, setUploading] = useState(false)
   const [credits, setCredits] = useState<number | null>(null)
   const [showConsent, setShowConsent] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
@@ -291,9 +293,22 @@ export default function ProductTryOn({ product }: Props) {
                     <p className="font-bold text-navy">Sign in to try on</p>
                     <p className="text-sm text-gray-400 mt-1">You need an account to use AI Try-On.<br />Get 20 free credits every month!</p>
                   </div>
-                  <Link href="/auth/login" onClick={handleClose} className="px-6 py-2.5 bg-navy text-white rounded-xl font-semibold text-sm hover:bg-navy/90 transition-colors">
-                    Sign In
-                  </Link>
+                  <div className="flex flex-col gap-2 w-full">
+                    <button
+                      onClick={() => { setAuthMode('login'); setShowAuth(true) }}
+                      className="w-full py-3 bg-navy text-white rounded-xl font-semibold text-sm hover:bg-navy/90 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Sign In
+                    </button>
+                    <button
+                      onClick={() => { setAuthMode('register'); setShowAuth(true) }}
+                      className="w-full py-3 border-2 border-gold bg-gold/5 text-navy rounded-xl font-semibold text-sm hover:bg-gold/15 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Create Account
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -467,6 +482,13 @@ export default function ProductTryOn({ product }: Props) {
           </div>
         </>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuth}
+        onClose={() => setShowAuth(false)}
+        initialMode={authMode}
+      />
     </>
   )
 }
