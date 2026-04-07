@@ -84,6 +84,7 @@ export default function ProductDetailPage() {
   const [recentlyViewed, setRecentlyViewed] = useState<FirestoreProduct[]>([])
   const [customerTryOns, setCustomerTryOns] = useState<TryOnResult[]>([])
   const [tryOnLightbox, setTryOnLightbox] = useState<string | null>(null)
+  const [triggerTryOn, setTriggerTryOn] = useState(false)
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -386,7 +387,7 @@ export default function ProductDetailPage() {
 
               {/* CTA */}
               <div className="space-y-2.5 pt-1">
-              <ProductTryOn product={product as any} />
+              <ProductTryOn product={product as any} triggerOpen={triggerTryOn} onTriggerHandled={() => setTriggerTryOn(false)} />
               <div className="flex gap-3">
                 <button
                   onClick={handleAddToCart}
@@ -483,15 +484,15 @@ export default function ProductDetailPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-navy text-sm">No try-ons yet</p>
-                  <p className="text-xs text-gray-400 mt-1 max-w-xs">Be the first! Try this on in the AI Dresser and your look will appear here.</p>
+                  <p className="text-xs text-gray-400 mt-1 max-w-xs">Be the first! Try this on and your look will appear here.</p>
                 </div>
-                <Link
-                  href="/ai-dresser"
+                <button
+                  onClick={() => setTriggerTryOn(true)}
                   className="mt-1 inline-flex items-center gap-2 bg-navy text-white text-xs font-semibold px-5 py-2.5 rounded-full hover:bg-navy/90 transition-colors"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   Try It On
-                </Link>
+                </button>
               </div>
             ) : (
               /* Scrollable row on mobile, wrapped grid on desktop */

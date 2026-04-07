@@ -13,9 +13,11 @@ type Step = 'upload' | 'generating' | 'done' | 'error'
 
 interface Props {
   product: FirestoreProduct
+  triggerOpen?: boolean
+  onTriggerHandled?: () => void
 }
 
-export default function ProductTryOn({ product }: Props) {
+export default function ProductTryOn({ product, triggerOpen, onTriggerHandled }: Props) {
   const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [step, setStep] = useState<Step>('upload')
@@ -41,6 +43,18 @@ export default function ProductTryOn({ product }: Props) {
       getTryOnCredits(user.id).then(({ credits }) => setCredits(credits))
     }
   }, [isOpen, user?.id])
+
+  // External trigger — same logic as clicking the button
+  useEffect(() => {
+    if (!triggerOpen) return
+    onTriggerHandled?.()
+    const hasConsented = typeof window !== 'undefined' && localStorage.getItem(CONSENT_KEY) === 'true'
+    if (hasConsented) {
+      setIsOpen(true)
+    } else {
+      setShowConsent(true)
+    }
+  }, [triggerOpen])
 
   const reset = () => {
     setStep('upload')
