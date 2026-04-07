@@ -2849,7 +2849,7 @@ export default function AdminDashboard() {
                                   <span className="text-xs text-gray-400 italic">Guest</span>
                                 ) : customer ? (
                                   <div>
-                                    <p className="font-medium text-navy text-xs">{customer.name || customer.username}</p>
+                                    <p className="font-medium text-navy text-xs">{customer.name}</p>
                                     <p className="text-[10px] text-gray-400">{customer.email}</p>
                                   </div>
                                 ) : (
@@ -2881,7 +2881,7 @@ export default function AdminDashboard() {
                             <p className="font-semibold text-navy text-sm truncate">{product?.name || 'Unknown product'}</p>
                             <p className="text-[10px] text-gold uppercase mb-1">{product?.brand || ''}</p>
                             <p className="text-xs text-gray-500">
-                              {tryon.userId === 'anonymous' ? 'Guest' : customer?.name || customer?.username || tryon.userId.slice(0, 8)}
+                              {tryon.userId === 'anonymous' ? 'Guest' : customer?.name || tryon.userId.slice(0, 8)}
                             </p>
                             <p className="text-[10px] text-gray-300 mt-0.5">
                               {date ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
