@@ -1339,6 +1339,17 @@ export const getAllTryOns = async (maxResults = 200): Promise<TryOnResult[]> => 
   }
 }
 
+export const deleteTryOnResult = async (id: string): Promise<boolean> => {
+  if (!db) return false
+  try {
+    await deleteDoc(doc(db, 'tryOnResults', id))
+    return true
+  } catch (error) {
+    console.error('Error deleting try-on result:', error)
+    return false
+  }
+}
+
 export const getProductTryOns = async (productId: string, maxResults = 24): Promise<TryOnResult[]> => {
   if (!db) return []
   try {

@@ -42,7 +42,8 @@ import {
   getAllTryOns,
   TryOnResult,
   createOrderNotification,
-  deleteOrder
+  deleteOrder,
+  deleteTryOnResult
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 import { storage } from '@/lib/firebase'
@@ -199,6 +200,7 @@ export default function AdminDashboard() {
   const [tryOnsLoading, setTryOnsLoading] = useState(false)
   const [tryOnProductFilter, setTryOnProductFilter] = useState('all')
   const [tryOnLightbox, setTryOnLightbox] = useState<string | null>(null)
+  const [deletingTryOnId, setDeletingTryOnId] = useState<string | null>(null)
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null)
 
   // Payment filter state
@@ -2981,6 +2983,7 @@ export default function AdminDashboard() {
                           <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Product</th>
                           <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Customer</th>
                           <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Date</th>
+                          <th className="px-4 py-3"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -3027,6 +3030,22 @@ export default function AdminDashboard() {
                               <td className="px-4 py-3 text-xs text-gray-400">
                                 {date ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                               </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={async () => {
+                                    if (!tryon.id) return
+                                    setDeletingTryOnId(tryon.id)
+                                    const ok = await deleteTryOnResult(tryon.id)
+                                    if (ok) setTryOns(prev => prev.filter(t => t.id !== tryon.id))
+                                    setDeletingTryOnId(null)
+                                  }}
+                                  disabled={deletingTryOnId === tryon.id}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                                  title="Delete"
+                                >
+                                  {deletingTryOnId === tryon.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                </button>
+                              </td>
                             </tr>
                           )
                         })}
@@ -3041,7 +3060,7 @@ export default function AdminDashboard() {
                       const customer = userMap[tryon.userId]
                       const date = tryon.createdAt ? ((tryon.createdAt as any).toDate?.() || new Date(tryon.createdAt as any)) : null
                       return (
-                        <div key={tryon.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex gap-3">
+                        <div key={tryon.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex gap-3 items-start">
                           <button onClick={() => setTryOnLightbox(tryon.imageUrl)} className="relative w-16 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 hover:opacity-80 transition-opacity">
                             <Image src={tryon.imageUrl} alt="Try-on" fill className="object-cover" sizes="64px" />
                           </button>
@@ -3055,6 +3074,19 @@ export default function AdminDashboard() {
                               {date ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                             </p>
                           </div>
+                          <button
+                            onClick={async () => {
+                              if (!tryon.id) return
+                              setDeletingTryOnId(tryon.id)
+                              const ok = await deleteTryOnResult(tryon.id)
+                              if (ok) setTryOns(prev => prev.filter(t => t.id !== tryon.id))
+                              setDeletingTryOnId(null)
+                            }}
+                            disabled={deletingTryOnId === tryon.id}
+                            className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-xl bg-red-50 text-red-400 hover:bg-red-100 transition-colors disabled:opacity-40"
+                          >
+                            {deletingTryOnId === tryon.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
                       )
                     })}
