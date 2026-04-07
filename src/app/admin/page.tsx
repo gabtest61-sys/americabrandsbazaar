@@ -13,7 +13,7 @@ import {
   CheckSquare, Square, History,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
   Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle,
-  Grid, List, LayoutGrid, Table2, Wand2, RefreshCw
+  Grid, List, LayoutGrid, Table2, Wand2, RefreshCw, Printer
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
