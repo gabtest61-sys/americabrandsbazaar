@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
-import { createOrder } from '@/lib/firestore'
+import { createOrder, addTryOnCreditsForPurchase } from '@/lib/firestore'
 import { formatPrice } from '@/lib/constants'
 import { ChevronLeft, ShoppingBag, CheckCircle, Package, Truck, Tag } from 'lucide-react'
 
@@ -128,6 +128,11 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailPayload),
       }).catch(() => {})
+
+      // Add 10 try-on credits per item purchased
+      if (user?.id) {
+        addTryOnCreditsForPurchase(user.id, orderItems.length).catch(() => {})
+      }
 
       clearCart()
       setOrderId(result.orderId)

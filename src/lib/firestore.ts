@@ -1121,6 +1121,125 @@ export const deleteUserData = async (userId: string): Promise<boolean> => {
   }
 }
 
+// ==================== TRY-ON CREDITS ====================
+
+const MONTHLY_TRY_ON_CREDITS = 20
+const CREDITS_PER_PURCHASE = 10
+
+export const getTryOnCredits = async (userId: string): Promise<{ credits: number; resetMonth: string }> => {
+  if (!db) return { credits: MONTHLY_TRY_ON_CREDITS, resetMonth: '' }
+  try {
+    const userRef = doc(db, 'users', userId)
+    const userDoc = await getDoc(userRef)
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    if (!userDoc.exists()) {
+      await setDoc(userRef, { tryOnCredits: MONTHLY_TRY_ON_CREDITS, tryOnCreditsResetMonth: currentMonth }, { merge: true })
+      return { credits: MONTHLY_TRY_ON_CREDITS, resetMonth: currentMonth }
+    }
+
+    const data = userDoc.data()
+    const savedMonth = data?.tryOnCreditsResetMonth || ''
+
+    if (savedMonth !== currentMonth) {
+      await updateDoc(userRef, { tryOnCredits: MONTHLY_TRY_ON_CREDITS, tryOnCreditsResetMonth: currentMonth })
+      return { credits: MONTHLY_TRY_ON_CREDITS, resetMonth: currentMonth }
+    }
+
+    const credits = data?.tryOnCredits ?? MONTHLY_TRY_ON_CREDITS
+    return { credits, resetMonth: currentMonth }
+  } catch (error) {
+    console.error('Error getting try-on credits:', error)
+    return { credits: MONTHLY_TRY_ON_CREDITS, resetMonth: '' }
+  }
+}
+
+export const consumeTryOnCredit = async (userId: string): Promise<{ success: boolean; creditsLeft: number; error?: string }> => {
+  if (!db) return { success: true, creditsLeft: 99 }
+  try {
+    const { credits } = await getTryOnCredits(userId)
+    if (credits <= 0) return { success: false, creditsLeft: 0, error: 'No credits left this month' }
+    const userRef = doc(db, 'users', userId)
+    // Use setDoc with merge so it works even if the doc doesn't exist yet
+    await setDoc(userRef, { tryOnCredits: credits - 1 }, { merge: true })
+    return { success: true, creditsLeft: credits - 1 }
+  } catch (error) {
+    console.error('Error consuming try-on credit:', error)
+    return { success: false, creditsLeft: 0, error: 'Failed to use credit' }
+  }
+}
+
+export const addTryOnCreditsForPurchase = async (userId: string, itemCount: number): Promise<boolean> => {
+  if (!db || !userId) return false
+  try {
+    const { credits } = await getTryOnCredits(userId)
+    const userRef = doc(db, 'users', userId)
+    await updateDoc(userRef, { tryOnCredits: credits + itemCount * CREDITS_PER_PURCHASE })
+    return true
+  } catch (error) {
+    console.error('Error adding try-on credits:', error)
+    return false
+  }
+}
+
+// ==================== TRY-ON RESULTS ====================
+
+export interface TryOnResult {
+  id?: string
+  productId: string
+  userId: string
+  imageUrl: string
+  createdAt: Timestamp | null
+}
+
+export const saveTryOnResult = async (
+  productId: string,
+  userId: string,
+  imageUrl: string
+): Promise<boolean> => {
+  if (!db) return false
+  try {
+    await addDoc(collection(db, 'tryOnResults'), {
+      productId,
+      userId,
+      imageUrl,
+      createdAt: serverTimestamp()
+    })
+    return true
+  } catch (error) {
+    console.error('Error saving try-on result:', error)
+    return false
+  }
+}
+
+export const getAllTryOns = async (maxResults = 200): Promise<TryOnResult[]> => {
+  if (!db) return []
+  try {
+    const colRef = collection(db, 'tryOnResults')
+    const q = query(colRef, orderBy('createdAt', 'desc'), limit(maxResults))
+    const snap = await getDocs(q)
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as TryOnResult[]
+  } catch (error) {
+    console.error('Error fetching all try-on results:', error)
+    return []
+  }
+}
+
+export const getProductTryOns = async (productId: string, maxResults = 24): Promise<TryOnResult[]> => {
+  if (!db) return []
+  try {
+    const colRef = collection(db, 'tryOnResults')
+    // No orderBy to avoid needing a composite index
+    const q = query(colRef, where('productId', '==', productId), limit(maxResults))
+    const snap = await getDocs(q)
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })) as TryOnResult[]
+  } catch (error) {
+    console.error('Error fetching try-on results:', error)
+    return []
+  }
+}
+
 // ==================== SHIPPING SETTINGS ====================
 
 export interface ShippingRate {

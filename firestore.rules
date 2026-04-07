@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow admins to read all users
+      allow read: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      // Users can read their own orders, create new orders
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null;
+      // Admins can read/update all orders
+      allow read, update: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Guest orders (no auth required to create)
+    match /guestOrders/{orderId} {
+      allow create: if true;
+      allow read, update: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Products - public read, admin write
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Settings - public read (for checkout shipping rates), admin write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Wishlists
+    match /wishlists/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if request.auth != null && request.auth.uid == adminId;
+    }
+
+    // Saved AI Dresser looks
+    match /savedLooks/{lookId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Try-On Results - anyone can create and read (images are already public on Cloudinary)
+    match /tryOnResults/{resultId} {
+      allow create: if true;
+      allow read: if true;
+    }
+  }
+}

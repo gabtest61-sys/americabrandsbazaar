@@ -13,7 +13,7 @@ import {
   CheckSquare, Square, History, MessageSquare, Printer,
   FileSpreadsheet, Tag, TrendingDown, ArrowUp, ArrowDown, GripVertical,
   Settings, Star, CreditCard, Wallet, BanknoteIcon, AlertCircle,
-  Grid, List, LayoutGrid, Table2
+  Grid, List, LayoutGrid, Table2, Wand2
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -35,7 +35,9 @@ import {
   ShippingRate,
   getAllReviews,
   deleteReview,
-  Review
+  Review,
+  getAllTryOns,
+  TryOnResult
 } from '@/lib/firestore'
 import { products as staticProducts, Product, brands, categories } from '@/lib/products'
 import { storage } from '@/lib/firebase'
@@ -50,7 +52,7 @@ const statusColors = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
-type TabType = 'dashboard' | 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'reviews' | 'settings'
+type TabType = 'dashboard' | 'orders' | 'customers' | 'inventory' | 'analytics' | 'products' | 'coupons' | 'reviews' | 'tryons' | 'settings'
 
 // Coupon interface
 interface Coupon {
@@ -175,6 +177,12 @@ export default function AdminDashboard() {
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null)
   const [reviewFilter, setReviewFilter] = useState<'all' | 'verified' | 'unverified'>('all')
+
+  // AI Try-Ons report state
+  const [tryOns, setTryOns] = useState<TryOnResult[]>([])
+  const [tryOnsLoading, setTryOnsLoading] = useState(false)
+  const [tryOnProductFilter, setTryOnProductFilter] = useState('all')
+  const [tryOnLightbox, setTryOnLightbox] = useState<string | null>(null)
   const [reviewRatingFilter, setReviewRatingFilter] = useState<number | null>(null)
 
   // Payment filter state
@@ -206,18 +214,20 @@ export default function AdminDashboard() {
       setIsAdmin(adminStatus)
 
       if (adminStatus) {
-        const [ordersData, usersData, productsData, shippingData, reviewsData] = await Promise.all([
+        const [ordersData, usersData, productsData, shippingData, reviewsData, tryOnsData] = await Promise.all([
           getAllOrders(),
           getAllUsers(),
           getFirestoreProducts(),
           getShippingSettings(),
-          getAllReviews()
+          getAllReviews(),
+          getAllTryOns()
         ])
         setOrders(ordersData)
         setUsers(usersData)
         setFirestoreProducts(productsData)
         setShippingSettings(shippingData)
         setReviews(reviewsData)
+        setTryOns(tryOnsData)
       }
       setIsLoadingData(false)
     }
@@ -995,6 +1005,7 @@ export default function AdminDashboard() {
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
             { id: 'products', icon: Package, label: 'Products' },
             { id: 'reviews', icon: Star, label: 'Reviews' },
+            { id: 'tryons', icon: Wand2, label: 'AI Try-Ons' },
             { id: 'coupons', icon: Tag, label: 'Coupons' },
             { id: 'settings', icon: Settings, label: 'Settings' },
           ].map(tab => (
@@ -1091,6 +1102,7 @@ export default function AdminDashboard() {
                 { id: 'customers', icon: Users, label: 'Customers' },
                 { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
                 { id: 'reviews', icon: Star, label: 'Reviews', badge: reviews.length },
+                { id: 'tryons', icon: Wand2, label: 'AI Try-Ons', badge: tryOns.length },
                 { id: 'coupons', icon: Tag, label: 'Coupons' },
                 { id: 'settings', icon: Settings, label: 'Settings' },
               ].map(tab => {
@@ -2711,6 +2723,191 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* AI Try-Ons Tab */}
+        {activeTab === 'tryons' && (() => {
+          const productMap = Object.fromEntries(firestoreProducts.map(p => [p.id, p]))
+          const userMap = Object.fromEntries(users.map(u => [u.id, u]))
+          const filtered = tryOnProductFilter === 'all'
+            ? tryOns
+            : tryOns.filter(t => t.productId === tryOnProductFilter)
+
+          // Stats
+          const uniqueProducts = new Set(tryOns.map(t => t.productId)).size
+          const uniqueCustomers = new Set(tryOns.filter(t => t.userId !== 'anonymous').map(t => t.userId)).size
+          const todayCount = tryOns.filter(t => {
+            if (!t.createdAt) return false
+            const d = (t.createdAt as any).toDate?.() || new Date(t.createdAt as any)
+            return new Date().toDateString() === d.toDateString()
+          }).length
+
+          // Unique products for filter dropdown
+          const usedProductIds = [...new Set(tryOns.map(t => t.productId))]
+
+          return (
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-navy">AI Try-On Report</h2>
+                  <p className="text-sm text-gray-400">Customer-generated virtual try-on activity</p>
+                </div>
+                <div className="text-xs text-gray-400">{tryOns.length} total generations</div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Try-Ons', value: tryOns.length, color: 'text-gold', bg: 'bg-gold/10' },
+                  { label: 'Today', value: todayCount, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Unique Customers', value: uniqueCustomers, color: 'text-green-600', bg: 'bg-green-50' },
+                  { label: 'Products Tried', value: uniqueProducts, color: 'text-purple-600', bg: 'bg-purple-50' },
+                ].map(s => (
+                  <div key={s.label} className="bg-white rounded-2xl p-4 border border-gray-100">
+                    <div className={`w-8 h-8 rounded-full ${s.bg} flex items-center justify-center mb-2`}>
+                      <Wand2 className={`w-4 h-4 ${s.color}`} />
+                    </div>
+                    <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filter by product */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setTryOnProductFilter('all')}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${tryOnProductFilter === 'all' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  All Products
+                </button>
+                {usedProductIds.map(pid => {
+                  const p = productMap[pid]
+                  return (
+                    <button
+                      key={pid}
+                      onClick={() => setTryOnProductFilter(pid)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${tryOnProductFilter === pid ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      {p ? p.name : pid.slice(0, 8)}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Table — desktop */}
+              {filtered.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                  <Wand2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 font-medium">No try-ons yet</p>
+                  <p className="text-xs text-gray-300 mt-1">Generated images will appear here</p>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Generated Image</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Product</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Customer</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {filtered.map(tryon => {
+                          const product = productMap[tryon.productId]
+                          const customer = userMap[tryon.userId]
+                          const date = tryon.createdAt ? ((tryon.createdAt as any).toDate?.() || new Date(tryon.createdAt as any)) : null
+                          return (
+                            <tr key={tryon.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3">
+                                <button onClick={() => setTryOnLightbox(tryon.imageUrl)} className="relative w-12 h-16 rounded-lg overflow-hidden bg-gray-100 block hover:opacity-80 transition-opacity">
+                                  <Image src={tryon.imageUrl} alt="Try-on" fill className="object-cover" sizes="48px" />
+                                </button>
+                              </td>
+                              <td className="px-4 py-3">
+                                {product ? (
+                                  <div className="flex items-center gap-2.5">
+                                    {product.images?.[0] && (
+                                      <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                        <Image src={product.images[0]} alt={product.name} fill className="object-cover" sizes="32px" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <p className="font-medium text-navy text-xs">{product.name}</p>
+                                      <p className="text-[10px] text-gold uppercase">{product.brand}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400 font-mono">{tryon.productId.slice(0, 10)}…</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {tryon.userId === 'anonymous' ? (
+                                  <span className="text-xs text-gray-400 italic">Guest</span>
+                                ) : customer ? (
+                                  <div>
+                                    <p className="font-medium text-navy text-xs">{customer.name || customer.username}</p>
+                                    <p className="text-[10px] text-gray-400">{customer.email}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400 font-mono">{tryon.userId.slice(0, 10)}…</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-400">
+                                {date ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-3">
+                    {filtered.map(tryon => {
+                      const product = productMap[tryon.productId]
+                      const customer = userMap[tryon.userId]
+                      const date = tryon.createdAt ? ((tryon.createdAt as any).toDate?.() || new Date(tryon.createdAt as any)) : null
+                      return (
+                        <div key={tryon.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex gap-3">
+                          <button onClick={() => setTryOnLightbox(tryon.imageUrl)} className="relative w-16 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 hover:opacity-80 transition-opacity">
+                            <Image src={tryon.imageUrl} alt="Try-on" fill className="object-cover" sizes="64px" />
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-navy text-sm truncate">{product?.name || 'Unknown product'}</p>
+                            <p className="text-[10px] text-gold uppercase mb-1">{product?.brand || ''}</p>
+                            <p className="text-xs text-gray-500">
+                              {tryon.userId === 'anonymous' ? 'Guest' : customer?.name || customer?.username || tryon.userId.slice(0, 8)}
+                            </p>
+                            <p className="text-[10px] text-gray-300 mt-0.5">
+                              {date ? date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Lightbox */}
+              {tryOnLightbox && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-4" onClick={() => setTryOnLightbox(null)}>
+                  <button className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                  <div className="relative max-h-[90dvh] max-w-sm w-full rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <Image src={tryOnLightbox} alt="Try-on" width={480} height={640} className="w-full h-auto object-contain" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (

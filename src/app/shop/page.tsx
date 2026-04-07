@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight, Eye, Clock, Tag } from 'lucide-react'
+import AIChatBubble from '@/components/AIChatBubble'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ProductQuickView from '@/components/ProductQuickView'
@@ -1285,6 +1286,8 @@ function ShopContent() {
           isWishlisted={wishlist.has(quickViewProduct.id!)}
         />
       )}
+
+      <AIChatBubble />
     </>
   )
 }

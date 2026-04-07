@@ -7,14 +7,14 @@ import {
   Upload, Sparkles, ShoppingCart, Wand2, Lock,
   RotateCcw, AlertCircle, ChevronRight, Loader2,
   CheckCircle, X, ImageIcon, Shirt, Palette,
-  User, ArrowRight, ZoomIn,
+  User, ArrowRight, ZoomIn, Zap,
 } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/context/AuthContext'
 import { useCart } from '@/context/CartContext'
-import { getFirestoreProducts, FirestoreProduct } from '@/lib/firestore'
+import { getFirestoreProducts, FirestoreProduct, getTryOnCredits, consumeTryOnCredit, saveTryOnResult } from '@/lib/firestore'
 
 // ─── Style quiz options ───────────────────────────────────────────────────────
 const GENDERS = ['Men', 'Women', 'Both']
@@ -99,7 +99,7 @@ function filterProducts(
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AIDresserPage() {
-  const { isLoggedIn, isLoading: authLoading } = useAuth()
+  const { isLoggedIn, isLoading: authLoading, user } = useAuth()
   const { addItem } = useCart()
 
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -133,10 +133,16 @@ export default function AIDresserPage() {
   const [tryOnError, setTryOnError] = useState('')
   const [addedToCart, setAddedToCart] = useState<string[]>([])
 
-  // Marketing consent state
-  const [marketingConsent, setMarketingConsent] = useState(false)
+  // Marketing consent state — synced with localStorage so it persists across pages
+  const CONSENT_KEY = 'tryon_consent_v1'
+  const [marketingConsent, setMarketingConsent] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('tryon_consent_v1') === 'true'
+  )
   const [showConsentModal, setShowConsentModal] = useState(false)
   const [pendingTryOnProduct, setPendingTryOnProduct] = useState<FirestoreProduct | null>(null)
+
+  // Try-on credits
+  const [credits, setCredits] = useState<number | null>(null)
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const tryOnSectionRef = useRef<HTMLDivElement>(null)
@@ -149,6 +155,12 @@ export default function AIDresserPage() {
       .catch(console.error)
       .finally(() => setLoadingProducts(false))
   }, [isLoggedIn])
+
+  useEffect(() => {
+    if (isLoggedIn && user?.id) {
+      getTryOnCredits(user.id).then(({ credits: c }) => setCredits(c))
+    }
+  }, [isLoggedIn, user?.id])
 
   // Stop polling on unmount
   useEffect(() => () => { if (pollingRef.current) clearInterval(pollingRef.current) }, [])
@@ -265,6 +277,7 @@ export default function AIDresserPage() {
   }
 
   const handleConsentAccept = () => {
+    localStorage.setItem(CONSENT_KEY, 'true')
     setMarketingConsent(true)
     setShowConsentModal(false)
     if (pendingTryOnProduct) {
@@ -276,6 +289,16 @@ export default function AIDresserPage() {
   const startTryOn = async (product: FirestoreProduct) => {
     if (!uploadedDataUrl) { setTryOnError('Upload a photo first to try on this item'); return }
     if (!product.images?.[0]) { setTryOnError('This product has no image available'); return }
+
+    // Check and consume credit
+    if (user?.id) {
+      const creditResult = await consumeTryOnCredit(user.id)
+      if (!creditResult.success) {
+        setTryOnError(creditResult.error || 'No try-on credits left this month')
+        return
+      }
+      setCredits(creditResult.creditsLeft)
+    }
 
     setTryOnProduct(product)
     setTryOnStatus('generating')
@@ -346,9 +369,26 @@ export default function AIDresserPage() {
           if (statusData.status === 'done') {
             clearInterval(pollingRef.current!)
             console.log('[TryOn] Done! Image URL:', statusData.imageUrl)
-            setTryOnImageUrl(statusData.imageUrl)
+
+            // Save to Cloudinary so result doesn't expire
+            let finalUrl = statusData.imageUrl
+            try {
+              const saveRes = await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: statusData.imageUrl, folder: 'tryon-results' }),
+              })
+              const saveData = await saveRes.json()
+              if (saveData.success && saveData.url) finalUrl = saveData.url
+            } catch {}
+
+            setTryOnImageUrl(finalUrl)
             setTryOnStatus('done')
             tryOnSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            // Save to the product's Customer Try-Ons gallery
+            if (user?.id && product.id) {
+              saveTryOnResult(product.id as string, user.id, finalUrl).catch(() => {})
+            }
           } else if (statusData.status === 'failed') {
             clearInterval(pollingRef.current!)
             console.error('[TryOn] Failed:', statusData.error)
@@ -480,7 +520,17 @@ export default function AIDresserPage() {
                       <Camera className="w-4 h-4 text-navy-600" />
                       <h2 className="font-serif text-base md:text-lg font-bold text-navy-900">Your Photo</h2>
                     </div>
-                    <span className="text-gray-400 text-[10px]">Optional · For try-on</span>
+                    {/* Credits badge */}
+                    {credits !== null && (
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${
+                        credits === 0 ? 'bg-red-50 text-red-500' :
+                        credits <= 5 ? 'bg-orange-50 text-orange-500' :
+                        'bg-gold/10 text-gold'
+                      }`}>
+                        <Zap className="w-3 h-3" />
+                        {credits} try-on{credits !== 1 ? 's' : ''} left
+                      </div>
+                    )}
                   </div>
 
                   {!uploadedDataUrl ? (
@@ -678,6 +728,16 @@ export default function AIDresserPage() {
 
                     {/* Edit style / picks row */}
                     <div className="flex items-center justify-between">
+                      {credits !== null && (
+                        <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold ${
+                          credits === 0 ? 'bg-red-50 text-red-500' :
+                          credits <= 5 ? 'bg-orange-50 text-orange-500' :
+                          'bg-gold/10 text-gold'
+                        }`}>
+                          <Zap className="w-3 h-3" />
+                          {credits} try-on{credits !== 1 ? 's' : ''} left
+                        </div>
+                      )}
                       <button
                         onClick={() => { setPageStep('quiz'); setRecommended([]); setAiStyleNote(''); setAiError(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
                         className="flex items-center gap-2 text-sm font-medium bg-white border border-gray-200 px-4 py-2 rounded-full text-navy shadow-sm"
@@ -824,6 +884,7 @@ export default function AIDresserPage() {
                             isThisTryOn={tryOnProduct?.id === product.id}
                             tryOnStatus={tryOnStatus}
                             hasPhoto={!!uploadedDataUrl}
+                            credits={credits}
                             onAddToCart={() => handleAddToCart(product)}
                             onTryOn={() => handleTryOnClick(product)}
                           />
@@ -926,6 +987,7 @@ function ProductCard({
   isThisTryOn,
   tryOnStatus,
   hasPhoto,
+  credits,
   onAddToCart,
   onTryOn,
 }: {
@@ -934,12 +996,14 @@ function ProductCard({
   isThisTryOn: boolean
   tryOnStatus: TryOnStatus
   hasPhoto: boolean
+  credits: number | null
   onAddToCart: () => void
   onTryOn: () => void
 }) {
   const isBusy = tryOnStatus === 'uploading' || tryOnStatus === 'generating'
   const isLoading = isThisTryOn && isBusy
-  const isDisabled = isBusy // disable ALL cards while any try-on is in progress
+  const noCredits = credits !== null && credits <= 0
+  const isDisabled = isBusy || noCredits // disable if busy or out of credits
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
@@ -987,6 +1051,8 @@ function ProductCard({
             className={`flex-1 py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all relative overflow-hidden whitespace-nowrap ${
               isLoading
                 ? 'bg-gold text-navy animate-gold-glow'
+                : noCredits
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : hasPhoto
                 ? 'bg-gold text-navy hover:brightness-105'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -998,6 +1064,8 @@ function ProductCard({
             <span className="relative z-10 flex items-center gap-1">
               {isLoading
                 ? <><Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />Wait</>
+                : noCredits
+                ? <><Zap className="w-3 h-3 flex-shrink-0" />No Credits</>
                 : <><Wand2 className="w-3 h-3 flex-shrink-0" />Try On</>
               }
             </span>

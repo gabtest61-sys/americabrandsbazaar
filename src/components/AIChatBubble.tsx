@@ -19,10 +19,20 @@ function MessageContent({ text }: { text: string }) {
   return (
     <div className="space-y-1.5">
       {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-1" />
+        if (!line.trim()) return <div key={i} className="h-0.5" />
 
-        // Section header: **Title:**
-        const headerMatch = line.match(/^\*\*(.+?)\*\*:?$/)
+        // ### Heading (with optional emoji)
+        const h3Match = line.match(/^#{1,3}\s+(.+)$/)
+        if (h3Match) {
+          return (
+            <p key={i} className="font-bold text-navy text-[13px] mt-3 mb-0.5 first:mt-0 flex items-center gap-1.5">
+              {h3Match[1]}
+            </p>
+          )
+        }
+
+        // **Title:** standalone bold header
+        const headerMatch = line.match(/^\*\*(.+?)\*\*:?\s*$/)
         if (headerMatch) {
           return (
             <p key={i} className="font-semibold text-navy text-[13px] mt-2 first:mt-0">
@@ -31,12 +41,23 @@ function MessageContent({ text }: { text: string }) {
           )
         }
 
+        // Numbered list: 1. item
+        const numMatch = line.match(/^(\d+)\.\s+(.+)$/)
+        if (numMatch) {
+          return (
+            <div key={i} className="flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-navy text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{numMatch[1]}</span>
+              <span className="text-[13px] leading-relaxed">{renderInline(numMatch[2])}</span>
+            </div>
+          )
+        }
+
         // Bullet line: starts with - or •
         if (line.match(/^[-•]\s/)) {
           const content = line.replace(/^[-•]\s/, '')
           return (
             <div key={i} className="flex items-start gap-1.5">
-              <span className="text-gold mt-0.5 flex-shrink-0 text-[10px]">●</span>
+              <span className="text-gold mt-1 flex-shrink-0 text-[8px]">●</span>
               <span className="text-[13px] leading-relaxed">{renderInline(content)}</span>
             </div>
           )
@@ -101,11 +122,18 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+const CATEGORY_SUGGESTIONS = [
+  { label: 'Tops', emoji: '👕', prompt: 'Show me your best tops and shirts available' },
+  { label: 'Accessories', emoji: '⌚', prompt: 'What accessories do you have in stock?' },
+  { label: 'Fragrance', emoji: '🌸', prompt: 'What fragrances and perfumes do you carry?' },
+  { label: 'Shoes', emoji: '👟', prompt: 'Show me your available shoes and sneakers' },
+]
+
 const QUICK_PROMPTS = [
-  'What should I wear on a date?',
-  'Best casual outfit for hot weather?',
-  'Suggest a formal office look',
+  'Best outfit for a date night?',
   'What brands do you carry?',
+  'Something for a casual day out?',
+  'Help me pick a gift',
 ]
 
 const INSTALL_STORAGE_KEY = 'abb-install-prompted'
@@ -378,15 +406,47 @@ export default function AIChatBubble() {
 
   return (
     <>
-      {/* Chat Panel */}
+      {/* ── Mobile: full-screen overlay backdrop ── */}
+      {isOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-[59]"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Chat Panel
+          Mobile  → slides up from bottom, full width, 92dvh tall
+          Desktop → floating card, bottom-right corner              */}
       <div
-        className={`fixed bottom-24 right-4 sm:right-6 z-[60] w-[calc(100vw-2rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col transition-all duration-300 origin-bottom-right ${
-          isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
-        }`}
-        style={{ maxHeight: '70vh', minHeight: '420px' }}
+        className={`fixed z-[60] bg-white flex flex-col transition-all duration-300
+          bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl
+          md:bottom-6 md:right-6 md:left-auto md:w-[420px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 md:origin-bottom-right
+          ${isOpen
+            ? 'opacity-100 translate-y-0 pointer-events-auto md:scale-100'
+            : 'opacity-0 translate-y-full pointer-events-none md:translate-y-0 md:scale-95'
+          }`}
+        style={{
+          // Mobile: 92% of viewport height. Desktop (md+): fixed 600px tall
+          height: isOpen ? 'min(92dvh, 92vh)' : undefined,
+          maxHeight: isOpen ? 'min(92dvh, 92vh)' : 0,
+        } as React.CSSProperties}
+        // Override max-height on desktop via inline (Tailwind can't use arbitrary values easily here)
+        ref={(el) => {
+          if (el) {
+            if (window.innerWidth >= 768) {
+              el.style.height = isOpen ? '600px' : '0'
+              el.style.maxHeight = isOpen ? '600px' : '0'
+            }
+          }
+        }}
       >
+        {/* Drag handle (mobile only) */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-navy rounded-t-2xl flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 bg-navy md:rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-gold" />
@@ -489,27 +549,47 @@ export default function AIChatBubble() {
 
           {/* Welcome message */}
           {messages.length === 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Greeting bubble */}
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-navy flex items-center justify-center flex-shrink-0 mt-0.5">
                   <Sparkles className="w-3.5 h-3.5 text-gold" />
                 </div>
                 <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%]">
-                  <p className="text-navy text-sm">
-                    I can also help you with outfit ideas, brand picks, and fashion advice. What are you looking for? ✨
+                  <p className="text-navy text-sm leading-relaxed">
+                    Hi! 👋 I&apos;m your ABB style assistant. Browse our categories or ask me anything about fashion and our products.
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 ml-9">
-                {QUICK_PROMPTS.map((p) => (
+
+              {/* Category tiles */}
+              <div className="grid grid-cols-2 gap-2">
+                {CATEGORY_SUGGESTIONS.map((cat) => (
                   <button
-                    key={p}
-                    onClick={() => sendMessage(p)}
-                    className="text-xs bg-cream text-navy px-3 py-1.5 rounded-full border border-gold/20 hover:bg-gold/10 hover:border-gold/40 transition-colors text-left"
+                    key={cat.label}
+                    onClick={() => sendMessage(cat.prompt)}
+                    className="flex items-center gap-2.5 bg-white border border-gray-100 hover:border-gold/50 hover:bg-gold/5 rounded-2xl px-3.5 py-3 transition-all shadow-sm group text-left"
                   >
-                    {p}
+                    <span className="text-xl leading-none">{cat.emoji}</span>
+                    <span className="text-sm font-semibold text-navy group-hover:text-gold transition-colors">{cat.label}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* Quick prompt chips */}
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2 ml-1">Or ask me</p>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_PROMPTS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => sendMessage(p)}
+                      className="text-xs bg-navy/5 text-navy px-3 py-1.5 rounded-full border border-navy/10 hover:bg-gold/10 hover:border-gold/40 hover:text-navy transition-colors"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -555,7 +635,7 @@ export default function AIChatBubble() {
         </div>
 
         {/* Input */}
-        <div className="flex-shrink-0 px-3 py-3 border-t border-gray-100">
+        <div className="flex-shrink-0 px-3 py-3 border-t border-gray-100 pb-[max(12px,env(safe-area-inset-bottom))]">
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
@@ -575,25 +655,22 @@ export default function AIChatBubble() {
               <Send className="w-4 h-4 text-white" />
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 text-center mt-1.5">Powered by DeepSeek AI</p>
         </div>
       </div>
 
-      {/* Bubble Button */}
-      <button
-        onClick={() => setIsOpen((v: boolean) => !v)}
-        className="fixed bottom-6 right-4 sm:right-6 z-[60] w-14 h-14 rounded-full bg-navy shadow-xl hover:bg-gold transition-all duration-300 flex items-center justify-center group hover:scale-110"
-        aria-label="Open AI Style Assistant"
-      >
-        {isOpen ? (
-          <X className="w-6 h-6 text-white" />
-        ) : (
+      {/* Bubble Button — hidden on mobile when open, hidden on desktop when open (panel has close) */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-4 sm:right-6 z-[61] w-14 h-14 rounded-full bg-navy shadow-xl hover:bg-gold transition-all duration-300 flex items-center justify-center group hover:scale-110"
+          aria-label="Open AI Style Assistant"
+        >
           <Sparkles className="w-6 h-6 text-gold group-hover:text-navy transition-colors" />
-        )}
-        {hasUnread && !isOpen && (
-          <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
-        )}
-      </button>
+          {hasUnread && (
+            <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+          )}
+        </button>
+      )}
     </>
   )
 }
