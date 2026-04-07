@@ -85,11 +85,11 @@ export default function FeaturedProducts() {
     <section id="featured-products" className="section-padding bg-white">
       <div className="container-max">
         {/* Section Header */}
-        <div className="mb-10">
+        <div className="mb-6 md:mb-10">
           <span className="text-gold font-semibold text-sm tracking-wider uppercase mb-2 block">
             Curated Selection
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold text-navy">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-navy">
             Featured Products
           </h2>
         </div>
@@ -104,7 +104,7 @@ export default function FeaturedProducts() {
             No featured products yet
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             {featuredProducts.filter(p => p.id).map((product) => {
               const productId = product.id!
               const isAdded = addedProducts.has(productId)

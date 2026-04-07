@@ -28,7 +28,7 @@ export default function Hero() {
   }
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden bg-navy pt-28 md:pt-32">
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-navy pt-20 md:pt-28 lg:pt-32">
       {/* Animated gradient background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-navy via-navy-800 to-navy-900" />
@@ -36,14 +36,14 @@ export default function Hero() {
         <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_right,rgba(201,162,39,0.1),transparent_50%)]" />
       </div>
 
-      <div className="container-max px-4 md:px-8 relative z-10 py-12">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+      <div className="container-max px-4 md:px-8 relative z-10 py-8 md:py-12">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-8 items-center">
           {/* Content */}
           <div className={`text-center lg:text-left transition-all duration-1000 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}>
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-gold/10 backdrop-blur-sm border border-gold/20 text-gold px-4 py-2 rounded-full text-sm font-medium mb-8">
+            <div className="inline-flex items-center gap-2 bg-gold/10 backdrop-blur-sm border border-gold/20 text-gold px-4 py-2 rounded-full text-sm font-medium mb-5 md:mb-8">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-gold"></span>
@@ -52,7 +52,7 @@ export default function Hero() {
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-4 md:mb-6">
               Premium Style,
               <span className="block mt-2">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold animate-pulse">
@@ -62,8 +62,8 @@ export default function Hero() {
             </h1>
 
             {/* Rotating brand text */}
-            <div className="h-8 mb-8 overflow-hidden">
-              <p className="text-white/60 text-lg">
+            <div className="h-8 mb-5 md:mb-8 overflow-hidden">
+              <p className="text-white/60 text-base md:text-lg">
                 Shop authentic{' '}
                 <span className="text-gold font-semibold inline-block min-w-[140px] text-left transition-all duration-500">
                   {brands[activeBrand]}
@@ -73,7 +73,7 @@ export default function Hero() {
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start mb-12">
+            <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 justify-center lg:justify-start mb-8 md:mb-12">
               <button
                 onClick={scrollToProducts}
                 className="group w-full sm:w-auto flex items-center justify-center gap-3 bg-gold hover:bg-gold-400 text-navy-900 font-bold py-4 px-8 rounded-full transition-all duration-300 shadow-lg shadow-gold/25 hover:shadow-gold/40 hover:shadow-xl hover:scale-105"
@@ -112,7 +112,7 @@ export default function Hero() {
           <div className={`relative transition-all duration-1000 delay-300 ${
             isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}>
-            <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-[420px] md:h-[420px] mx-auto">
+            <div className="relative w-52 h-52 sm:w-72 sm:h-72 md:w-[380px] md:h-[380px] lg:w-[420px] lg:h-[420px] mx-auto">
               {/* Animated rings */}
               <div className="absolute inset-0 rounded-full border border-gold/10 animate-[spin_20s_linear_infinite]" />
               <div className="absolute inset-4 sm:inset-6 rounded-full border border-gold/20 animate-[spin_15s_linear_infinite_reverse]" />

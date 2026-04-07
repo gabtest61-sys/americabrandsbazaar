@@ -23,7 +23,7 @@ const features = [
 
 export default function AIDresserBanner() {
   return (
-    <section className="relative overflow-hidden bg-navy py-20 md:py-28">
+    <section className="relative overflow-hidden bg-navy py-12 md:py-20 lg:py-28">
       {/* Background effects */}
       <div className="absolute inset-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(201,162,39,0.15),transparent_60%)]" />
@@ -41,7 +41,7 @@ export default function AIDresserBanner() {
             </div>
 
             {/* Headline */}
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight mb-4 md:mb-6">
               Your Personal
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-300 to-gold">
                 AI Fashion Stylist
@@ -49,20 +49,20 @@ export default function AIDresserBanner() {
             </h2>
 
             {/* Description */}
-            <p className="text-white/60 text-lg mb-10 max-w-lg mx-auto lg:mx-0">
+            <p className="text-white/60 text-sm md:text-base lg:text-lg mb-6 md:mb-10 max-w-lg mx-auto lg:mx-0">
               Answer a few questions and let our AI curate the perfect look from our premium collection.
             </p>
 
             {/* Features */}
-            <div className="grid grid-cols-3 gap-4 mb-10">
+            <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-10">
               {features.map((feature) => {
                 const Icon = feature.icon
                 return (
                   <div key={feature.title} className="text-center">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mx-auto mb-3">
-                      <Icon className="w-6 h-6 text-gold" />
+                    <div className="w-9 h-9 md:w-12 md:h-12 rounded-xl bg-white/10 flex items-center justify-center mx-auto mb-2 md:mb-3">
+                      <Icon className="w-4 h-4 md:w-6 md:h-6 text-gold" />
                     </div>
-                    <h3 className="text-white font-medium text-sm mb-1">{feature.title}</h3>
+                    <h3 className="text-white font-medium text-xs md:text-sm mb-1">{feature.title}</h3>
                     <p className="text-white/40 text-xs hidden md:block">{feature.description}</p>
                   </div>
                 )

@@ -1,6 +1,7 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { RotateCcw, CheckCircle, XCircle, AlertCircle, Phone } from 'lucide-react'
+import Link from 'next/link'
+import { RotateCcw, CheckCircle, XCircle, AlertCircle, Phone, ChevronRight } from 'lucide-react'
 
 export const metadata = {
   title: 'Returns & Exchanges | America Brands Bazaar',
@@ -11,21 +12,32 @@ export default function ReturnsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-cream pt-24">
+      <main className="min-h-screen bg-gray-50 ">
 
         {/* Hero */}
-        <section className="bg-navy py-14">
-          <div className="container-max px-4 md:px-8 text-center">
-            <span className="text-gold text-sm font-semibold uppercase tracking-widest mb-3 block">Policy</span>
-            <h1 className="text-4xl font-bold text-white mb-3">Returns & Exchanges</h1>
-            <p className="text-white/60 max-w-xl mx-auto">
+        <section className="pt-[72px]" style={{ background: '#0f1e38' }}>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+            <nav className="hidden md:flex items-center gap-2 text-sm text-white/40 mb-6">
+              <Link href="/" className="hover:text-white/70 transition-colors">Home</Link>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-gold/80">Returns & Exchanges</span>
+            </nav>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                <RotateCcw className="w-4 h-4 text-gold" />
+              </div>
+              <span className="text-gold text-xs font-semibold uppercase tracking-[0.2em]">Policy</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">Returns & Exchanges</h1>
+            <p className="text-white/50 text-sm md:text-base max-w-xl">
               Your satisfaction is our priority. We accept returns within 7 days for eligible items.
             </p>
           </div>
+          <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
         </section>
 
         <section className="py-16">
-          <div className="container-max px-4 md:px-8 max-w-4xl mx-auto space-y-8">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 max-w-4xl mx-auto space-y-8">
 
             {/* How to Return */}
             <div className="bg-white rounded-2xl shadow-sm p-8">

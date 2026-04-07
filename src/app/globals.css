@@ -78,7 +78,7 @@ h1, h2 {
   }
 
   .section-padding {
-    @apply py-16 md:py-24 px-4 md:px-8;
+    @apply py-10 md:py-16 lg:py-24 px-4 md:px-8;
   }
 
   .container-max {

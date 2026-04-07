@@ -1,5 +1,7 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Link from 'next/link'
+import { FileText, ChevronRight } from 'lucide-react'
 
 export const metadata = {
   title: 'Terms of Service | America Brands Bazaar',
@@ -76,18 +78,29 @@ Facebook: America Brands Bazaar`,
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-cream pt-24">
+      <main className="min-h-screen bg-gray-50 ">
 
-        <section className="bg-navy py-14">
-          <div className="container-max px-4 md:px-8 text-center">
-            <span className="text-gold text-sm font-semibold uppercase tracking-widest mb-3 block">Legal</span>
-            <h1 className="text-4xl font-bold text-white mb-3">Terms of Service</h1>
-            <p className="text-white/60">Effective date: January 1, 2024</p>
+        <section className="pt-[72px]" style={{ background: '#0f1e38' }}>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+            <nav className="hidden md:flex items-center gap-2 text-sm text-white/40 mb-6">
+              <Link href="/" className="hover:text-white/70 transition-colors">Home</Link>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-gold/80">Terms of Service</span>
+            </nav>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-gold" />
+              </div>
+              <span className="text-gold text-xs font-semibold uppercase tracking-[0.2em]">Legal</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">Terms of Service</h1>
+            <p className="text-white/50 text-sm md:text-base">Effective date: January 1, 2024</p>
           </div>
+          <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
         </section>
 
         <section className="py-16">
-          <div className="container-max px-4 md:px-8 max-w-3xl mx-auto">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 max-w-3xl mx-auto">
             <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12">
               <p className="text-gray-600 mb-8 leading-relaxed">
                 These Terms of Service govern your use of America Brands Bazaar&apos;s website and services. Please read them carefully before making a purchase.

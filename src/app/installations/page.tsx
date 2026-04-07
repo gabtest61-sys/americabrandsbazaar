@@ -62,7 +62,7 @@ export default function InstallationsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-screen bg-cream pt-24 pb-16 flex items-center justify-center">
+        <main className="min-h-screen bg-cream pt-[72px] pb-16 flex items-center justify-center">
           <div className="text-center px-6">
             <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-12 h-12 text-green-500" />
@@ -79,7 +79,7 @@ export default function InstallationsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-cream pt-24 pb-16">
+      <main className="min-h-screen bg-cream pt-[72px] pb-16">
         <div className="container-max px-4 md:px-8 py-12">
 
           {/* Hero */}

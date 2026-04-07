@@ -1,6 +1,7 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { Mail, Phone, Facebook, Clock, MapPin } from 'lucide-react'
+import Link from 'next/link'
+import { Mail, Phone, Facebook, Clock, MapPin, ChevronRight, MessageSquare } from 'lucide-react'
 
 export const metadata = {
   title: 'Contact Us | America Brands Bazaar',
@@ -11,26 +12,37 @@ export default function ContactPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-cream pt-24">
+      <main className="min-h-screen bg-gray-50 ">
 
         {/* Hero */}
-        <section className="bg-navy py-14">
-          <div className="container-max px-4 md:px-8 text-center">
-            <span className="text-gold text-sm font-semibold uppercase tracking-widest mb-3 block">Get in Touch</span>
-            <h1 className="text-4xl font-bold text-white mb-3">Contact Us</h1>
-            <p className="text-white/60 max-w-xl mx-auto">
+        <section className="pt-[72px]" style={{ background: '#0f1e38' }}>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+            <nav className="hidden md:flex items-center gap-2 text-sm text-white/40 mb-6">
+              <Link href="/" className="hover:text-white/70 transition-colors">Home</Link>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-gold/80">Contact Us</span>
+            </nav>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-gold" />
+              </div>
+              <span className="text-gold text-xs font-semibold uppercase tracking-[0.2em]">Get in Touch</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">Contact Us</h1>
+            <p className="text-white/50 text-sm md:text-base max-w-xl">
               Have a question about your order or need help finding the right product? We&apos;re happy to assist.
             </p>
           </div>
+          <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
         </section>
 
-        <section className="py-16">
-          <div className="container-max px-4 md:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
+        <section className="py-10 md:py-16">
+          <div className="max-w-7xl mx-auto px-4 md:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10 max-w-5xl mx-auto">
 
               {/* Contact Info */}
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-navy">Reach Us Directly</h2>
+              <div className="space-y-4 md:space-y-6">
+                <h2 className="text-xl md:text-2xl font-bold text-navy">Reach Us Directly</h2>
 
                 {[
                   {
@@ -95,7 +107,7 @@ export default function ContactPage() {
 
               {/* FAQ */}
               <div>
-                <h2 className="text-2xl font-bold text-navy mb-6">Common Questions</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-navy mb-4 md:mb-6">Common Questions</h2>
                 <div className="space-y-4">
                   {[
                     { q: 'How do I track my order?', a: 'Once your order is shipped, we will send the tracking number to your contact details via SMS or Facebook message.' },

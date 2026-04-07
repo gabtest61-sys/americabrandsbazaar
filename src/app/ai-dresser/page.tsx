@@ -382,48 +382,54 @@ export default function AIDresserPage() {
       <Header />
 
       {/* Hero */}
-      <section className="bg-navy-900 pt-24 pb-6 md:pb-12">
-        <div className="container-max px-4 md:px-8">
-          <nav className="hidden md:flex items-center gap-2 text-sm text-white/50 mb-6">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-gold-400">AI Dresser</span>
+      <section className="pt-[72px]" style={{ background: '#0f1e38' }}>
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+          {/* Breadcrumb */}
+          <nav className="hidden md:flex items-center gap-2 text-sm text-white/40 mb-8">
+            <Link href="/" className="hover:text-white/70 transition-colors">Home</Link>
+            <ChevronRight className="w-3.5 h-3.5" />
+            <span className="text-gold/80">AI Dresser</span>
           </nav>
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gold-500/20 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-gold-400" />
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-gold" />
                 </div>
-                <span className="text-gold-400 text-xs md:text-sm font-medium uppercase tracking-widest">
+                <span className="text-gold text-xs font-semibold uppercase tracking-[0.2em]">
                   Powered by AI
                 </span>
               </div>
-              <h1 className="font-serif text-3xl md:text-5xl font-bold text-white mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">
                 AI Personal Stylist
               </h1>
-              <p className="text-white/60 text-sm md:text-lg max-w-xl">
+              <p className="text-white/50 text-sm md:text-base max-w-lg">
                 Tell us your style, get tailored picks, then see yourself wearing them.
               </p>
             </div>
-            <div className="hidden md:flex flex-wrap gap-3">
+
+            <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
               {[
                 { icon: Shirt, label: 'Style Quiz' },
                 { icon: Sparkles, label: 'Smart Picks' },
                 { icon: Wand2, label: 'Virtual Try-On' },
               ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/70 text-sm">
-                  <Icon className="w-4 h-4 text-gold-400" />
+                <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 md:px-3.5 md:py-2 rounded-full bg-white/8 border border-white/10 text-white/60 text-xs font-medium">
+                  <Icon className="w-3.5 h-3.5 text-gold" />
                   {label}
                 </div>
               ))}
             </div>
           </div>
         </div>
+
+        {/* Bottom separator */}
+        <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
       </section>
 
       <main className="bg-gray-50 min-h-screen">
-        <div className="container-max px-3 md:px-8 py-6 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-10">
 
           {/* Auth loading */}
           {authLoading && (
@@ -434,25 +440,25 @@ export default function AIDresserPage() {
 
           {/* Not logged in */}
           {!authLoading && !isLoggedIn && (
-            <div className="max-w-lg mx-auto text-center py-16">
-              <div className="w-20 h-20 rounded-full bg-navy-900/10 flex items-center justify-center mx-auto mb-6">
-                <Lock className="w-9 h-9 text-navy-800" />
+            <div className="max-w-lg mx-auto text-center py-10 md:py-16">
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-navy-900/10 flex items-center justify-center mx-auto mb-5 md:mb-6">
+                <Lock className="w-7 h-7 md:w-9 md:h-9 text-navy-800" />
               </div>
-              <h2 className="font-serif text-3xl font-bold text-navy-900 mb-3">Sign In Required</h2>
-              <p className="text-gray-500 mb-8 text-lg">
+              <h2 className="font-serif text-2xl md:text-3xl font-bold text-navy-900 mb-3">Sign In Required</h2>
+              <p className="text-gray-500 mb-6 md:mb-8 text-base md:text-lg">
                 Create a free account to access the AI Dresser and get personalized style
                 recommendations with virtual try-on.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
                   onClick={() => { setAuthMode('register'); setShowAuthModal(true) }}
-                  className="px-8 py-3 bg-navy-900 text-white rounded-xl font-semibold hover:bg-navy-800 transition-colors"
+                  className="w-full sm:w-auto px-8 py-3 bg-navy-900 text-white rounded-xl font-semibold hover:bg-navy-800 transition-colors"
                 >
                   Create Free Account
                 </button>
                 <button
                   onClick={() => { setAuthMode('login'); setShowAuthModal(true) }}
-                  className="px-8 py-3 bg-white text-navy-900 border border-navy-200 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-auto px-8 py-3 bg-white text-navy-900 border border-navy-200 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
                 >
                   Sign In
                 </button>
@@ -627,16 +633,59 @@ export default function AIDresserPage() {
               {/* ── Right panel ───────────────────────────────────────────── */}
               <div className={`lg:col-span-2 space-y-4 lg:space-y-6 ${pageStep === 'quiz' ? 'hidden lg:block' : ''}`}>
 
-                {/* Mobile: back to quiz button */}
+                {/* Mobile: top bar with photo + edit style */}
                 {pageStep === 'results' && (
-                  <div className="flex items-center justify-between lg:hidden">
-                    <button
-                      onClick={() => { setPageStep('quiz'); setRecommended([]); setAiStyleNote(''); setAiError(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
-                      className="flex items-center gap-2 text-sm text-navy-700 font-medium bg-white border border-gray-200 px-4 py-2 rounded-full"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Edit Style
-                    </button>
-                    <span className="text-sm text-gray-400">{recommended.length} picks</span>
+                  <div className="lg:hidden space-y-3">
+                    {/* Photo indicator row */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
+                      {uploadedDataUrl ? (
+                        <>
+                          <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 ring-2 ring-gold/40">
+                            <img src={uploadedDataUrl} alt="Your photo" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-navy">Photo ready ✓</p>
+                            <p className="text-xs text-gray-400">Tap Try On on any product</p>
+                          </div>
+                          <button
+                            onClick={() => { setUploadedDataUrl(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
+                            className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5 text-gray-500" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 cursor-pointer border-2 border-dashed border-gray-300"
+                          >
+                            <Upload className="w-4 h-4 text-gray-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-navy">Add your photo</p>
+                            <p className="text-xs text-gray-400">To use virtual try-on</p>
+                          </div>
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-xs font-semibold text-gold border border-gold/30 px-3 py-1.5 rounded-full"
+                          >
+                            Upload
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Edit style / picks row */}
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => { setPageStep('quiz'); setRecommended([]); setAiStyleNote(''); setAiError(''); setTryOnStatus('idle'); setTryOnImageUrl(''); setTryOnProduct(null) }}
+                        className="flex items-center gap-2 text-sm font-medium bg-white border border-gray-200 px-4 py-2 rounded-full text-navy shadow-sm"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Edit Style
+                      </button>
+                      <span className="text-sm text-gray-400">{recommended.length} picks</span>
+                    </div>
                   </div>
                 )}
 
@@ -653,8 +702,8 @@ export default function AIDresserPage() {
 
                 {(tryOnStatus === 'uploading' || tryOnStatus === 'generating') && tryOnProduct && (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100">
-                      <h3 className="font-serif text-xl font-bold text-navy-900">AI Style Shot</h3>
+                    <div className="px-4 md:px-6 py-4 border-b border-gray-100">
+                      <h3 className="font-serif text-lg md:text-xl font-bold text-navy-900">AI Style Shot</h3>
                       <p className="text-gray-500 text-sm">{tryOnProduct.brand} — {tryOnProduct.name}</p>
                     </div>
                     <div className="p-6 max-w-xs mx-auto">
@@ -675,9 +724,9 @@ export default function AIDresserPage() {
                 {/* Try-on result */}
                 {tryOnStatus === 'done' && tryOnImageUrl && tryOnProduct && (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                       <div>
-                        <h3 className="font-serif text-xl font-bold text-navy-900">AI Style Shot</h3>
+                        <h3 className="font-serif text-lg md:text-xl font-bold text-navy-900">AI Style Shot</h3>
                         <p className="text-gray-500 text-sm">{tryOnProduct.brand} — {tryOnProduct.name}</p>
                       </div>
                       <button
@@ -703,10 +752,10 @@ export default function AIDresserPage() {
                       <p className="text-center text-xs text-gray-400 mt-2">Tap to zoom</p>
                     </div>
 
-                    <div className="px-6 pb-6 flex gap-3">
+                    <div className="px-4 md:px-6 pb-4 md:pb-6 flex gap-3">
                       <button
                         onClick={() => handleAddToCart(tryOnProduct)}
-                        className="flex-1 py-3 rounded-xl bg-navy-900 text-white font-semibold flex items-center justify-center gap-2 hover:bg-navy-800 transition-colors"
+                        className="flex-1 py-3 rounded-xl bg-navy-900 text-white font-semibold flex items-center justify-center gap-2 hover:bg-navy-800 transition-colors text-sm"
                       >
                         {addedToCart.includes(tryOnProduct.id as string) ? (
                           <><CheckCircle className="w-4 h-4 text-green-400" /> Added!</>
@@ -745,7 +794,7 @@ export default function AIDresserPage() {
                   <>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="font-serif text-2xl font-bold text-navy-900">Recommended For You</h2>
+                        <h2 className="font-serif text-xl md:text-2xl font-bold text-navy-900">Recommended For You</h2>
                         <p className="text-gray-500 text-sm mt-0.5 flex items-center gap-1.5">
                           {isAiMode && <Sparkles className="w-3.5 h-3.5 text-gold-500" />}
                           {style} · {occasion} · {isAiMode ? 'AI Selected' : colorGroup} · {gender}
@@ -914,52 +963,46 @@ function ProductCard({
         )}
       </div>
 
-      <div className="p-3 md:p-4">
-        <p className="text-[10px] font-semibold text-gold-600 uppercase tracking-wider mb-0.5">{product.brand}</p>
-        <h3 className="font-medium text-navy-900 text-xs md:text-sm line-clamp-2 mb-1">{product.name}</h3>
-        <div className="flex items-baseline gap-1.5 mb-3">
-          <span className="text-navy-900 font-bold text-sm">₱{product.price.toLocaleString()}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-gray-400 text-xs line-through">₱{product.originalPrice.toLocaleString()}</span>
-          )}
-        </div>
+      <div className="p-3">
+        <p className="text-[9px] font-semibold text-gold uppercase tracking-wider mb-0.5 truncate">{product.brand}</p>
+        <h3 className="font-medium text-navy text-xs line-clamp-1 mb-1">{product.name}</h3>
+        <p className="text-navy font-bold text-sm mb-2">₱{product.price.toLocaleString()}</p>
 
-        <div className="flex gap-1.5 md:gap-2">
+        <div className="flex gap-1.5">
+          {/* Cart button */}
           <button
             onClick={onAddToCart}
-            className="flex-1 py-2 md:py-2.5 rounded-xl border border-navy-200 text-navy-800 text-xs md:text-sm font-medium flex items-center justify-center gap-1 md:gap-1.5 hover:bg-navy-50 transition-colors"
+            className="flex-1 py-2 rounded-xl border border-gray-200 text-navy text-[11px] font-semibold flex items-center justify-center gap-1 hover:bg-gray-50 transition-colors whitespace-nowrap"
           >
-            {isAddedToCart ? (
-              <><CheckCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-500" /> Added!</>
-            ) : (
-              <><ShoppingCart className="w-3 h-3 md:w-3.5 md:h-3.5" /> Cart</>
-            )}
+            {isAddedToCart
+              ? <><CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" /><span>Added</span></>
+              : <><ShoppingCart className="w-3 h-3 flex-shrink-0" /><span>Cart</span></>
+            }
           </button>
+
+          {/* Try On button */}
           <button
             onClick={onTryOn}
             disabled={isDisabled}
-            title={!hasPhoto ? 'Upload a photo first' : undefined}
-            className={`flex-1 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-semibold flex items-center justify-center gap-1 md:gap-1.5 transition-all relative overflow-hidden ${
+            className={`flex-1 py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all relative overflow-hidden whitespace-nowrap ${
               isLoading
-                ? 'bg-gold-500 text-navy-900 animate-gold-glow'
+                ? 'bg-gold text-navy animate-gold-glow'
                 : hasPhoto
-                ? 'bg-gold-500 text-navy-900 hover:bg-gold-400'
+                ? 'bg-gold text-navy hover:brightness-105'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             } disabled:opacity-60`}
           >
             {isLoading && (
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_1.2s_infinite]" style={{ backgroundSize: '200% 100%' }} />
             )}
-            {isLoading ? (
-              <><Loader2 className="w-3 h-3 animate-spin relative z-10" /><span className="relative z-10">Wait…</span></>
-            ) : (
-              <><Wand2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Try On</>
-            )}
+            <span className="relative z-10 flex items-center gap-1">
+              {isLoading
+                ? <><Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />Wait</>
+                : <><Wand2 className="w-3 h-3 flex-shrink-0" />Try On</>
+              }
+            </span>
           </button>
         </div>
-        {!hasPhoto && (
-          <p className="text-[10px] text-gray-400 text-center mt-1.5">Upload photo to try on</p>
-        )}
       </div>
     </div>
   )

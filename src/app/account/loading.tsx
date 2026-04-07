@@ -6,7 +6,7 @@ export default function AccountLoading() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gray-50 pt-24">
+      <main className="min-h-screen bg-gray-50 pt-[72px]">
         <div className="container-max px-4 md:px-8 py-8">
           <div className="max-w-6xl mx-auto">
             {/* Header Skeleton */}

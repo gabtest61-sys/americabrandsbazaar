@@ -1,3 +1,4 @@
+import AIChatBubble from '@/components/AIChatBubble'
 import Header from '@/components/Header'
 import Hero from '@/components/Hero'
 import Categories from '@/components/Categories'
@@ -16,6 +17,7 @@ export default function Home() {
       <AIDresserBanner />
       <Reviews />
       <Footer />
+      <AIChatBubble />
     </main>
   )
 }

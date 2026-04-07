@@ -14,12 +14,11 @@ export const COLORS = {
 }
 
 export const NAV_LINKS = [
+  { name: 'Home', href: '/' },
   { name: 'Shop', href: '/shop' },
-  { name: 'Clothes', href: '/shop?category=clothes' },
-  { name: 'Accessories', href: '/shop?category=accessories' },
-  { name: 'Shoes', href: '/shop?category=shoes' },
-  { name: 'Fragrance', href: '/shop?category=fragrance' },
   { name: 'AI Dresser', href: '/ai-dresser' },
+  { name: 'About Us', href: '/about' },
+  { name: 'Contact Us', href: '/contact' },
 ]
 
 export const CATEGORIES = [

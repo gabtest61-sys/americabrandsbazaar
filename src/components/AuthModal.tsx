@@ -303,36 +303,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                 </div>
               </div>
 
-              <div>
-                <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">
-                  Street Address, Barangay
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-white/30" />
-                  <input
-                    type="text"
-                    value={registerData.address}
-                    onChange={(e) => setRegisterData({ ...registerData, address: e.target.value })}
-                    placeholder="Street address, barangay"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">
-                  City / Municipality
-                </label>
-                <input
-                  type="text"
-                  value={registerData.city}
-                  onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
-                  placeholder="City / Municipality"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder-white/30 focus:outline-none focus:border-gold/50 transition-colors"
-                  required
-                />
-              </div>
 
               <div>
                 <label className="block text-white/70 text-xs sm:text-sm font-medium mb-1">

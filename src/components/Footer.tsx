@@ -29,10 +29,10 @@ export default function Footer() {
     <footer className="bg-navy text-white">
       {/* Newsletter */}
       <div className="border-b border-white/10">
-        <div className="container-max px-4 md:px-8 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="container-max px-4 md:px-8 py-8 md:py-10">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
             <div>
-              <h3 className="text-xl font-bold mb-1">Get Exclusive Offers</h3>
+              <h3 className="text-lg md:text-xl font-bold mb-1">Get Exclusive Offers</h3>
               <p className="text-white/50 text-sm">Subscribe for deals and new arrivals</p>
             </div>
             <div className="flex w-full md:w-auto md:max-w-sm">
@@ -50,8 +50,8 @@ export default function Footer() {
       </div>
 
       {/* Main Footer */}
-      <div className="container-max px-4 md:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 sm:gap-8">
+      <div className="container-max px-4 md:px-8 py-8 md:py-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-5">

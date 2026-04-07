@@ -273,7 +273,7 @@ export default function AccountPage() {
     return (
       <>
         <Header />
-        <main className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center">
+        <main className="min-h-screen bg-gray-50 pt-[72px] flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-gold border-t-transparent rounded-full" />
         </main>
         <Footer />
@@ -288,7 +288,7 @@ export default function AccountPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gray-50 pt-24 pb-16">
+      <main className="min-h-screen bg-gray-50 pt-[72px] pb-16">
         <div className="container-max px-4 md:px-8 py-8">
           {/* Mobile: Profile bar + horizontal tabs */}
           <div className="lg:hidden mb-6">

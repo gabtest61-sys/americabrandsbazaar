@@ -154,7 +154,7 @@ export default function ProductDetailPage() {
     return (
       <>
         <Header />
-        <main className="min-h-screen bg-white pt-24">
+        <main className="min-h-screen bg-white pt-[72px]">
           <ProductDetailSkeleton />
         </main>
         <Footer />
@@ -166,7 +166,7 @@ export default function ProductDetailPage() {
     return (
       <>
         <Header />
-        <main className="min-h-screen bg-white pt-24">
+        <main className="min-h-screen bg-white pt-[72px]">
           <div className="container-max px-4 py-20 text-center">
             <Shirt className="w-16 h-16 text-gray-200 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-navy mb-2">Product Not Found</h1>
@@ -187,10 +187,10 @@ export default function ProductDetailPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-white pt-[100px]">
+      <main className="min-h-screen bg-white pt-[72px] md:pt-[100px]">
 
         {/* ── PRODUCT HERO ── */}
-        <div className="container-max px-4 md:px-8 py-8">
+        <div className="container-max px-4 md:px-8 py-4 md:py-8">
           {/* Breadcrumb */}
           <div className="mb-6">
             <Breadcrumb
@@ -202,7 +202,7 @@ export default function ProductDetailPage() {
             />
           </div>
 
-          <div className="grid lg:grid-cols-[1fr_1fr] gap-8 lg:gap-14 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6 md:gap-8 lg:gap-14 items-start">
 
             {/* LEFT — image */}
             <div className="space-y-3">
@@ -263,15 +263,15 @@ export default function ProductDetailPage() {
               {/* Brand + Name */}
               <div>
                 <p className="text-gold text-xs font-bold tracking-[0.25em] uppercase mb-2">{product.brand}</p>
-                <h1 className="text-3xl md:text-4xl font-bold text-navy leading-tight mb-3 capitalize">{product.name}</h1>
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-navy leading-tight mb-3 capitalize">{product.name}</h1>
                 {product.description && (
                   <p className="text-gray-500 text-sm leading-relaxed">{product.description}</p>
                 )}
               </div>
 
               {/* Price */}
-              <div className="flex items-center gap-3">
-                <span className="text-3xl font-bold text-navy">₱{product.price.toLocaleString()}</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-2xl md:text-3xl font-bold text-navy">₱{product.price.toLocaleString()}</span>
                 {hasDiscount && (
                   <>
                     <span className="text-lg text-gray-300 line-through">₱{product.originalPrice!.toLocaleString()}</span>
@@ -413,20 +413,20 @@ export default function ProductDetailPage() {
 
               {/* Trust strip */}
               <div className="grid grid-cols-3 divide-x divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden">
-                <div className="flex flex-col items-center gap-1.5 py-4 px-2">
-                  <Truck className="w-5 h-5 text-gold" />
-                  <p className="text-xs font-semibold text-navy">Free Shipping</p>
-                  <p className="text-[11px] text-gray-400 text-center">Orders over ₱2,000</p>
+                <div className="flex flex-col items-center gap-1 py-3 px-1 md:gap-1.5 md:py-4 md:px-2">
+                  <Truck className="w-4 h-4 md:w-5 md:h-5 text-gold" />
+                  <p className="text-[10px] md:text-xs font-semibold text-navy text-center">Free Shipping</p>
+                  <p className="text-[9px] md:text-[11px] text-gray-400 text-center hidden sm:block">Orders over ₱2,000</p>
                 </div>
-                <div className="flex flex-col items-center gap-1.5 py-4 px-2">
-                  <Shield className="w-5 h-5 text-gold" />
-                  <p className="text-xs font-semibold text-navy">100% Authentic</p>
-                  <p className="text-[11px] text-gray-400 text-center">Guaranteed original</p>
+                <div className="flex flex-col items-center gap-1 py-3 px-1 md:gap-1.5 md:py-4 md:px-2">
+                  <Shield className="w-4 h-4 md:w-5 md:h-5 text-gold" />
+                  <p className="text-[10px] md:text-xs font-semibold text-navy text-center">100% Authentic</p>
+                  <p className="text-[9px] md:text-[11px] text-gray-400 text-center hidden sm:block">Guaranteed original</p>
                 </div>
-                <div className="flex flex-col items-center gap-1.5 py-4 px-2">
-                  <RotateCcw className="w-5 h-5 text-gold" />
-                  <p className="text-xs font-semibold text-navy">Easy Returns</p>
-                  <p className="text-[11px] text-gray-400 text-center">7-day policy</p>
+                <div className="flex flex-col items-center gap-1 py-3 px-1 md:gap-1.5 md:py-4 md:px-2">
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5 text-gold" />
+                  <p className="text-[10px] md:text-xs font-semibold text-navy text-center">Easy Returns</p>
+                  <p className="text-[9px] md:text-[11px] text-gray-400 text-center hidden sm:block">7-day policy</p>
                 </div>
               </div>
 
@@ -445,13 +445,13 @@ export default function ProductDetailPage() {
         </div>{/* end container */}
 
         {/* ── LOWER SECTIONS ── */}
-        <div className="container-max px-4 md:px-8 py-12">
+        <div className="container-max px-4 md:px-8 py-6 md:py-12">
 
           {/* ── RELATED PRODUCTS ── */}
           {relatedProducts.length > 0 && (
-            <section className="mt-20">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-navy">You May Also Like</h2>
+            <section className="mt-10 md:mt-20">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h2 className="text-lg md:text-xl font-bold text-navy">You May Also Like</h2>
                 <Link href={`/shop?category=${product.category}`} className="text-sm text-gold hover:underline font-medium">
                   View all →
                 </Link>
@@ -509,8 +509,8 @@ export default function ProductDetailPage() {
 
           {/* ── RECENTLY VIEWED ── */}
           {recentlyViewed.length > 0 && (
-            <section className="mt-16">
-              <h2 className="text-xl font-bold text-navy mb-6">Recently Viewed</h2>
+            <section className="mt-10 md:mt-16">
+              <h2 className="text-lg md:text-xl font-bold text-navy mb-4 md:mb-6">Recently Viewed</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {recentlyViewed.map((item) => {
                   const itemHasImage = item.images && item.images.length > 0 && item.images[0]

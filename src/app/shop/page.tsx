@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight, Eye, Clock } from 'lucide-react'
+import { Search, Filter, X, ShoppingBag, Heart, ChevronDown, Grid, List, Shirt, Loader2, ChevronLeft, ChevronRight, Eye, Clock, Tag } from 'lucide-react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import ProductQuickView from '@/components/ProductQuickView'
@@ -458,13 +458,18 @@ function ShopContent() {
     return Array.from(colorSet).sort()
   }, [products])
 
-  // Get all available brands (static + custom from products)
+  // Get all available brands from Firestore products
   const availableBrands = useMemo(() => {
-    const brandSet = new Set<string>([...brands])
-    products.forEach(p => {
-      if (p.brand) brandSet.add(p.brand)
-    })
+    const brandSet = new Set<string>()
+    products.forEach(p => { if (p.brand) brandSet.add(p.brand) })
     return Array.from(brandSet).sort()
+  }, [products])
+
+  // Get categories directly from Firestore data
+  const availableCategories = useMemo(() => {
+    const catSet = new Set<string>()
+    products.forEach(p => { if (p.category) catSet.add(p.category) })
+    return Array.from(catSet).sort()
   }, [products])
 
   // Search autocomplete suggestions
@@ -533,20 +538,42 @@ function ShopContent() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gray-50 pt-24">
+      <main className="min-h-screen bg-gray-50 ">
         {/* Hero Banner */}
-        <div className="bg-navy text-white py-12">
-          <div className="container-max px-4 md:px-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">
+        <div className="pt-[72px]" style={{ background: '#0f1e38' }}>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+            <nav className="hidden md:flex items-center gap-2 text-sm text-white/40 mb-6">
+              <a href="/" className="hover:text-white/70 transition-colors">Home</a>
+              <span className="text-white/20">›</span>
+              {selectedCategory ? (
+                <>
+                  <a href="/shop" className="hover:text-white/70 transition-colors">Shop</a>
+                  <span className="text-white/20">›</span>
+                  <span className="text-gold/80 capitalize">{selectedCategory}</span>
+                </>
+              ) : (
+                <span className="text-gold/80">Shop</span>
+              )}
+            </nav>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4 text-gold" />
+              </div>
+              <span className="text-gold text-xs font-semibold uppercase tracking-[0.2em]">
+                {selectedCategory ? selectedCategory : 'All Products'}
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">
               {selectedCategory ? `Shop ${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}` : 'Shop All Products'}
             </h1>
-            <p className="text-white/60">
+            <p className="text-white/50 text-sm md:text-base max-w-xl">
               Discover premium brands like Calvin Klein, Nike, GAP, Ralph Lauren, Michael Kors, and more
             </p>
           </div>
+          <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
         </div>
 
-        <div className="container-max px-4 md:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           {/* Breadcrumb */}
           <Breadcrumb
             items={[
@@ -557,147 +584,139 @@ function ShopContent() {
           />
 
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Sidebar Filters - Desktop */}
-            <aside className="hidden lg:block w-60 flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-sm sticky top-28 overflow-hidden">
+            {/* ── SIDEBAR FILTERS ── */}
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-28 bg-white border border-gray-100 rounded-2xl overflow-hidden">
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                   <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-navy" />
-                    <h2 className="font-bold text-navy text-sm">Filters</h2>
+                    <span className="font-bold text-navy text-sm tracking-wide">Filters</span>
                     {activeFiltersCount > 0 && (
-                      <span className="bg-navy text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                        {activeFiltersCount}
-                      </span>
+                      <span className="bg-gold text-navy text-[10px] font-bold px-2 py-0.5 rounded-full">{activeFiltersCount}</span>
                     )}
                   </div>
                   {activeFiltersCount > 0 && (
-                    <button onClick={clearFilters} className="text-xs text-gold hover:text-navy transition-colors font-medium">
-                      Clear all
+                    <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-red-400 transition-colors font-medium">
+                      Reset
                     </button>
                   )}
                 </div>
 
-                <div className="p-5 space-y-6 max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide">
+                <div className="divide-y divide-gray-50 max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide">
 
-                  {/* Active filter chips */}
+                  {/* Active chips */}
                   {activeFiltersCount > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="px-4 py-3 flex flex-wrap gap-1.5">
                       {selectedCategory && (
-                        <span className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full capitalize">
-                          {selectedCategory}
-                          <button onClick={() => setSelectedCategory('')}><X className="w-3 h-3" /></button>
-                        </span>
+                        <button onClick={() => setSelectedCategory('')} className="inline-flex items-center gap-1 bg-navy text-white text-[11px] px-2.5 py-1 rounded-full capitalize font-medium">
+                          {selectedCategory} <X className="w-3 h-3" />
+                        </button>
                       )}
                       {selectedBrands.map(b => (
-                        <span key={b} className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
-                          {b}
-                          <button onClick={() => toggleBrand(b)}><X className="w-3 h-3" /></button>
-                        </span>
+                        <button key={b} onClick={() => toggleBrand(b)} className="inline-flex items-center gap-1 bg-navy text-white text-[11px] px-2.5 py-1 rounded-full font-medium">
+                          {b} <X className="w-3 h-3" />
+                        </button>
                       ))}
                       {selectedColors.map(c => (
-                        <span key={c} className="inline-flex items-center gap-1.5 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
-                          <span className="w-2.5 h-2.5 rounded-full border border-gray-300" style={{ backgroundColor: getColorHex(c) }} />
-                          {c}
-                          <button onClick={() => toggleColor(c)}><X className="w-3 h-3" /></button>
-                        </span>
+                        <button key={c} onClick={() => toggleColor(c)} className="inline-flex items-center gap-1.5 bg-navy text-white text-[11px] px-2.5 py-1 rounded-full font-medium">
+                          <span className="w-2.5 h-2.5 rounded-full border border-white/30 flex-shrink-0" style={{ backgroundColor: getColorHex(c) }} />
+                          {c} <X className="w-3 h-3" />
+                        </button>
                       ))}
                       {(selectedPriceRange.min > 0 || selectedPriceRange.max < Infinity) && (
-                        <span className="inline-flex items-center gap-1 bg-navy/5 text-navy text-xs px-2.5 py-1 rounded-full">
-                          {selectedPriceRange.label}
-                          <button onClick={() => setSelectedPriceRange(priceRanges[0])}><X className="w-3 h-3" /></button>
-                        </span>
+                        <button onClick={() => setSelectedPriceRange(priceRanges[0])} className="inline-flex items-center gap-1 bg-navy text-white text-[11px] px-2.5 py-1 rounded-full font-medium">
+                          {selectedPriceRange.label} <X className="w-3 h-3" />
+                        </button>
                       )}
                     </div>
                   )}
 
-                  {/* Category */}
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">Category</p>
-                    <div className="space-y-0.5">
+                  {/* ── CATEGORY ── */}
+                  <div className="px-4 py-4">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Category</p>
+                    <div className="space-y-1">
                       <button
                         onClick={() => setSelectedCategory('')}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all ${
-                          !selectedCategory ? 'bg-navy text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                          !selectedCategory ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-navy'
                         }`}
                       >
-                        <span>All Categories</span>
-                        {!selectedCategory && <span className="text-[10px] text-white/60">{products.length}</span>}
+                        <span>All</span>
+                        <span className={`text-xs tabular-nums ${!selectedCategory ? 'text-white/60' : 'text-gray-300'}`}>{products.length}</span>
                       </button>
-                      {categories.map(cat => {
+                      {availableCategories.map(cat => {
                         const count = products.filter(p => p.category === cat).length
+                        const isActive = selectedCategory === cat
                         return (
                           <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm capitalize transition-all ${
-                              selectedCategory === cat ? 'bg-navy text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium capitalize transition-all ${
+                              isActive ? 'bg-navy text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-navy'
                             }`}
                           >
                             <span>{cat}</span>
-                            <span className={`text-[10px] ${selectedCategory === cat ? 'text-white/60' : 'text-gray-400'}`}>{count}</span>
+                            <span className={`text-xs tabular-nums ${isActive ? 'text-white/60' : 'text-gray-300'}`}>{count}</span>
                           </button>
                         )
                       })}
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-100" />
-
-                  {/* Brand */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Brand</p>
+                  {/* ── BRAND ── */}
+                  <div className="px-4 py-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">Brand</p>
                       {selectedBrands.length > 0 && (
-                        <button onClick={() => setSelectedBrands([])} className="text-[10px] text-gold font-medium">Clear</button>
+                        <button onClick={() => setSelectedBrands([])} className="text-[11px] text-gold font-semibold">Clear</button>
                       )}
                     </div>
-                    {/* Brand search */}
-                    <div className="relative mb-2">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <div className="relative mb-2.5">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
                       <input
                         type="text"
-                        placeholder="Search brands…"
+                        placeholder="Search brands..."
                         value={brandSearch}
                         onChange={e => setBrandSearch(e.target.value)}
-                        className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-gold bg-gray-50"
+                        className="w-full pl-8 pr-3 py-2 text-xs border border-gray-100 rounded-xl bg-gray-50 focus:outline-none focus:border-gold focus:bg-white transition-all"
                       />
                     </div>
-                    <div className="space-y-0.5 max-h-44 overflow-y-auto scrollbar-hide">
+                    <div className="space-y-0.5 max-h-48 overflow-y-auto scrollbar-hide">
                       {availableBrands
                         .filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()))
                         .map(brand => {
                           const checked = selectedBrands.includes(brand)
+                          const count = products.filter(p => p.brand === brand).length
                           return (
                             <button
                               key={brand}
                               onClick={() => toggleBrand(brand)}
-                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
-                                checked ? 'bg-gold/10 text-navy font-medium' : 'text-gray-600 hover:bg-gray-50'
+                              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all group ${
+                                checked ? 'text-navy' : 'text-gray-500 hover:text-navy'
                               }`}
                             >
-                              <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all ${
-                                checked ? 'bg-navy border-navy' : 'border-gray-300'
+                              <span className={`w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+                                checked ? 'bg-navy border-navy' : 'border-gray-200 group-hover:border-navy/40'
                               }`}>
                                 {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5"/></svg>}
                               </span>
-                              <span className="truncate">{brand}</span>
+                              <span className="flex-1 truncate text-left text-xs font-medium">{brand}</span>
+                              <span className="text-[10px] text-gray-300 tabular-nums">{count}</span>
                             </button>
                           )
                         })}
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-100" />
-
-                  {/* Color */}
+                  {/* ── COLOR ── */}
                   {availableColors.length > 0 && (
-                    <div>
+                    <div className="px-4 py-4">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Color</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">Color</p>
                         {selectedColors.length > 0 && (
-                          <button onClick={() => setSelectedColors([])} className="text-[10px] text-gold font-medium">Clear</button>
+                          <button onClick={() => setSelectedColors([])} className="text-[11px] text-gold font-semibold">Clear</button>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -710,13 +729,15 @@ function ShopContent() {
                               key={color}
                               onClick={() => toggleColor(color)}
                               title={color}
-                              className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
-                                isSelected ? 'border-navy scale-110 shadow-md' : isLight ? 'border-gray-300' : 'border-transparent hover:border-gray-300'
+                              className={`w-8 h-8 rounded-full transition-all hover:scale-110 ${
+                                isSelected
+                                  ? 'ring-2 ring-offset-2 ring-navy scale-110'
+                                  : isLight ? 'border border-gray-200' : ''
                               }`}
                               style={{ backgroundColor: hex }}
                             >
                               {isSelected && (
-                                <svg className={`w-3 h-3 mx-auto ${isLight ? 'text-navy' : 'text-white'}`} fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
+                                <svg className={`w-3.5 h-3.5 mx-auto ${isLight ? 'text-navy' : 'text-white'}`} fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5"/>
                                 </svg>
                               )}
@@ -725,33 +746,33 @@ function ShopContent() {
                         })}
                       </div>
                       {selectedColors.length > 0 && (
-                        <p className="text-[10px] text-gray-400 mt-2">{selectedColors.join(', ')}</p>
+                        <p className="text-[11px] text-gray-400 mt-2.5 capitalize">{selectedColors.join(' · ')}</p>
                       )}
                     </div>
                   )}
 
-                  <div className="border-t border-gray-100" />
-
-                  {/* Price */}
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">Price Range</p>
-                    <div className="space-y-0.5">
+                  {/* ── PRICE ── */}
+                  <div className="px-4 py-4">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Price</p>
+                    <div className="space-y-1">
                       {priceRanges.map((range, i) => {
                         const isActive = selectedPriceRange === range
                         return (
                           <button
                             key={i}
                             onClick={() => setSelectedPriceRange(range)}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
-                              isActive ? 'bg-gold/10 text-navy font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                              isActive ? 'bg-gold/10 text-navy' : 'text-gray-500 hover:bg-gray-50 hover:text-navy'
                             }`}
                           >
-                            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                              isActive ? 'border-navy' : 'border-gray-300'
-                            }`}>
-                              {isActive && <span className="w-2 h-2 rounded-full bg-navy" />}
+                            <span className="flex items-center gap-2.5">
+                              <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                                isActive ? 'border-navy' : 'border-gray-300'
+                              }`}>
+                                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-navy block" />}
+                              </span>
+                              {range.label}
                             </span>
-                            {range.label}
                           </button>
                         )
                       })}
@@ -856,11 +877,11 @@ function ShopContent() {
                   </button>
 
                   {/* Sort */}
-                  <div className="relative">
+                  <div className="relative w-full md:w-auto">
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="appearance-none px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:outline-none focus:border-gold bg-white"
+                      className="appearance-none w-full md:w-auto px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:outline-none focus:border-gold bg-white"
                     >
                       {sortOptions.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1035,7 +1056,7 @@ function ShopContent() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-8">
+                <div className="flex items-center justify-center gap-1 md:gap-2 mt-6 md:mt-8 flex-wrap">
                   {/* Previous Button */}
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -1091,7 +1112,7 @@ function ShopContent() {
         {showFilters && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowFilters(false)} />
-            <div className="absolute right-0 top-0 bottom-0 w-80 bg-white p-6 overflow-y-auto">
+            <div className="absolute right-0 top-0 bottom-0 w-[min(320px,90vw)] bg-white p-5 overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-semibold text-navy">Filters</h2>
                 <button onClick={() => setShowFilters(false)}>
@@ -1280,7 +1301,7 @@ function ShopContent() {
 export default function ShopPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50  flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-gold" />
       </div>
     }>

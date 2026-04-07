@@ -5,7 +5,6 @@ import { CartProvider } from '@/context/CartContext'
 import { ToastProvider } from '@/components/Toast'
 import CartDrawer from '@/components/CartDrawer'
 import NavigationProgress from '@/components/NavigationProgress'
-import AIChatBubble from '@/components/AIChatBubble'
 import './globals.css'
 
 const inter = Inter({
@@ -71,7 +70,6 @@ export default function RootLayout({
               <NavigationProgress />
               {children}
               <CartDrawer />
-              <AIChatBubble />
             </ToastProvider>
           </CartProvider>
         </AuthProvider>

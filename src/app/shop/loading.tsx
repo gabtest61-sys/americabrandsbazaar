@@ -1,21 +1,29 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { ProductGridSkeleton } from '@/components/ProductSkeleton'
+import Link from 'next/link'
+import { ShoppingBag, ChevronRight } from 'lucide-react'
 
 export default function ShopLoading() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-gray-50 pt-24">
+      <main className="min-h-screen bg-gray-50 ">
         {/* Hero Skeleton */}
-        <div className="bg-navy py-12">
-          <div className="container-max px-4 md:px-8">
+        <div className="pt-[72px]" style={{ background: '#0f1e38' }}>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
+            <div className="h-4 w-32 bg-white/10 rounded animate-pulse mb-6" />
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 animate-pulse" />
+              <div className="h-3 w-16 bg-white/10 rounded animate-pulse" />
+            </div>
             <div className="h-8 w-48 bg-white/10 rounded animate-pulse mb-2" />
             <div className="h-4 w-96 max-w-full bg-white/10 rounded animate-pulse" />
           </div>
+          <div className="h-[3px] bg-gradient-to-r from-gold/40 via-gold to-gold/40" />
         </div>
 
-        <div className="container-max px-4 md:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           {/* Breadcrumb Skeleton */}
           <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-6" />
 
