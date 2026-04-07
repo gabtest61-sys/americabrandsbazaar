@@ -289,19 +289,19 @@ export default function AccountPage() {
     <>
       <Header />
       <main className="min-h-screen bg-gray-50 pt-[72px] pb-16">
-        <div className="container-max px-4 md:px-8 py-8">
+        <div className="container-max px-4 md:px-8 py-4 md:py-8">
           {/* Mobile: Profile bar + horizontal tabs */}
-          <div className="lg:hidden mb-6">
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-3 flex items-center gap-4">
-              <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="w-6 h-6 text-gold" />
+          <div className="lg:hidden mb-3">
+            <div className="bg-white rounded-2xl shadow-sm p-3 mb-2 flex items-center gap-3">
+              <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-gold" />
               </div>
               <div className="min-w-0">
-                <h2 className="font-bold text-navy truncate">{user?.name || user?.email}</h2>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                <h2 className="font-semibold text-navy text-sm truncate">{user?.name || user?.email}</h2>
+                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
               </div>
-              <button onClick={handleLogout} className="ml-auto text-red-400 flex-shrink-0 p-2">
-                <LogOut className="w-5 h-5" />
+              <button onClick={handleLogout} className="ml-auto text-red-400 flex-shrink-0 p-1.5">
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -392,7 +392,7 @@ export default function AccountPage() {
             <div className="lg:col-span-3">
               {activeTab === 'orders' && (
                 <div>
-                  <h1 className="text-2xl font-bold text-navy mb-6">My Orders</h1>
+                  <h1 className="text-xl font-bold text-navy mb-4 lg:text-2xl lg:mb-6">My Orders</h1>
 
                   {orders.length > 0 ? (
                     <div className="space-y-4">
@@ -420,15 +420,15 @@ export default function AccountPage() {
                             </div>
 
                             {/* Order Items */}
-                            <div className="p-4">
-                              <div className="flex flex-wrap gap-4 mb-4">
+                            <div className="p-3 md:p-4">
+                              <div className="flex flex-col gap-2 mb-3 md:flex-wrap md:flex-row md:gap-4 md:mb-4">
                                 {order.items.slice(0, 3).map((item, i) => (
-                                  <div key={i} className="flex items-center gap-3">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                                      <ShoppingBag className="w-6 h-6 text-gray-300" />
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="w-10 h-10 md:w-16 md:h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                      <ShoppingBag className="w-4 h-4 md:w-6 md:h-6 text-gray-300" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-navy text-sm">{item.name}</p>
+                                      <p className="font-medium text-navy text-xs md:text-sm">{item.name}</p>
                                       <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                                     </div>
                                   </div>
@@ -469,10 +469,10 @@ export default function AccountPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-                      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-navy mb-2">No orders yet</h3>
-                      <p className="text-gray-500 mb-6">Start shopping to see your orders here</p>
+                    <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+                      <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <h3 className="text-base font-semibold text-navy mb-1">No orders yet</h3>
+                      <p className="text-gray-500 text-sm mb-5">Start shopping to see your orders here</p>
                       <Link
                         href="/shop"
                         className="inline-flex items-center gap-2 bg-gold text-navy font-semibold px-6 py-3 rounded-full hover:bg-gold-400 transition-colors"
@@ -487,9 +487,9 @@ export default function AccountPage() {
 
               {activeTab === 'wishlist' && (
                 <div>
-                  <h1 className="text-2xl font-bold text-navy mb-6">My Wishlist</h1>
+                  <h1 className="text-xl font-bold text-navy mb-4 lg:text-2xl lg:mb-6">My Wishlist</h1>
                   {wishlistLoading ? (
-                    <div className="bg-white rounded-2xl shadow-sm p-12 flex items-center justify-center">
+                    <div className="bg-white rounded-2xl shadow-sm p-8 flex items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-gold" />
                     </div>
                   ) : wishlistProducts.length > 0 ? (
@@ -544,7 +544,7 @@ export default function AccountPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+                    <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
                       <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold text-navy mb-2">Your wishlist is empty</h3>
                       <p className="text-gray-500 mb-6">Save items you love for later</p>
@@ -562,9 +562,9 @@ export default function AccountPage() {
 
               {activeTab === 'saved-looks' && (
                 <div>
-                  <h1 className="text-2xl font-bold text-navy mb-6">Saved Looks</h1>
+                  <h1 className="text-xl font-bold text-navy mb-4 lg:text-2xl lg:mb-6">Saved Looks</h1>
                   {savedLooksLoading ? (
-                    <div className="bg-white rounded-2xl shadow-sm p-12 flex items-center justify-center">
+                    <div className="bg-white rounded-2xl shadow-sm p-8 flex items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-gold" />
                     </div>
                   ) : savedLooks.length > 0 ? (
@@ -647,7 +647,7 @@ export default function AccountPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+                    <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
                       <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold text-navy mb-2">No saved looks yet</h3>
                       <p className="text-gray-500 mb-6">Save your favorite AI Dresser outfits to view them here</p>
