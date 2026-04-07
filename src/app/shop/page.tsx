@@ -923,7 +923,7 @@ function ShopContent() {
               {productsLoading ? (
                 <ProductGridSkeleton count={8} viewMode={viewMode} />
               ) : paginatedProducts.length > 0 ? (
-                <div className={`grid gap-4 ${
+                <div className={`grid gap-3 ${
                   viewMode === 'grid'
                     ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
                     : 'grid-cols-1'
@@ -940,8 +940,8 @@ function ShopContent() {
                       {/* Image */}
                       <Link
                         href={`/shop/${productId}`}
-                        className={`relative block bg-gray-100 overflow-hidden ${
-                          viewMode === 'list' ? 'w-40 h-40 flex-shrink-0' : 'aspect-[3/4]'
+                        className={`relative block bg-[#f5f3f0] overflow-hidden ${
+                          viewMode === 'list' ? 'w-36 h-36 flex-shrink-0' : 'aspect-square'
                         }`}
                       >
                         {product.images && product.images.length > 0 && product.images[0] ? (
@@ -950,59 +950,50 @@ function ShopContent() {
                             alt={product.name}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            sizes={viewMode === 'list' ? '160px' : '(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw'}
+                            sizes={viewMode === 'list' ? '144px' : '(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw'}
                           />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                            <Shirt className="w-16 h-16" />
+                            <Shirt className="w-12 h-12" />
                           </div>
                         )}
                         {/* Badges */}
-                        <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
-                          {product.originalPrice && (
-                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                          {product.originalPrice && product.originalPrice > product.price && (
+                            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-tight">
                               SALE
                             </span>
                           )}
                           {product.stockQty === 0 && (
-                            <span className="bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded-full">
-                              Out of Stock
+                            <span className="bg-gray-800/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-tight">
+                              Sold Out
                             </span>
                           )}
                           {product.stockQty > 0 && product.stockQty <= 5 && (
-                            <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                            <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-tight">
                               Only {product.stockQty} left
                             </span>
                           )}
                         </div>
-                        {/* Action buttons */}
-                        <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
-                          <button
-                            onClick={(e) => toggleWishlist(productId, e)}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${
-                              wishlist.has(productId)
-                                ? 'bg-pink-500 text-white opacity-100'
-                                : 'bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-50'
-                            }`}
-                          >
-                            <Heart className={`w-4 h-4 ${wishlist.has(productId) ? 'fill-current' : ''}`} />
-                          </button>
-                          <button
-                            onClick={(e) => openQuickView(product, e)}
-                            className="w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gold hover:text-navy"
-                            title="Quick View"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {/* Wishlist button — always visible on mobile, hover on desktop */}
+                        <button
+                          onClick={(e) => toggleWishlist(productId, e)}
+                          className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow z-10 ${
+                            wishlist.has(productId)
+                              ? 'bg-pink-500 text-white'
+                              : 'bg-white/90 text-gray-400 md:opacity-0 md:group-hover:opacity-100'
+                          }`}
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${wishlist.has(productId) ? 'fill-current' : ''}`} />
+                        </button>
                       </Link>
 
                       {/* Info */}
-                      <div className={`p-4 ${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
+                      <div className={`p-2.5 md:p-4 ${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
                         <div>
-                          <p className="text-xs text-gold font-medium mb-1">{product.brand}</p>
+                          <p className="text-[10px] md:text-xs text-gold font-semibold uppercase tracking-wide mb-0.5">{product.brand}</p>
                           <Link href={`/shop/${productId}`}>
-                            <h3 className="font-medium text-navy hover:text-gold transition-colors line-clamp-2">
+                            <h3 className="text-sm font-semibold text-navy hover:text-gold transition-colors line-clamp-1 leading-snug">
                               {product.name}
                             </h3>
                           </Link>
@@ -1011,25 +1002,25 @@ function ShopContent() {
                           )}
                         </div>
 
-                        <div className={`flex items-center justify-between ${viewMode === 'list' ? 'mt-4' : 'mt-3'}`}>
-                          <div>
-                            <span className="font-bold text-navy">₱{product.price.toLocaleString()}</span>
-                            {product.originalPrice && (
-                              <span className="text-sm text-gray-400 line-through ml-2">
+                        <div className={`flex items-center justify-between gap-1 ${viewMode === 'list' ? 'mt-4' : 'mt-2'}`}>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-navy leading-none">₱{product.price.toLocaleString()}</p>
+                            {product.originalPrice && product.originalPrice > product.price && (
+                              <p className="text-[10px] text-gray-400 line-through leading-none mt-0.5">
                                 ₱{product.originalPrice.toLocaleString()}
-                              </span>
+                              </p>
                             )}
                           </div>
                           <button
                             onClick={() => handleAddToCart(product)}
                             disabled={addedItems.has(productId) || !product.inStock || product.stockQty === 0}
                             title={!product.inStock || product.stockQty === 0 ? 'Out of Stock' : 'Add to Cart'}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                            className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
                               addedItems.has(productId)
                                 ? 'bg-green-500 text-white'
                                 : !product.inStock || product.stockQty === 0
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                : 'bg-gold text-navy hover:bg-gold-400'
+                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                : 'bg-gold text-navy hover:bg-yellow-400'
                             }`}
                           >
                             {addedItems.has(productId) ? '✓' : <ShoppingBag className="w-4 h-4" />}
